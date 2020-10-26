@@ -2,7 +2,6 @@ idf_component_register(
                     SRCS         "main.c"
                                  "url_decode.c"
                                  "nvs.c"
-                                 "http_server.c"
                                  "wifi.c"
                                  "mdns_local.c"
                                  "gpio.c"

@@ -17,7 +17,6 @@
 
 #include "constants.h"
 #include "nvs.h"
-#include "http_server.h"
 #include "wifi.h"
 #include "mdns_local.h"
 #include "gpio.h"
