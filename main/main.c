@@ -11,7 +11,6 @@
 #include "esp_log.h"
 #include "esp_task_wdt.h"
 #include "mdns.h"
-#include "cJSON.h"
 
 #include "driver/gpio.h"
 
@@ -23,6 +22,7 @@
 #include "timer.h"
 #include "http_client.h"
 #include "json.h"
+#include "http_server.h"
 
 static int sta_connect_attempts = 0;
 
@@ -68,6 +68,8 @@ void default_event_handler(void* arg, esp_event_base_t event_base, int32_t event
                 ip_event_got_ip_t* event = (ip_event_got_ip_t*) event_data;
                 ESP_LOGI(TAG, "Setting CONNECTED bit, got ip:" IPSTR, IP2STR(&event->ip_info.ip));
                 sta_connect_attempts = 0;
+                mdns_advertise_tcp_service();
+                http_server_start();
                 break;
             }
             default:
@@ -113,6 +115,24 @@ void default_event_handler(void* arg, esp_event_base_t event_base, int32_t event
     }
 }
 
+char *get_next_forecast_type() {
+    static unsigned int index = 0;
+    if (index > MAX_NUM_FORECAST_TYPES - 1) {
+        index = 0;
+    }
+
+    char *next_type = forecast_types[index];
+
+    // Wrap if we get a null since we probably haven't filled all 5 param slots
+    if (*next_type == 0) {
+        index = 0;
+        next_type = forecast_types[index];
+    }
+
+    index++;
+    return next_type;
+}
+
 void app_main(void) {
     // ESP_ERROR_CHECK(esp_task_wdt_init());
 
@@ -131,24 +151,18 @@ void app_main(void) {
     http_client_init();
     wifi_start_provisioning(false);
 
-    bool tides = false;
     while (1) {
         // ESP_ERROR_CHECK(esp_task_wdt_reset());
 
         if (button_was_released()) {
             ESP_ERROR_CHECK(gpio_set_level(LED_PIN, !gpio_get_level(LED_PIN)));
 
-            // Space for base url, endpoint, and some extra
+            // Space for base url, endpoint, and some extra for query params
             char url_buf[strlen(URL_BASE) + 20];
             request request;
             query_param params[2];
-            if (tides) {
-                request = http_client_build_request("tides", "wedge", "2", url_buf, params);
-                tides = false;
-            } else {
-                request = http_client_build_request("swell", "wedge", "2", url_buf, params);
-                tides = true;
-            }
+            char *next_forecast_type = get_next_forecast_type();
+            request = http_client_build_request(get_next_forecast_typee, spot_name, number_of_days, url_buf, params);
 
             char *server_response;
             int data_length = http_client_perform_request(&request, &server_response);

@@ -8,4 +8,5 @@ idf_component_register(
                                  "timer.c"
                                  "http_client.c"
                                  "json.c"
+                                 "http_server.c"
                     INCLUDE_DIRS "include")
