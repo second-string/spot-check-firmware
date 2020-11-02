@@ -1,3 +1,5 @@
+#include "constants.h"
+
 #include <stdlib.h>
 #include <ctype.h>
 #include <string.h>
@@ -5,7 +7,6 @@
 #include "esp_log.h"
 #include "esp_err.h"
 
-#include "constants.h"
 #include "url_decode.h"
 
 void urldecode2(char *dst, const char *src)

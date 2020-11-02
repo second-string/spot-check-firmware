@@ -1,3 +1,5 @@
+#include "constants.h"
+
 #include <string.h>
 #include <wifi_provisioning/manager.h>
 #include <wifi_provisioning/scheme_softap.h>
@@ -10,14 +12,14 @@
 #include "lwip/err.h"
 #include "lwip/sys.h"
 
-#include "constants.h"
 #include "wifi.h"
 
 // Local configuration network
 #define CONFIG_AP_SSID          CONFIG_CONFIGURATION_ACCESS_POINT_SSID
 
+bool wifi_is_provisioning_inited = false;
+
 static esp_event_handler_instance_t provisioning_manager_event_handler;
-static bool wifi_is_provisioning_inited = false;
 
 /*
  * We're responsible for internally holding the pointer to the event

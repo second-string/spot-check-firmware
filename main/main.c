@@ -1,3 +1,5 @@
+#include "constants.h"
+
 #include <stdio.h>
 #include <string.h>
 #include <wifi_provisioning/manager.h>
@@ -14,7 +16,6 @@
 
 #include "driver/gpio.h"
 
-#include "constants.h"
 #include "nvs.h"
 #include "wifi.h"
 #include "mdns_local.h"
@@ -69,7 +70,15 @@ void default_event_handler(void* arg, esp_event_base_t event_base, int32_t event
                 ESP_LOGI(TAG, "Setting CONNECTED bit, got ip:" IPSTR, IP2STR(&event->ip_info.ip));
                 sta_connect_attempts = 0;
                 mdns_advertise_tcp_service();
-                http_server_start();
+
+                // We only start our http server upon IP assignment if this is a normal startup
+                // in STA mode where we already have creds. If we're in this state after connecting
+                // through a provisioning, we don't have enough sockets (I think) and the http server
+                // start will fail every time (there is another call to this function in the WIFI_PROV_DEINIT)
+                // event case
+                if (!wifi_is_provisioning_inited) {
+                    http_server_start();
+                }
                 break;
             }
             default:
@@ -103,6 +112,7 @@ void default_event_handler(void* arg, esp_event_base_t event_base, int32_t event
             case WIFI_PROV_END: {
                 ESP_LOGI(TAG, "Provisioning complete event emitted, de-initing prov mgr");
                 wifi_deinit_provisioning();
+                http_server_start();
                 break;
             }
             case WIFI_PROV_DEINIT:
@@ -113,24 +123,6 @@ void default_event_handler(void* arg, esp_event_base_t event_base, int32_t event
                 break;
         }
     }
-}
-
-char *get_next_forecast_type() {
-    static unsigned int index = 0;
-    if (index > MAX_NUM_FORECAST_TYPES - 1) {
-        index = 0;
-    }
-
-    char *next_type = forecast_types[index];
-
-    // Wrap if we get a null since we probably haven't filled all 5 param slots
-    if (*next_type == 0) {
-        index = 0;
-        next_type = forecast_types[index];
-    }
-
-    index++;
-    return next_type;
 }
 
 void app_main(void) {
@@ -161,8 +153,10 @@ void app_main(void) {
             char url_buf[strlen(URL_BASE) + 20];
             request request;
             query_param params[2];
-            char *next_forecast_type = get_next_forecast_type();
-            request = http_client_build_request(get_next_forecast_typee, spot_name, number_of_days, url_buf, params);
+            spot_check_config *config = nvs_get_config();
+
+            char *next_forecast_type = get_next_forecast_type(config->forecast_types);
+            request = http_client_build_request(next_forecast_type, config->spot_name, config->number_of_days, url_buf, params);
 
             char *server_response;
             int data_length = http_client_perform_request(&request, &server_response);
@@ -187,7 +181,4 @@ void app_main(void) {
             }
         }
     }
-
-    // wifi_init_softap_sta(default_event_handler);
-    // httpd_handle_t server = http_server_start();
 }

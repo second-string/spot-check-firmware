@@ -1,7 +1,8 @@
+#include "constants.h"
+
 #include "freertos/FreeRTOS.h"
 #include "cJSON.h"
 
-#include "constants.h"
 #include "json.h"
 
 // Must included below constants.h where we overwite the define of LOG_LOCAL_LEVEL

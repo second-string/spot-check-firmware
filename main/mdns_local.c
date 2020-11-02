@@ -1,7 +1,8 @@
+#include "constants.h"
+
 #include "mdns.h"
 #include "esp_log.h"
 
-#include "constants.h"
 #include "mdns_local.h"
 
 static char *hostname = "spot-check";

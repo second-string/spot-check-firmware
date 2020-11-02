@@ -1,8 +1,9 @@
+#include "constants.h"
+
 #include "freeRTOS/FreeRTOS.h"
 #include "esp_timer.h"
 #include "esp_log.h"
 
-#include "constants.h"
 #include "timer.h"
 
 static bool timer_inited = false;

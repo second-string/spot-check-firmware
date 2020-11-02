@@ -1,11 +1,14 @@
+#include "constants.h"
+
 #include <sys/param.h>
-#include <esp_log.h>
 #include <esp_system.h>
 #include <esp_http_server.h>
+#include <esp_log.h>
 
-#include "constants.h"
 #include "http_server.h"
 #include "json.h"
+#include "nvs.h"
+
 
 static httpd_handle_t server_handle;
 
@@ -126,16 +129,24 @@ static esp_err_t configure_post_handler(httpd_req_t *req) {
         strcpy(_forecast_types[0], "tides");
     }
 
-    number_of_days = _number_of_days;
-    spot_name = _spot_name;
+    spot_check_config config = {
+        .number_of_days = _number_of_days,
+        .spot_name = _spot_name,
+    };
     int i;
-    for (i = 0; i < 5; i++) {
-        forecast_types[i] = _forecast_types[i];
+    unsigned int num_forecast_types = 0;
+    for (i = 0; i < MAX_NUM_FORECAST_TYPES; i++) {
+        if (*_forecast_types[0] != 0) {
+            config.forecast_types[i] = _forecast_types[i];
+            num_forecast_types++;
+        }
     }
+    config.forecast_type_count = num_forecast_types;
 
-    cJSON_Delete(payload);
+    nvs_save_config(&config);
 
     // End response
+    cJSON_Delete(payload);
     httpd_resp_send(req, NULL, 0);
     return ESP_OK;
 }
@@ -145,7 +156,11 @@ void http_server_start() {
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
 
     ESP_LOGI(TAG, "Starting server on port: '%d'", 80);
-    ESP_ERROR_CHECK(httpd_start(&server, &config));
+    esp_err_t err;
+    if ((err = httpd_start(&server, &config)) != ESP_OK) {
+        ESP_LOGI(TAG, "Error starting webserver (%s), trying one more time", esp_err_to_name(err));
+        ESP_ERROR_CHECK(httpd_start(&server, &config));
+    }
 
     httpd_register_uri_handler(server, &configure_uri);
     httpd_register_uri_handler(server, &health_uri);
