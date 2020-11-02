@@ -19,6 +19,7 @@ static char _forecast_types[MAX_NUM_FORECAST_TYPES][MAX_LENGTH_FORECAST_TYPE_PAR
 
 static esp_err_t health_get_handler(httpd_req_t *req);
 static esp_err_t configure_post_handler(httpd_req_t *req);
+static esp_err_t current_config_get_handler(httpd_req_t *req);
 
 static const httpd_uri_t health_uri = {
     .uri       = "/health",
@@ -31,6 +32,13 @@ static const httpd_uri_t configure_uri = {
     .uri       = "/configure",
     .method    = HTTP_POST,
     .handler   = configure_post_handler,
+    .user_ctx  = NULL
+};
+
+static const httpd_uri_t current_config_uri = {
+    .uri       = "/current_configuration",
+    .method    = HTTP_GET,
+    .handler   = current_config_get_handler,
     .user_ctx  = NULL
 };
 
@@ -151,6 +159,28 @@ static esp_err_t configure_post_handler(httpd_req_t *req) {
     return ESP_OK;
 }
 
+static esp_err_t current_config_get_handler(httpd_req_t *req) {
+    spot_check_config *current_config = nvs_get_config();
+    const char **forecast_types_ptr = (const char **)current_config->forecast_types;
+
+    cJSON *root = cJSON_CreateObject();
+    cJSON *num_days_json = cJSON_CreateString(current_config->number_of_days);
+    cJSON *spot_name_json = cJSON_CreateString(current_config->spot_name);
+    cJSON *forecast_types_json = cJSON_CreateStringArray(forecast_types_ptr, current_config->forecast_type_count);
+    cJSON_AddItemToObject(root, "number_of_days", num_days_json);
+    cJSON_AddItemToObject(root, "spot_name", spot_name_json);
+    cJSON_AddItemToObject(root, "forecast_types", forecast_types_json);
+
+    char *response_json = cJSON_Print(root);
+    httpd_resp_send(req, response_json, HTTPD_RESP_USE_STRLEN);
+
+    // cJSON_Delete(forecast_types_json);
+    // cJSON_Delete(spot_name_json);
+    // cJSON_Delete(num_days_json);
+    cJSON_Delete(root);
+    return ESP_OK;
+}
+
 void http_server_start() {
     httpd_handle_t server = NULL;
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
@@ -164,6 +194,7 @@ void http_server_start() {
 
     httpd_register_uri_handler(server, &configure_uri);
     httpd_register_uri_handler(server, &health_uri);
+    httpd_register_uri_handler(server, &current_config_uri);
 
     server_handle = server;
 }
