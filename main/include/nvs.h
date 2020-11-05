@@ -9,6 +9,7 @@
 typedef struct {
     char *number_of_days;
     char *spot_name;
+    char *spot_uid;
     char *forecast_types[MAX_NUM_FORECAST_TYPES];
     unsigned int forecast_type_count;
 } spot_check_config;

@@ -15,6 +15,7 @@ static httpd_handle_t server_handle;
 // Allocate backing field buffers for our settings
 static char _number_of_days[MAX_LENGTH_NUMBER_OF_DAYS_PARAM + 1] = { 0 };
 static char _spot_name[MAX_LENGTH_SPOT_NAME_PARAM + 1] = { 0 };
+static char _spot_uid[MAX_LENGTH_SPOT_UID_PARAM + 1] = { 0 };
 static char _forecast_types[MAX_NUM_FORECAST_TYPES][MAX_LENGTH_FORECAST_TYPE_PARAM + 1] = { 0 };
 
 static esp_err_t health_get_handler(httpd_req_t *req);
@@ -111,6 +112,22 @@ static esp_err_t configure_post_handler(httpd_req_t *req) {
         strcpy(_spot_name, "wedge");
     }
 
+    cJSON *json_spot_uid = cJSON_GetObjectItem(payload, "spot_uid");
+    char *wedge_uid = "5842041f4e65fad6a770882b";
+    if (cJSON_IsString(json_spot_uid)) {
+        char *temp_spot_uid = cJSON_GetStringValue(json_spot_uid);
+        if (strlen(temp_spot_uid) > MAX_LENGTH_SPOT_UID_PARAM) {
+            char *wedge_uid = "";
+            ESP_LOGI(TAG, "Received spot_uid > %d chars, invalid. Defaulting to wedge uid (%s)", MAX_LENGTH_SPOT_UID_PARAM, wedge_uid);
+            strcpy(_spot_uid, wedge_uid);
+        } else {
+            strcpy(_spot_uid, temp_spot_uid);
+        }
+    } else {
+        ESP_LOGI(TAG, "Unable to parse spot_uid param, defaulting to wedge uid (%s)", wedge_uid);
+        strcpy(_spot_uid, wedge_uid);
+    }
+
     bool one_valid_forecast_type = false;
     cJSON *json_forecast_types = cJSON_GetObjectItem(payload, "forecast_types");
     if (cJSON_IsArray(json_forecast_types)) {
@@ -140,6 +157,7 @@ static esp_err_t configure_post_handler(httpd_req_t *req) {
     spot_check_config config = {
         .number_of_days = _number_of_days,
         .spot_name = _spot_name,
+        .spot_uid = _spot_uid
     };
     int i;
     unsigned int num_forecast_types = 0;
@@ -166,18 +184,18 @@ static esp_err_t current_config_get_handler(httpd_req_t *req) {
     cJSON *root = cJSON_CreateObject();
     cJSON *num_days_json = cJSON_CreateString(current_config->number_of_days);
     cJSON *spot_name_json = cJSON_CreateString(current_config->spot_name);
+    cJSON *spot_uid_json = cJSON_CreateString(current_config->spot_uid);
     cJSON *forecast_types_json = cJSON_CreateStringArray(forecast_types_ptr, current_config->forecast_type_count);
     cJSON_AddItemToObject(root, "number_of_days", num_days_json);
     cJSON_AddItemToObject(root, "spot_name", spot_name_json);
+    cJSON_AddItemToObject(root, "spot_uid", spot_uid_json);
     cJSON_AddItemToObject(root, "forecast_types", forecast_types_json);
 
     char *response_json = cJSON_Print(root);
     httpd_resp_send(req, response_json, HTTPD_RESP_USE_STRLEN);
 
-    // cJSON_Delete(forecast_types_json);
-    // cJSON_Delete(spot_name_json);
-    // cJSON_Delete(num_days_json);
     cJSON_Delete(root);
+    cJSON_free(response_json);
     return ESP_OK;
 }
 
