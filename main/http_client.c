@@ -79,15 +79,15 @@ void http_client_init() {
 // Caller passes in endpoint (tides/swell) the values for the 2 query params,
 // a pointer to a block of already-allocated memory for the base url + endpoint,
 // and a pointer to a block of already-allocated memory to hold the query params structs
-request http_client_build_request(char* endpoint, char *spot, char *days, char *url_buf, query_param *params) {
+request http_client_build_request(char* endpoint, spot_check_config *config, char *url_buf, query_param *params) {
     query_param temp_params[] = {
         {
             .key = "days",
-            .value = days
+            .value = config->number_of_days
         },
         {
-            .key = "spot",
-            .value = spot
+            .key = "spot_id",
+            .value = config->spot_uid
         }
     };
 

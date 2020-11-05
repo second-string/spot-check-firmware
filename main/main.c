@@ -156,7 +156,7 @@ void app_main(void) {
             spot_check_config *config = nvs_get_config();
 
             char *next_forecast_type = get_next_forecast_type(config->forecast_types);
-            request = http_client_build_request(next_forecast_type, config->spot_name, config->number_of_days, url_buf, params);
+            request = http_client_build_request(next_forecast_type, config, url_buf, params);
 
             char *server_response;
             int data_length = http_client_perform_request(&request, &server_response);

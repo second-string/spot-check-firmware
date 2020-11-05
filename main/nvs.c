@@ -52,7 +52,6 @@ void nvs_save_config(spot_check_config *config) {
         sprintf(forecast_type_key, "forecast_type_%d", i);
 
         // If we're onto empty types or nullptrs, delete any of the further forecast_type keys that we might have saved previously
-        ESP_LOGI(TAG, "%p", config->forecast_types[i]);
         if (config->forecast_types[i] == 0 || *config->forecast_types[i] == 0) {
             err = nvs_erase_key(handle, forecast_type_key);
         } else {
