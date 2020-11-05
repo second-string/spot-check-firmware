@@ -20,4 +20,10 @@ void nvs_save_config(spot_check_config *config);
 spot_check_config *nvs_get_config();
 char *get_next_forecast_type(char **types);
 
+// When allocing a new config struct, on the stack, zero out
+// all of the indices starting with the supplied index so our logic
+// in nvs_save_config doesn't try to deref a random ptr from
+// the default inited memory
+void nvs_zero_forecast_types(int starting_from, char **forecast_types);
+
 #endif

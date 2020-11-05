@@ -51,8 +51,9 @@ void nvs_save_config(spot_check_config *config) {
     for (i = 0; i < MAX_NUM_FORECAST_TYPES; i++) {
         sprintf(forecast_type_key, "forecast_type_%d", i);
 
-        // If we're onto empty types, delete any of the further forecast_type keys that we might have saved previously
-        if (*config->forecast_types[i] == 0) {
+        // If we're onto empty types or nullptrs, delete any of the further forecast_type keys that we might have saved previously
+        ESP_LOGI(TAG, "%p", config->forecast_types[i]);
+        if (config->forecast_types[i] == 0 || *config->forecast_types[i] == 0) {
             err = nvs_erase_key(handle, forecast_type_key);
         } else {
             err = nvs_set_str(handle, forecast_type_key, config->forecast_types[i]);
@@ -174,5 +175,11 @@ char *get_next_forecast_type(char **types) {
 
     index++;
     return next_type;
+}
+
+void nvs_zero_forecast_types(int starting_from, char **forecast_types) {
+    for (; starting_from < MAX_NUM_FORECAST_TYPES; starting_from++) {
+        forecast_types[starting_from] = NULL;
+    }
 }
 
