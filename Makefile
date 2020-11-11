@@ -7,3 +7,5 @@ PROJECT_NAME := spot-check-embedded
 
 include $(IDF_PATH)/make/project.mk
 
+debug:
+	idf.py openocd gdb --gdbinit .gdbinit --gdb-tui 1
