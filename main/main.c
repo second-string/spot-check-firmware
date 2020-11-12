@@ -158,7 +158,7 @@ void app_main(void) {
             char *next_forecast_type = get_next_forecast_type(config->forecast_types);
             request = http_client_build_request(next_forecast_type, config, url_buf, params);
 
-            char *server_response;
+            char *server_response = NULL;
             int data_length = http_client_perform_request(&request, &server_response);
             if (data_length != 0) {
                 cJSON *json = parse_json(server_response);
