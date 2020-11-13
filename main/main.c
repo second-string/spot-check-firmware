@@ -25,6 +25,11 @@
 #include "json.h"
 #include "http_server.h"
 #include "led_strip.h"
+#include "led_text.h"
+#include "fonts.h"
+
+#define LED_ROWS 6
+#define LEDS_PER_ROW 50
 
 static int sta_connect_attempts = 0;
 
@@ -138,6 +143,7 @@ void app_main(void) {
     gpio_init_local(button_isr_handler);
     led_strip_t *strip = led_strip_init_ws2812();
     strip->clear(strip);
+    led_text_init(fonts_4x6, LED_ROWS, LEDS_PER_ROW, ZIGZAG);
 
     ESP_ERROR_CHECK(esp_event_loop_create_default());
     wifi_init(default_event_handler);
@@ -145,6 +151,10 @@ void app_main(void) {
     wifi_init_provisioning();
     http_client_init();
     wifi_start_provisioning(false);
+
+    char *text = "ABCDEFGHD~";
+    char text_len = strlen(text);
+    led_text_scroll_text_async(text, text_len, false);
 
     int pixel_idx = 0;
     while (1) {
@@ -176,6 +186,7 @@ void app_main(void) {
                 // assert(values_written > 0);
                 strip->set_pixel(strip, pixel_idx, 0x00FF00);
                 strip->show(strip);
+                pixel_idx++;
 
                 cJSON_free(data_value);
                 cJSON_free(json);
