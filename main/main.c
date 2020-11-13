@@ -24,6 +24,7 @@
 #include "http_client.h"
 #include "json.h"
 #include "http_server.h"
+#include "led_strip.h"
 
 static int sta_connect_attempts = 0;
 
@@ -135,6 +136,8 @@ void app_main(void) {
     nvs_init();
     timer_init(timer_expired_callback);
     gpio_init_local(button_isr_handler);
+    led_strip_t *strip = led_strip_init_ws2812();
+    strip->clear(strip);
 
     ESP_ERROR_CHECK(esp_event_loop_create_default());
     wifi_init(default_event_handler);
@@ -143,6 +146,7 @@ void app_main(void) {
     http_client_init();
     wifi_start_provisioning(false);
 
+    int pixel_idx = 0;
     while (1) {
         // ESP_ERROR_CHECK(esp_task_wdt_reset());
 
@@ -170,6 +174,8 @@ void app_main(void) {
 
                 // int values_written = send_json_list(data_value);
                 // assert(values_written > 0);
+                strip->set_pixel(strip, pixel_idx, 0x00FF00);
+                strip->show(strip);
 
                 cJSON_free(data_value);
                 cJSON_free(json);
