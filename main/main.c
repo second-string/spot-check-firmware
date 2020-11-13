@@ -143,7 +143,12 @@ void app_main(void) {
     gpio_init_local(button_isr_handler);
     led_strip_t *strip = led_strip_init_ws2812();
     strip->clear(strip);
-    led_text_init(fonts_4x6, LED_ROWS, LEDS_PER_ROW, ZIGZAG);
+
+    led_strip_funcs strip_funcs = {
+        .set_pixel = strip->set_pixel,
+        .show = strip->show
+    };
+    led_text_init(fonts_4x6, LED_ROWS, LEDS_PER_ROW, ZIGZAG, strip_funcs);
 
     ESP_ERROR_CHECK(esp_event_loop_create_default());
     wifi_init(default_event_handler);
@@ -184,8 +189,8 @@ void app_main(void) {
 
                 // int values_written = send_json_list(data_value);
                 // assert(values_written > 0);
-                strip->set_pixel(strip, pixel_idx, 0x00FF00);
-                strip->show(strip);
+                strip->set_pixel(pixel_idx, 0x00FF00);
+                strip->show();
                 pixel_idx++;
 
                 cJSON_free(data_value);

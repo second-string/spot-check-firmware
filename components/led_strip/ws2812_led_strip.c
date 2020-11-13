@@ -86,7 +86,7 @@ static void IRAM_ATTR ws2812_rmt_translator(const void *src, rmt_item32_t *dest,
     *item_num = num_rmt_items_copied;
 }
 
-static esp_err_t ws2812_set_pixel(led_strip_t *strip, int pixel_index, uint32_t rgb_val) {
+static esp_err_t ws2812_set_pixel(int pixel_index, uint32_t rgb_val) {
     if (pixel_index > (strip_handle.num_leds - 1)) {
         return ESP_ERR_INVALID_ARG;
     }
@@ -100,7 +100,7 @@ static esp_err_t ws2812_set_pixel(led_strip_t *strip, int pixel_index, uint32_t 
     return ESP_OK;
 }
 
-static esp_err_t ws2812_show(led_strip_t *strip) {
+static esp_err_t ws2812_show() {
     // Routes data through our translator function and blocks until full buffer is sent before continuing
     esp_err_t err = rmt_write_sample(strip_handle.rmt_channel, strip_handle.led_data, strip_handle.num_leds * 3, true);
     if (err != ESP_OK) {

@@ -22,10 +22,10 @@ struct led_strip_s {
     =
     rgb_val = 0x00FFAA55
     */
-    esp_err_t (*set_pixel)(led_strip_t *strip, int pixel_index, uint32_t rgb_val);
+    esp_err_t (*set_pixel)(int pixel_index, uint32_t rgb_val);
 
     /* Must be called to flush and re-apply every pixel change from set_pixel to the strip */
-    esp_err_t (*show)(led_strip_t *strip);
+    esp_err_t (*show)(void);
 
     /* Sets every pixel to 0,0,0 for RBG (aka turns it off) and automatically applies that to the strip */
     esp_err_t (*clear)(led_strip_t *strip);

@@ -7,7 +7,6 @@
 #include "freertos/task.h"
 
 #include "led_text.h"
-#include "fonts.h"
 
 #define TAG "led-text"
 
@@ -29,7 +28,9 @@ static row_orientation orientation;
 static TaskHandle_t scroll_text_task_handle;
 static scroll_text_args args;
 
-void led_text_init(const unsigned char *font, int rows, int num_per_row, row_orientation row_direction) {
+led_strip_funcs strip_funcs;
+
+void led_text_init(const unsigned char *font, int rows, int num_per_row, row_orientation row_direction, led_strip_funcs funcs) {
     font_ptr = font;
     width_of_letter = font_ptr[0];
     height_of_letter = font_ptr[1];
@@ -38,6 +39,8 @@ void led_text_init(const unsigned char *font, int rows, int num_per_row, row_ori
     led_rows = rows;
     leds_per_row = num_per_row;
     orientation = row_direction;
+
+    strip_funcs = funcs;
 
     ESP_LOGI(TAG, "Font width: %d", width_of_letter);
     ESP_LOGI(TAG, "Font height: %d", height_of_letter);
@@ -89,10 +92,13 @@ static void led_text_scroll_text(void *args) {
                         // Reverse-index to get the correct bit value since 0 for our font_bit corresponds to the furthest-left
                         // bit in the font byte data, but that's technically the MSB for what we read out of the font array
                         uint8_t is_font_bit_set = font_data & (1 << (7 - font_bit));
+                        int pixel_idx = current_led_row * leds_per_row + current_led_column;
                         if (is_font_bit_set) {
                             printf("X");
+                            ESP_ERROR_CHECK(strip_funcs.set_pixel(pixel_idx, 0x00FF00));
                         } else {
                             printf(" ");
+                            ESP_ERROR_CHECK(strip_funcs.set_pixel(pixel_idx, 0x000000));
                         }
 
                         // Move to the next letter in our text once we've set all the bits for
@@ -106,6 +112,8 @@ static void led_text_scroll_text(void *args) {
 
                     printf("\n");
                 }
+
+                strip_funcs.show();
 
                 int separators;
                 for (separators = 0; separators < leds_per_row; separators++) {
