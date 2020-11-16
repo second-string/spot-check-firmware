@@ -6,10 +6,18 @@
 #include "esp_err.h"
 #include "fonts.h"
 
+/* Set to true to enable printing the led pattern serially each scroll increment */
+#define DEBUG_LOG_LED_TEXT false
+
 typedef enum {
     ZIGZAG,
     STRAIGHT
 } row_orientation;
+
+typedef enum {
+    LEFT,
+    RIGHT
+} col_direction;
 
 typedef struct {
     esp_err_t (*set_pixel)(int pixel_index, uint32_t rgb_value);

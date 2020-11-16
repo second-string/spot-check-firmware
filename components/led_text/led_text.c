@@ -10,6 +10,13 @@
 
 #define TAG "led-text"
 
+// Only log if we have our debug flag set in the header
+#if DEBUG_LOG_LED_TEXT
+#define LED_TEXT_LOG(x) printf(x)
+#else
+#define LED_TEXT_LOG(x)
+#endif
+
 typedef struct {
     char *text;
     size_t text_len;
@@ -24,6 +31,7 @@ static uint8_t font_start_char;
 static int led_rows;
 static int leds_per_row;
 static row_orientation orientation;
+static col_direction direction;
 
 static TaskHandle_t scroll_text_task_handle;
 static scroll_text_args args;
@@ -39,6 +47,7 @@ void led_text_init(const unsigned char *font, int rows, int num_per_row, row_ori
     led_rows = rows;
     leds_per_row = num_per_row;
     orientation = row_direction;
+    direction = RIGHT;
 
     strip_funcs = funcs;
 
@@ -61,6 +70,7 @@ static void led_text_scroll_text(void *args) {
     int current_led_row;
     int current_letter_offset;
     int current_led_column;
+    int current_row_column_offset;
     uint8_t font_bit;
     char text_letter;
 
@@ -76,6 +86,14 @@ static void led_text_scroll_text(void *args) {
                     current_letter_offset = 0;
                     font_bit = text_inner_offset;
                     for (current_led_column = 0; current_led_column < leds_per_row; current_led_column++) {
+                        // If we're zigzagging rows, we need to adjust our column offset to be from the right
+                        // or the left as we move down the columns of this row
+                        if (direction == RIGHT) {
+                            current_row_column_offset = current_led_column;
+                        } else {
+                            current_row_column_offset = leds_per_row - 1 - current_led_column;
+                        }
+
                         if ((first_letter + current_letter_offset) >= text_len) {
                             // If we've printed the whole message, print spaces from now on
                             text_letter = ' ';
@@ -92,12 +110,12 @@ static void led_text_scroll_text(void *args) {
                         // Reverse-index to get the correct bit value since 0 for our font_bit corresponds to the furthest-left
                         // bit in the font byte data, but that's technically the MSB for what we read out of the font array
                         uint8_t is_font_bit_set = font_data & (1 << (7 - font_bit));
-                        int pixel_idx = current_led_row * leds_per_row + current_led_column;
+                        int pixel_idx = current_led_row * leds_per_row + current_row_column_offset;
                         if (is_font_bit_set) {
-                            printf("X");
+                            LED_TEXT_LOG("X");
                             ESP_ERROR_CHECK(strip_funcs.set_pixel(pixel_idx, 0x00FF00));
                         } else {
-                            printf(" ");
+                            LED_TEXT_LOG(" ");
                             ESP_ERROR_CHECK(strip_funcs.set_pixel(pixel_idx, 0x000000));
                         }
 
@@ -110,6 +128,15 @@ static void led_text_scroll_text(void *args) {
                         }
                     }
 
+                    // if we're zig zagging rows, switch the direction we're laying out pixels
+                    // for the next row
+                    if (orientation == ZIGZAG) {
+                        if (direction == LEFT) {
+                            direction = RIGHT;
+                        } else {
+                            direction = LEFT;
+                        }
+                    }
                     printf("\n");
                 }
 
