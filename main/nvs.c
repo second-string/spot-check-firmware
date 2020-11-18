@@ -14,6 +14,8 @@ static nvs_handle_t handle = 0;
 static char _number_of_days[MAX_LENGTH_NUMBER_OF_DAYS_PARAM + 1] = { 0 };
 static char _spot_name[MAX_LENGTH_SPOT_NAME_PARAM + 1] = { 0 };
 static char _spot_uid[MAX_LENGTH_SPOT_UID_PARAM + 1] = { 0 };
+static char _spot_lat[MAX_LENGTH_SPOT_LAT_PARAM + 1] = { 0 };
+static char _spot_lon[MAX_LENGTH_SPOT_LON_PARAM + 1] = { 0 };
 static char _forecast_types[MAX_NUM_FORECAST_TYPES][MAX_LENGTH_FORECAST_TYPE_PARAM + 1] = { 0 };
 
 static spot_check_config current_config;
@@ -42,9 +44,9 @@ void nvs_save_config(spot_check_config *config) {
     ESP_ERROR_CHECK(nvs_set_str(handle, "number_of_days", config->number_of_days));
     ESP_ERROR_CHECK(nvs_set_str(handle, "spot_name", config->spot_name));
     ESP_ERROR_CHECK(nvs_set_str(handle, "spot_uid", config->spot_uid));
+    ESP_ERROR_CHECK(nvs_set_str(handle, "spot_lat", config->spot_lat));
+    ESP_ERROR_CHECK(nvs_set_str(handle, "spot_lon", config->spot_lon));
 
-    // TODO :: BT this v and then test full flow of defaults, POST saves, re-pulls correctly, the next POST overwriting everything
-    // Loops for MAX macro, but once we're past forecast_type_count we need to delete remaining keys
     int i;
     char forecast_type_key[40];
     esp_err_t err;
@@ -80,6 +82,8 @@ spot_check_config *nvs_get_config() {
     size_t max_length_number_of_days_param = MAX_LENGTH_NUMBER_OF_DAYS_PARAM;
     size_t max_length_spot_name_param = MAX_LENGTH_SPOT_NAME_PARAM;
     size_t max_length_spot_uid_param = MAX_LENGTH_SPOT_UID_PARAM;
+    size_t max_length_spot_lat_param = MAX_LENGTH_SPOT_LAT_PARAM;
+    size_t max_length_spot_lon_param = MAX_LENGTH_SPOT_LON_PARAM;
     size_t max_length_forecast_type_param = MAX_LENGTH_FORECAST_TYPE_PARAM;
 
     esp_err_t err = nvs_get_str(handle, "number_of_days", _number_of_days, &max_length_number_of_days_param);
@@ -104,6 +108,30 @@ spot_check_config *nvs_get_config() {
             break;
         default :
             printf("Error (%s) reading spot_name from flash!\n", esp_err_to_name(err));
+    }
+
+    err = nvs_get_str(handle, "spot_lat", _spot_lat, &max_length_spot_lat_param);
+    switch (err) {
+        case ESP_OK:
+            break;
+        case ESP_ERR_NVS_NOT_FOUND:
+            printf("The value is not initialized yet, defaulting to 33.5930302087!\n");
+            strcpy(_spot_lat, "33.5930302087");
+            break;
+        default :
+            printf("Error (%s) reading spot_lat from flash!\n", esp_err_to_name(err));
+    }
+
+    err = nvs_get_str(handle, "spot_lon", _spot_lon, &max_length_spot_lon_param);
+    switch (err) {
+        case ESP_OK:
+            break;
+        case ESP_ERR_NVS_NOT_FOUND:
+            printf("The value is not initialized yet, defaulting to -117.8819918632!\n");
+            strcpy(_spot_lon, "-117.8819918632");
+            break;
+        default :
+            printf("Error (%s) reading spot_lon from flash!\n", esp_err_to_name(err));
     }
 
     err = nvs_get_str(handle, "spot_uid", _spot_uid, &max_length_spot_uid_param);
@@ -148,6 +176,8 @@ spot_check_config *nvs_get_config() {
     current_config.number_of_days = _number_of_days;
     current_config.spot_name = _spot_name;
     current_config.spot_uid = _spot_uid;
+    current_config.spot_lat = _spot_lat;
+    current_config.spot_lon = _spot_lon;
     for (i = 0; i < num_forecast_types; i++) {
         current_config.forecast_types[i] = _forecast_types[i];
     }

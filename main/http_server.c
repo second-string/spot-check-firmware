@@ -84,6 +84,8 @@ static esp_err_t configure_post_handler(httpd_req_t *req) {
     spot_check_config config;
     char *default_number_of_days = "2";
     char *default_spot_name = "The Wedge";
+    char *default_spot_lat = "33.5930302087";
+    char *default_spot_lon = "-117.8819918632";
     char *default_spot_uid = "5842041f4e65fad6a770882b";
     char *default_forecast_type = "tides";
 
@@ -109,6 +111,30 @@ static esp_err_t configure_post_handler(httpd_req_t *req) {
     } else {
         ESP_LOGI(TAG, "Unable to parse spot_name param, defaulting to %s", default_spot_name);
         config.spot_name = default_spot_name;
+    }
+
+    cJSON *json_spot_lat = cJSON_GetObjectItem(payload, "spot_lat");
+    if (cJSON_IsString(json_spot_lat)) {
+        config.spot_lat = cJSON_GetStringValue(json_spot_lat);
+        if (strlen(config.spot_lat) > MAX_LENGTH_SPOT_LAT_PARAM) {
+            ESP_LOGI(TAG, "Received spot_lat > %d chars, invalid. Defaulting to %s", MAX_LENGTH_SPOT_LAT_PARAM, default_spot_lat);
+            config.spot_lat = default_spot_lat;
+        }
+    } else {
+        ESP_LOGI(TAG, "Unable to parse spot_lat param, defaulting to %s", default_spot_lat);
+        config.spot_lat = default_spot_lat;
+    }
+
+    cJSON *json_spot_lon = cJSON_GetObjectItem(payload, "spot_lon");
+    if (cJSON_IsString(json_spot_lon)) {
+        config.spot_lon = cJSON_GetStringValue(json_spot_lon);
+        if (strlen(config.spot_lon) > MAX_LENGTH_SPOT_LON_PARAM) {
+            ESP_LOGI(TAG, "Received spot_lon > %d chars, invalid. Defaulting to %s", MAX_LENGTH_SPOT_LON_PARAM, default_spot_lon);
+            config.spot_lon = default_spot_lon;
+        }
+    } else {
+        ESP_LOGI(TAG, "Unable to parse spot_lon param, defaulting to %s", default_spot_lon);
+        config.spot_lon = default_spot_lon;
     }
 
     cJSON *json_spot_uid = cJSON_GetObjectItem(payload, "spot_uid");
@@ -181,10 +207,14 @@ static esp_err_t current_config_get_handler(httpd_req_t *req) {
     cJSON *root = cJSON_CreateObject();
     cJSON *num_days_json = cJSON_CreateString(current_config->number_of_days);
     cJSON *spot_name_json = cJSON_CreateString(current_config->spot_name);
+    cJSON *spot_lat_json = cJSON_CreateString(current_config->spot_lat);
+    cJSON *spot_lon_json = cJSON_CreateString(current_config->spot_lon);
     cJSON *spot_uid_json = cJSON_CreateString(current_config->spot_uid);
     cJSON *forecast_types_json = cJSON_CreateStringArray(forecast_types_ptr, current_config->forecast_type_count);
     cJSON_AddItemToObject(root, "number_of_days", num_days_json);
     cJSON_AddItemToObject(root, "spot_name", spot_name_json);
+    cJSON_AddItemToObject(root, "spot_lat", spot_lat_json);
+    cJSON_AddItemToObject(root, "spot_lon", spot_lon_json);
     cJSON_AddItemToObject(root, "spot_uid", spot_uid_json);
     cJSON_AddItemToObject(root, "forecast_types", forecast_types_json);
 
