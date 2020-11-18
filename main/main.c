@@ -157,11 +157,6 @@ void app_main(void) {
     http_client_init();
     wifi_start_provisioning(false);
 
-    char *text = "ABCDEFGHD~";
-    char text_len = strlen(text);
-    led_text_scroll_text_async(text, text_len, false);
-
-    int pixel_idx = 0;
     while (1) {
         // ESP_ERROR_CHECK(esp_task_wdt_reset());
 
@@ -183,15 +178,12 @@ void app_main(void) {
                 cJSON *json = parse_json(server_response);
 
                 cJSON *data_value = cJSON_GetObjectItem(json, "data");
-                char *pretty = cJSON_Print(data_value);
-                ESP_LOGI(TAG, "%s", pretty);
-                free(pretty);
-
-                // int values_written = send_json_list(data_value);
-                // assert(values_written > 0);
-                strip->set_pixel(pixel_idx, 0x00FF00);
-                strip->show();
-                pixel_idx++;
+                cJSON *data_list_value = NULL;
+                cJSON_ArrayForEach(data_list_value, data_value) {
+                    char *text = cJSON_GetStringValue(data_list_value);
+                    ESP_LOGI(TAG, "Showing: '%s'", text);
+                    led_text_scroll_text_async(text, strlen(text), false);
+                }
 
                 cJSON_free(data_value);
                 cJSON_free(json);

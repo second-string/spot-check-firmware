@@ -137,16 +137,16 @@ static void led_text_scroll_text(void *args) {
                             direction = LEFT;
                         }
                     }
-                    printf("\n");
+                    LED_TEXT_LOG("\n");
                 }
 
                 strip_funcs.show();
 
                 int separators;
                 for (separators = 0; separators < leds_per_row; separators++) {
-                    printf("-");
+                    LED_TEXT_LOG("-");
                 }
-                printf("\n");
+                LED_TEXT_LOG("\n");
 
                 vTaskDelay(100 / portTICK_PERIOD_MS);
             }
