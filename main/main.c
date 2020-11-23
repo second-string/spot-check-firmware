@@ -170,7 +170,8 @@ void app_main(void) {
             spot_check_config *config = nvs_get_config();
 
             char *next_forecast_type = get_next_forecast_type(config->forecast_types);
-            request = http_client_build_request(next_forecast_type, config, url_buf, params);
+            // request = http_client_build_request(next_forecast_type, config, url_buf, params);
+            request = http_client_build_request("weather", config, url_buf, params);
 
             char *server_response = NULL;
             int data_length = http_client_perform_request(&request, &server_response);
@@ -178,11 +179,19 @@ void app_main(void) {
                 cJSON *json = parse_json(server_response);
 
                 cJSON *data_value = cJSON_GetObjectItem(json, "data");
-                cJSON *data_list_value = NULL;
-                cJSON_ArrayForEach(data_list_value, data_value) {
-                    char *text = cJSON_GetStringValue(data_list_value);
-                    ESP_LOGI(TAG, "Showing: '%s'", text);
-                    led_text_scroll_text_async(text, strlen(text), false);
+                if (cJSON_IsArray(data_value)) {
+                    cJSON *data_list_value = NULL;
+                    cJSON_ArrayForEach(data_list_value, data_value) {
+                        char *text = cJSON_GetStringValue(data_list_value);
+                        ESP_LOGI(TAG, "Showing: '%s'", text);
+                        led_text_scroll_text_async(text, strlen(text), false);
+                    }
+                } else {
+                    cJSON *temperature_object = cJSON_GetObjectItem(data_value, "temp");
+                    char temperature_str[25] = { 0 };
+                    sprintf(temperature_str, "%d F", temperature_object->valueint);
+                    ESP_LOGI(TAG, "Showing: '%s'", temperature_str);
+                    led_text_scroll_text_async(temperature_str, strlen(temperature_str), false);
                 }
 
                 cJSON_free(data_value);

@@ -43,7 +43,7 @@ static esp_err_t health_get_handler(httpd_req_t *req) {
 }
 
 static esp_err_t configure_post_handler(httpd_req_t *req) {
-    const int rx_buf_size = 200;
+    const int rx_buf_size = 300;
     char buf[rx_buf_size];
 
     if (req->content_len > rx_buf_size) {
