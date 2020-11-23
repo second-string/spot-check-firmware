@@ -39,16 +39,16 @@ void gpio_init_local(gpio_isr_t button_isr_handler) {
     ESP_ERROR_CHECK(gpio_isr_handler_add(GPIO_BUTTON_PIN, button_isr_handler, (void *)GPIO_BUTTON_PIN));
 }
 
-bool button_was_released() {
+bool button_was_released(timer_info_handle debounce_handle) {
     switch (current_state) {
         case WAITING_FOR_PRESS:
             if (button_pressed) {
-                timer_reset();
+                timer_reset(debounce_handle, false);
                 current_state = DEBOUNCING_PRESS;
             }
             break;
         case DEBOUNCING_PRESS:
-            if (timer_expired) {
+            if (button_timer_expired) {
                 if (button_pressed) {
                     current_state = WAITING_FOR_RELEASE;
                 } else {
@@ -58,12 +58,12 @@ bool button_was_released() {
         break;
         case WAITING_FOR_RELEASE:
             if (!button_pressed) {
-                timer_reset();
+                timer_reset(debounce_handle, false);
                 current_state = DEBOUNCING_RELEASE;
             }
             break;
         case DEBOUNCING_RELEASE:
-            if (timer_expired) {
+            if (button_timer_expired) {
                 if (button_pressed) {
                     current_state = WAITING_FOR_RELEASE;
                 } else {

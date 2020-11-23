@@ -8,6 +8,7 @@
 #include "sdkconfig.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
+#include "freertos/task.h"
 #include "esp_system.h"
 #include "esp_wifi.h"
 #include "esp_log.h"
@@ -31,11 +32,22 @@
 #define LED_ROWS 6
 #define LEDS_PER_ROW 50
 
-static int sta_connect_attempts = 0;
+static volatile int sta_connect_attempts = 0;
+static volatile bool connected_to_network = false;
+static volatile unsigned int seconds_elapsed = 0;
+static volatile bool fetch_new_weather = false;
 
-void timer_expired_callback(void *timer_args) {
-    timer_expired = true;
+void button_timer_expired_callback(void *timer_args) {
+    button_timer_expired = true;
 }
+ void weather_timer_expired_callback(void *timer_args) {
+    seconds_elapsed++;
+
+    if ((seconds_elapsed / 60) >= WEATHER_UPDATE_INTERVAL_MIN) {
+        fetch_new_weather = true;
+        seconds_elapsed = 0;
+    }
+ }
 
 void button_isr_handler(void *arg) {
     button_pressed = !(bool)gpio_get_level(GPIO_BUTTON_PIN);
@@ -76,6 +88,7 @@ void default_event_handler(void* arg, esp_event_base_t event_base, int32_t event
                 ESP_LOGI(TAG, "Setting CONNECTED bit, got ip:" IPSTR, IP2STR(&event->ip_info.ip));
                 sta_connect_attempts = 0;
                 mdns_advertise_tcp_service();
+                connected_to_network = true;
 
                 // We only start our http server upon IP assignment if this is a normal startup
                 // in STA mode where we already have creds. If we're in this state after connecting
@@ -131,6 +144,47 @@ void default_event_handler(void* arg, esp_event_base_t event_base, int32_t event
     }
 }
 
+void update_weather(void *args) {
+    timer_info_handle weather_handle = timer_init("weather", weather_timer_expired_callback, ONE_SECOND_TIMER_MS * 1000);
+    timer_reset(weather_handle, true);
+
+    char url_buf[strlen(URL_BASE) + 20];
+    request request;
+    query_param params[2];
+    while (1) {
+        vTaskDelay(5000 / portTICK_PERIOD_MS);
+
+        if (!connected_to_network || !fetch_new_weather) {
+            continue;
+        }
+        fetch_new_weather = false;
+
+        spot_check_config *config = nvs_get_config();
+        request = http_client_build_request("weather", config, url_buf, params);
+
+        char *server_response = NULL;
+        int data_length = http_client_perform_request(&request, &server_response);
+        if (data_length != 0) {
+            cJSON *json = parse_json(server_response);
+            cJSON *data_value = cJSON_GetObjectItem(json, "data");
+            cJSON *temperature_object = cJSON_GetObjectItem(data_value, "temp");
+
+            char temperature_str[25] = { 0 };
+            sprintf(temperature_str, "%d F", temperature_object->valueint);
+            ESP_LOGI(TAG, "Showing: '%s'", temperature_str);
+            led_text_scroll_text_async(temperature_str, strlen(temperature_str), false);
+
+            cJSON_free(data_value);
+            cJSON_free(json);
+        }
+
+        // Caller responsible for freeing buffer if non-null on return
+        if (server_response != NULL) {
+            free(server_response);
+        }
+    }
+}
+
 void app_main(void) {
     // ESP_ERROR_CHECK(esp_task_wdt_init());
 
@@ -139,7 +193,7 @@ void app_main(void) {
     // first setup.
     // https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-guides/wifi.html#wi-fi-configuration-phase
     nvs_init();
-    timer_init(timer_expired_callback);
+    timer_info_handle debounce_handle = timer_init("debounce", button_timer_expired_callback, BUTTON_TIMER_PERIOD_MS * 1000);
     gpio_init_local(button_isr_handler);
     led_strip_t *strip = led_strip_init_ws2812();
     strip->clear(strip);
@@ -157,27 +211,28 @@ void app_main(void) {
     http_client_init();
     wifi_start_provisioning(false);
 
+    TaskHandle_t update_weather_task_handle;
+    xTaskCreate(&update_weather, "update-weather-display", 8192 / 4, NULL, tskIDLE_PRIORITY, &update_weather_task_handle);
+
     while (1) {
         // ESP_ERROR_CHECK(esp_task_wdt_reset());
 
-        if (button_was_released()) {
+        if (button_was_released(debounce_handle)) {
             ESP_ERROR_CHECK(gpio_set_level(LED_PIN, !gpio_get_level(LED_PIN)));
 
-            // Space for base url, endpoint, and some extra for query params
+            // Space for base url + endpoint. Query param space handled when building full url in perform_request func
             char url_buf[strlen(URL_BASE) + 20];
             request request;
             query_param params[2];
             spot_check_config *config = nvs_get_config();
 
             char *next_forecast_type = get_next_forecast_type(config->forecast_types);
-            // request = http_client_build_request(next_forecast_type, config, url_buf, params);
-            request = http_client_build_request("weather", config, url_buf, params);
+            request = http_client_build_request(next_forecast_type, config, url_buf, params);
 
             char *server_response = NULL;
             int data_length = http_client_perform_request(&request, &server_response);
             if (data_length != 0) {
                 cJSON *json = parse_json(server_response);
-
                 cJSON *data_value = cJSON_GetObjectItem(json, "data");
                 if (cJSON_IsArray(data_value)) {
                     cJSON *data_list_value = NULL;
@@ -186,12 +241,9 @@ void app_main(void) {
                         ESP_LOGI(TAG, "Showing: '%s'", text);
                         led_text_scroll_text_async(text, strlen(text), false);
                     }
+
                 } else {
-                    cJSON *temperature_object = cJSON_GetObjectItem(data_value, "temp");
-                    char temperature_str[25] = { 0 };
-                    sprintf(temperature_str, "%d F", temperature_object->valueint);
-                    ESP_LOGI(TAG, "Showing: '%s'", temperature_str);
-                    led_text_scroll_text_async(temperature_str, strlen(temperature_str), false);
+                    ESP_LOGI(TAG, "Didn't get json array of strings to print, bailing");
                 }
 
                 cJSON_free(data_value);
