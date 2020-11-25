@@ -26,6 +26,8 @@ typedef struct {
 
 void led_text_init(const unsigned char *font, int rows, int num_per_row, row_orientation row_direction, led_strip_funcs strip_funcs);
 
+void led_text_show_text(char *text, size_t text_len);
+
 void led_text_scroll_text_blocking(char *text, size_t text_len);
 
 void led_text_scroll_text_async(char *text, size_t text_len, bool scroll_continously);

@@ -177,7 +177,7 @@ void update_weather(void *args) {
             char temperature_str[25] = { 0 };
             sprintf(temperature_str, "%d F", temperature_object->valueint);
             ESP_LOGI(TAG, "Showing: '%s'", temperature_str);
-            led_text_scroll_text_async(temperature_str, strlen(temperature_str), false);
+            led_text_show_text(temperature_str, strlen(temperature_str));
 
             cJSON_free(data_value);
             cJSON_free(json);
