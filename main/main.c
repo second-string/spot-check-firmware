@@ -34,7 +34,12 @@
 
 static volatile int sta_connect_attempts = 0;
 static volatile bool connected_to_network = false;
-static volatile unsigned int seconds_elapsed = 0;
+
+/*
+ * Initialize this to pass our check is (since we normally divide this num by 60)
+ * to force a weather request on startup
+ */
+static volatile unsigned int seconds_elapsed = WEATHER_UPDATE_INTERVAL_MINUTES * 60;
 static volatile bool fetch_new_weather = false;
 
 void button_timer_expired_callback(void *timer_args) {
@@ -43,7 +48,7 @@ void button_timer_expired_callback(void *timer_args) {
  void weather_timer_expired_callback(void *timer_args) {
     seconds_elapsed++;
 
-    if ((seconds_elapsed / 60) >= WEATHER_UPDATE_INTERVAL_MIN) {
+    if ((seconds_elapsed / 60) >= WEATHER_UPDATE_INTERVAL_MINUTES) {
         fetch_new_weather = true;
         seconds_elapsed = 0;
     }
@@ -132,7 +137,6 @@ void default_event_handler(void* arg, esp_event_base_t event_base, int32_t event
                 ESP_LOGI(TAG, "Provisioning complete event emitted, de-initing prov mgr");
                 wifi_deinit_provisioning();
                 esp_restart();
-                // http_server_start();
                 break;
             }
             case WIFI_PROV_DEINIT:

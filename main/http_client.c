@@ -155,6 +155,11 @@ int http_client_perform_request(request *request_obj, char **read_buffer) {
     int content_length = esp_http_client_get_content_length(client);
     int status = esp_http_client_get_status_code(client);
     if (status >= 200 && status <= 299) {
+        if (content_length < 0) {
+            ESP_LOGI(TAG, "Got success status (%d) but no content in response, bailing", status);
+            return 0;
+        }
+
         ESP_LOGI(TAG, "GET success! Status=%d, Content-length=%d", status, content_length);
     } else {
         ESP_LOGI(TAG, "GET failed. Status=%d, Content-length=%d", status, content_length);
