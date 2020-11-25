@@ -92,9 +92,9 @@ void default_event_handler(void* arg, esp_event_base_t event_base, int32_t event
 
                 // We only start our http server upon IP assignment if this is a normal startup
                 // in STA mode where we already have creds. If we're in this state after connecting
-                // through a provisioning, we don't have enough sockets (I think) and the http server
-                // start will fail every time (there is another call to this function in the WIFI_PROV_DEINIT)
-                // event case
+                // through a provisioning, we might not have enough sockets (I think) and the http server
+                // start will fail sometimes. In the PROV_END case below, we force a reboot once we're done
+                // provisioning, which always frees up the ability to successfully start the http_server
                 if (!wifi_is_provisioning_inited) {
                     http_server_start();
                 }
@@ -131,7 +131,8 @@ void default_event_handler(void* arg, esp_event_base_t event_base, int32_t event
             case WIFI_PROV_END: {
                 ESP_LOGI(TAG, "Provisioning complete event emitted, de-initing prov mgr");
                 wifi_deinit_provisioning();
-                http_server_start();
+                esp_restart();
+                // http_server_start();
                 break;
             }
             case WIFI_PROV_DEINIT:

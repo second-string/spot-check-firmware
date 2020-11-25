@@ -234,7 +234,11 @@ void http_server_start() {
     esp_err_t err;
     if ((err = httpd_start(&server, &config)) != ESP_OK) {
         ESP_LOGI(TAG, "Error starting webserver (%s), trying one more time", esp_err_to_name(err));
-        ESP_ERROR_CHECK(httpd_start(&server, &config));
+        err = httpd_start(&server, &config);
+        if (err != ESP_OK) {
+            ESP_LOGI(TAG, "Error starting webserver (%s) for the second time, rebooting...", esp_err_to_name(err));
+            esp_restart();
+        }
     }
 
     httpd_register_uri_handler(server, &configure_uri);
