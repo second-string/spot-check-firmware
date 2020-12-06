@@ -23,7 +23,7 @@ static spot_check_config current_config;
 void nvs_init() {
     esp_err_t ret = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
-      ESP_ERROR_CHECK(nvs_flash_erase());
+      ESP_ERROR_CHECK(nvs_full_erase());
       ret = nvs_flash_init();
     }
     ESP_ERROR_CHECK(ret);
@@ -184,6 +184,15 @@ spot_check_config *nvs_get_config() {
     current_config.forecast_type_count = num_forecast_types;
 
     return &current_config;
+}
+
+esp_err_t nvs_full_erase() {
+    esp_err_t err = nvs_flash_erase();
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to erase NVS flash! %s", esp_err_to_name(err));
+    }
+
+    return err;
 }
 
 char *get_next_forecast_type(char **types) {

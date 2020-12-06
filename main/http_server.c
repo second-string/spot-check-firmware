@@ -15,6 +15,7 @@ static httpd_handle_t server_handle;
 static esp_err_t health_get_handler(httpd_req_t *req);
 static esp_err_t configure_post_handler(httpd_req_t *req);
 static esp_err_t current_config_get_handler(httpd_req_t *req);
+static esp_err_t clear_nvs_post_handler(httpd_req_t *req);
 
 static const httpd_uri_t health_uri = {
     .uri       = "/health",
@@ -34,6 +35,13 @@ static const httpd_uri_t current_config_uri = {
     .uri       = "/current_configuration",
     .method    = HTTP_GET,
     .handler   = current_config_get_handler,
+    .user_ctx  = NULL
+};
+
+static const httpd_uri_t clear_nvs_uri = {
+    .uri       = "/clear_nvs",
+    .method    = HTTP_POST,
+    .handler   = clear_nvs_post_handler,
     .user_ctx  = NULL
 };
 
@@ -226,6 +234,36 @@ static esp_err_t current_config_get_handler(httpd_req_t *req) {
     return ESP_OK;
 }
 
+static esp_err_t clear_nvs_post_handler(httpd_req_t *req) {
+    int query_buf_len = 30;
+    char query_buf[query_buf_len];
+    int actual_query_len = httpd_req_get_url_query_len(req) + 1;
+    if (actual_query_len > query_buf_len) {
+        ESP_LOGI(TAG, "Query str too long for buffer (%d long, can only fit %d)", actual_query_len, query_buf_len);
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid query string");
+        return ESP_OK;
+    }
+
+    if (httpd_req_get_url_query_str(req, query_buf, actual_query_len) == ESP_OK) {
+        char value[15];
+        if (httpd_query_key_value(query_buf, "key", value, sizeof(value)) == ESP_OK) {
+            if (strcmp(value, "sekrit") == 0) {
+                ESP_ERROR_CHECK(nvs_full_erase());
+                httpd_resp_send(req, "Successfully cleared nvs, restarting", HTTPD_RESP_USE_STRLEN);
+                esp_restart();
+            } else {
+                ESP_LOGI(TAG, "Received incorrect key for erasing flash: %s", value);
+                httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid query string");
+            }
+        }
+    } else {
+        ESP_LOGI(TAG, "Failed to get query string");
+        httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to get query string");
+    }
+    
+    return ESP_OK;
+}
+
 void http_server_start() {
     httpd_handle_t server = NULL;
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
@@ -244,6 +282,7 @@ void http_server_start() {
     httpd_register_uri_handler(server, &configure_uri);
     httpd_register_uri_handler(server, &health_uri);
     httpd_register_uri_handler(server, &current_config_uri);
+    httpd_register_uri_handler(server, &clear_nvs_uri);
 
     server_handle = server;
 }

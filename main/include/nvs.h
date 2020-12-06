@@ -19,6 +19,7 @@ typedef struct {
 
 void nvs_init();
 void nvs_save_config(spot_check_config *config);
+esp_err_t nvs_full_erase();
 spot_check_config *nvs_get_config();
 char *get_next_forecast_type(char **types);
 
