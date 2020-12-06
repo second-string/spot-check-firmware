@@ -2,3 +2,6 @@ sdkconfig*
 *.projbuild
 
 build/
+
+# Don't include our open vim buffers
+*.swp
