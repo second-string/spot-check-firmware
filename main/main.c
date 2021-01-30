@@ -49,9 +49,10 @@ void button_timer_expired_callback(void *timer_args) {
  void weather_timer_expired_callback(void *timer_args) {
     seconds_elapsed++;
 
-    if ((seconds_elapsed / 60) >= WEATHER_UPDATE_INTERVAL_MINUTES) {
-        fetch_new_weather = true;
+    if ((seconds_elapsed / 60) >= WEATHER_UPDATE_INTERVAL_MINUTES || new_location_set) {
+        new_location_set;
         seconds_elapsed = 0;
+        fetch_new_weather = true;
     }
  }
 
