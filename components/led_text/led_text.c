@@ -36,7 +36,9 @@ static col_direction direction;
 static TaskHandle_t scroll_text_task_handle;
 static scroll_text_args args;
 
-led_strip_funcs strip_funcs;
+static led_strip_funcs strip_funcs;
+
+led_text_state led_text_current_state;
 
 void led_text_init(const unsigned char *font, int rows, int num_per_row, row_orientation row_direction, led_strip_funcs funcs) {
     font_ptr = font;
@@ -50,6 +52,7 @@ void led_text_init(const unsigned char *font, int rows, int num_per_row, row_ori
     direction = RIGHT;
 
     strip_funcs = funcs;
+    led_text_current_state = IDLE;
 
     ESP_LOGI(TAG, "Font width: %d", width_of_letter);
     ESP_LOGI(TAG, "Font height: %d", height_of_letter);
@@ -137,6 +140,8 @@ static void led_text_set_static_text(char *text, size_t text_len, int first_lett
 }
 
 static void led_text_scroll_text(void *args) {
+    led_text_current_state = SCROLLING;
+
     scroll_text_args *casted_args = (scroll_text_args *)args;
     char *text = casted_args->text;
     size_t text_len = casted_args->text_len;
@@ -166,6 +171,7 @@ static void led_text_scroll_text(void *args) {
         }
 
         if (!scroll_continously) {
+            led_text_current_state = IDLE;
             scroll_text_task_handle = NULL;
             vTaskDelete(NULL);
         }
@@ -174,6 +180,8 @@ static void led_text_scroll_text(void *args) {
 
 void led_text_show_text(char *text, size_t text_len) {
     led_text_set_static_text(text, text_len, 0, 0);
+    led_text_current_state = STATIC;
+
     strip_funcs.show();
 }
 
@@ -217,6 +225,7 @@ void led_text_scroll_text_async(char *text, size_t text_len, bool scroll_contino
 }
 
 void led_text_stop_scroll() {
+    // TODO :: I think clear all the leds otherwise they'll be frozen on last write
     vTaskDelete(scroll_text_task_handle);
     scroll_text_task_handle = NULL;
 }

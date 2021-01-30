@@ -41,6 +41,7 @@ static volatile bool connected_to_network = false;
  */
 static volatile unsigned int seconds_elapsed = WEATHER_UPDATE_INTERVAL_MINUTES * 60;
 static volatile bool fetch_new_weather = false;
+static volatile int last_retrieved_temperature = 0;
 
 void button_timer_expired_callback(void *timer_args) {
     button_timer_expired = true;
@@ -149,23 +150,11 @@ void default_event_handler(void* arg, esp_event_base_t event_base, int32_t event
     }
 }
 
-void update_weather(void *args) {
-    timer_info_handle weather_handle = timer_init("weather", weather_timer_expired_callback, ONE_SECOND_TIMER_MS * 1000);
-    timer_reset(weather_handle, true);
-
-    char url_buf[strlen(URL_BASE) + 20];
-    request request;
-    query_param params[2];
-    while (1) {
-        vTaskDelay(5000 / portTICK_PERIOD_MS);
-
-        if (!connected_to_network || !fetch_new_weather) {
-            continue;
-        }
-        fetch_new_weather = false;
-
+int refresh_weather() {
         spot_check_config *config = nvs_get_config();
-        request = http_client_build_request("weather", config, url_buf, params);
+        char url_buf[strlen(URL_BASE) + 20];
+        query_param params[2];
+        request request = http_client_build_request("weather", config, url_buf, params);
 
         char *server_response = NULL;
         int data_length = http_client_perform_request(&request, &server_response);
@@ -174,19 +163,40 @@ void update_weather(void *args) {
             cJSON *data_value = cJSON_GetObjectItem(json, "data");
             cJSON *temperature_object = cJSON_GetObjectItem(data_value, "temp");
 
-            char temperature_str[25] = { 0 };
-            sprintf(temperature_str, "%d F", temperature_object->valueint);
-            ESP_LOGI(TAG, "Showing: '%s'", temperature_str);
-            led_text_show_text(temperature_str, strlen(temperature_str));
+            last_retrieved_temperature = temperature_object->valueint;
 
             cJSON_free(data_value);
             cJSON_free(json);
+        } else {
+            ESP_LOGI(TAG, "Failed to get new temperature value, falling back to last saved value (%d)", last_retrieved_temperature);
         }
 
         // Caller responsible for freeing buffer if non-null on return
         if (server_response != NULL) {
             free(server_response);
         }
+
+        return last_retrieved_temperature;
+}
+
+void update_weather(void *args) {
+    timer_info_handle weather_handle = timer_init("weather", weather_timer_expired_callback, ONE_SECOND_TIMER_MS * 1000);
+    timer_reset(weather_handle, true);
+
+    while (1) {
+        vTaskDelay(5000 / portTICK_PERIOD_MS);
+
+        if (!connected_to_network || !fetch_new_weather) {
+            continue;
+        }
+        fetch_new_weather = false;
+
+        int new_temperature = refresh_weather();
+
+        char temperature_str[10] = { 0 };
+        sprintf(temperature_str, "%d F", new_temperature);
+        ESP_LOGI(TAG, "Showing: '%s'", temperature_str);
+        led_text_show_text(temperature_str, strlen(temperature_str));
     }
 }
 
@@ -217,10 +227,46 @@ void app_main(void) {
     wifi_start_provisioning(false);
 
     TaskHandle_t update_weather_task_handle;
-    xTaskCreate(&update_weather, "update-weather-display", 8192 / 4, NULL, tskIDLE_PRIORITY, &update_weather_task_handle);
+    xTaskCreate(&update_weather, "update-weather", 8192 / 4, NULL, tskIDLE_PRIORITY, &update_weather_task_handle);
 
+    led_text_state previous_text_state = led_text_current_state;
+    led_text_state current_state;
+    char text_to_scroll_buffer[5][50];
+    unsigned int next_index_to_scroll = 0;
+    unsigned int num_available_text_to_scroll = 0;
     while (1) {
         // ESP_ERROR_CHECK(esp_task_wdt_reset());
+        current_state = led_text_current_state;
+        switch (current_state) {
+            case IDLE:
+            case STATIC:
+                // If there's text available to scroll, doesn't matter if we got here from SCROLLING or IDLE, scroll it
+                if (num_available_text_to_scroll > 0 && next_index_to_scroll < num_available_text_to_scroll) {
+                    ESP_LOGI(TAG, "text in the buffer to scrolling, scrolling index %d", next_index_to_scroll);
+                    char *text_to_scroll = text_to_scroll_buffer[next_index_to_scroll];
+                    led_text_scroll_text_async(text_to_scroll, strlen(text_to_scroll), false);
+                    next_index_to_scroll++;
+                } else {
+                    if (previous_text_state == SCROLLING) {
+                        // We just became idle after scrolling and we have no more text to scroll,
+                        // "clear" our buffer and index and re-show the weather
+                        num_available_text_to_scroll = 0;
+                        next_index_to_scroll = 0;
+
+                        char temperature_str[10] = { 0 };
+                        sprintf(temperature_str, "%d F", last_retrieved_temperature);
+                        ESP_LOGI(TAG, "Re showing temp after scrolling: '%s'", temperature_str);
+                        led_text_show_text(temperature_str, strlen(temperature_str));
+                    }
+                }
+                break;
+            case SCROLLING:
+                break;
+        }
+
+                vTaskDelay(100 / portTICK_PERIOD_MS);
+
+        previous_text_state = current_state;
 
         if (button_was_released(debounce_handle)) {
             ESP_ERROR_CHECK(gpio_set_level(LED_PIN, !gpio_get_level(LED_PIN)));
@@ -243,10 +289,10 @@ void app_main(void) {
                     cJSON *data_list_value = NULL;
                     cJSON_ArrayForEach(data_list_value, data_value) {
                         char *text = cJSON_GetStringValue(data_list_value);
-                        ESP_LOGI(TAG, "Showing: '%s'", text);
-                        led_text_scroll_text_async(text, strlen(text), false);
+                        ESP_LOGI(TAG, "Adding new text to the buffer at index %d: '%s'", num_available_text_to_scroll, text);
+                        strcpy(text_to_scroll_buffer[num_available_text_to_scroll], text);
+                        num_available_text_to_scroll++;
                     }
-
                 } else {
                     ESP_LOGI(TAG, "Didn't get json array of strings to print, bailing");
                 }

@@ -5,3 +5,6 @@ build/
 
 # Don't include our open vim buffers
 *.swp
+
+*.sublime-project
+*.sublime-workspace

@@ -122,7 +122,7 @@ request http_client_build_request(char* endpoint, spot_check_config *config, cha
 int http_client_perform_request(request *request_obj, char **read_buffer) {
     if (request_obj) {
         // assume we won't have that many query params. Could calc this too
-        char req_url[strlen(request_obj->url) + 50];
+        char req_url[strlen(request_obj->url) + 30];
         strcpy(req_url, request_obj->url);
         strcat(req_url, "?");
         for (int i = 0; i < request_obj->num_params; i++) {
@@ -179,18 +179,12 @@ int http_client_perform_request(request *request_obj, char **read_buffer) {
         // here, but hopefully the quick malloc/free shouldn't cause any issues
         *read_buffer = malloc(content_length + 1);
         int length_received = esp_http_client_read(client, *read_buffer, content_length);
-        (*read_buffer)[length_received + 1] = '\0';
+        (*read_buffer)[length_received] = '\0';
         alloced_space_used = length_received + 1;
     } else {
         ESP_LOGI(TAG, "Not enough room in read buffer: buffer=%d, content=%d", MAX_READ_BUFFER_SIZE, content_length);
     }
-
-    // Close current connection but don't free http_client data and un-init with cleanup
-    error = esp_http_client_close(client);
-    if (error != ESP_OK) {
-        const char *err_str = esp_err_to_name(error);
-        ESP_LOGI(TAG, "Error closing http client connection: %s", err_str);
-    }
+    ESP_LOGI(TAG, "%s", *read_buffer);
 
     return alloced_space_used;
 }
