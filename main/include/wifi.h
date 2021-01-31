@@ -3,11 +3,11 @@
 
 #include "freertos/event_groups.h"
 
- #define PROVISIONED_NETWORK_CONNECTION_MAXIMUM_RETRY  3
+#define PROVISIONED_NETWORK_CONNECTION_MAXIMUM_RETRY 3
 
 typedef struct {
-    char *ssid;
-    char *password;
+    char * ssid;
+    char * password;
     size_t ssid_len;
     size_t password_len;
 } connect_to_network_task_args;

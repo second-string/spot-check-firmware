@@ -1,6 +1,6 @@
+#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
-#include <stdint.h>
 
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
@@ -18,40 +18,41 @@
 #endif
 
 typedef struct {
-    char *text;
+    char * text;
     size_t text_len;
-    bool scroll_continously;
+    bool   scroll_continously;
 } scroll_text_args;
 
 static const unsigned char *font_ptr;
-static uint8_t width_of_letter;
-static uint8_t height_of_letter;
-static uint8_t font_start_char;
+static uint8_t              width_of_letter;
+static uint8_t              height_of_letter;
+static uint8_t              font_start_char;
 
-static int led_rows;
-static int leds_per_row;
+static int             led_rows;
+static int             leds_per_row;
 static row_orientation orientation;
-static col_direction direction;
+static col_direction   direction;
 
-static TaskHandle_t scroll_text_task_handle;
+static TaskHandle_t     scroll_text_task_handle;
 static scroll_text_args args;
 
 static led_strip_funcs strip_funcs;
 
 led_text_state led_text_current_state;
 
-void led_text_init(const unsigned char *font, int rows, int num_per_row, row_orientation row_direction, led_strip_funcs funcs) {
-    font_ptr = font;
-    width_of_letter = font_ptr[0];
+void led_text_init(const unsigned char *font, int rows, int num_per_row, row_orientation row_direction,
+                   led_strip_funcs funcs) {
+    font_ptr         = font;
+    width_of_letter  = font_ptr[0];
     height_of_letter = font_ptr[1];
-    font_start_char = font_ptr[2];
+    font_start_char  = font_ptr[2];
 
-    led_rows = rows;
+    led_rows     = rows;
     leds_per_row = num_per_row;
-    orientation = row_direction;
-    direction = RIGHT;
+    orientation  = row_direction;
+    direction    = RIGHT;
 
-    strip_funcs = funcs;
+    strip_funcs            = funcs;
     led_text_current_state = IDLE;
 
     ESP_LOGI(TAG, "Font width: %d", width_of_letter);
@@ -59,30 +60,32 @@ void led_text_init(const unsigned char *font, int rows, int num_per_row, row_ori
     ESP_LOGI(TAG, "First ASCII value in array: %d", font_start_char);
     ESP_LOGI(TAG, "# led strip rows: %d", led_rows);
     ESP_LOGI(TAG, "# LEDs per row: %d", leds_per_row);
-    ESP_LOGI(TAG, "Row orientation: %s", orientation == ZIGZAG ? "ZIGZAG" : orientation == STRAIGHT ? "STRAIGHT" : "undefined");
+    ESP_LOGI(TAG, "Row orientation: %s",
+             orientation == ZIGZAG ? "ZIGZAG" : orientation == STRAIGHT ? "STRAIGHT" : "undefined");
 }
 
 /*
- * Performs logic for iterating over every accessible LED and setting the pixel on or off depending on the text data. strip.show()
- * must still be called to flush data through RMT
+ * Performs logic for iterating over every accessible LED and setting the pixel on or off depending on the text data.
+ * strip.show() must still be called to flush data through RMT
  *
  * text: the char array of text that we're trying to display on the LEDs
  * text_len: the number of characters in the 'text' arg
- * first_letter_idx: the index of the letter we should start at in the 'text' arg. This will be 0 every time for displaying static text
- * text_inner_offset: the number of pixels inside a letter the text should be shifted over by before display. Again, 0 for static text
+ * first_letter_idx: the index of the letter we should start at in the 'text' arg. This will be 0 every time for
+ * displaying static text text_inner_offset: the number of pixels inside a letter the text should be shifted over by
+ * before display. Again, 0 for static text
  */
 static void led_text_set_static_text(char *text, size_t text_len, int first_letter_idx, int text_inner_offset) {
-    int current_led_row;
-    int current_letter_offset;
-    int current_led_column;
-    int current_row_column_offset;
+    int     current_led_row;
+    int     current_letter_offset;
+    int     current_led_column;
+    int     current_row_column_offset;
     uint8_t font_bit;
-    char text_letter;
+    char    text_letter;
 
     // Start of the inner loops responsible for one complete static display of our text
     for (current_led_row = 0; current_led_row < led_rows && current_led_row < height_of_letter; current_led_row++) {
         current_letter_offset = 0;
-        font_bit = text_inner_offset;
+        font_bit              = text_inner_offset;
         for (current_led_column = 0; current_led_column < leds_per_row; current_led_column++) {
             // If we're zigzagging rows, we need to adjust our column offset to be from the right
             // or the left as we move down the columns of this row
@@ -103,12 +106,13 @@ static void led_text_set_static_text(char *text, size_t text_len, int first_lett
             // ESP_LOGI(TAG, "Indexing into font data: [%d + (%d - %d) * %d + %d] (total: %d)",
             //     FONT_DATA_OFFSET, text_letter, font_start_char, height_of_letter, current_led_row,
             //     FONT_DATA_OFFSET + (text_letter - font_start_char) * height_of_letter + current_led_row);
-            char font_data = font_ptr[FONT_DATA_OFFSET + (text_letter - font_start_char) * height_of_letter + current_led_row];
+            char font_data =
+                font_ptr[FONT_DATA_OFFSET + (text_letter - font_start_char) * height_of_letter + current_led_row];
 
             // Reverse-index to get the correct bit value since 0 for our font_bit corresponds to the furthest-left
             // bit in the font byte data, but that's technically the MSB for what we read out of the font array
             uint8_t is_font_bit_set = font_data & (1 << (7 - font_bit));
-            int pixel_idx = current_led_row * leds_per_row + current_row_column_offset;
+            int     pixel_idx       = current_led_row * leds_per_row + current_row_column_offset;
             if (is_font_bit_set) {
                 LED_TEXT_LOG("X");
                 ESP_ERROR_CHECK(strip_funcs.set_pixel(pixel_idx, 0x00FF00));
@@ -142,10 +146,10 @@ static void led_text_set_static_text(char *text, size_t text_len, int first_lett
 static void led_text_scroll_text(void *args) {
     led_text_current_state = SCROLLING;
 
-    scroll_text_args *casted_args = (scroll_text_args *)args;
-    char *text = casted_args->text;
-    size_t text_len = casted_args->text_len;
-    bool scroll_continously = casted_args->scroll_continously;
+    scroll_text_args *casted_args        = (scroll_text_args *)args;
+    char *            text               = casted_args->text;
+    size_t            text_len           = casted_args->text_len;
+    bool              scroll_continously = casted_args->scroll_continously;
 
     int first_letter;
     int text_inner_offset;
@@ -171,7 +175,7 @@ static void led_text_scroll_text(void *args) {
         }
 
         if (!scroll_continously) {
-            led_text_current_state = IDLE;
+            led_text_current_state  = IDLE;
             scroll_text_task_handle = NULL;
             vTaskDelete(NULL);
         }
@@ -186,11 +190,7 @@ void led_text_show_text(char *text, size_t text_len) {
 }
 
 void led_text_scroll_text_blocking(char *text, size_t text_len) {
-    args = (scroll_text_args) {
-        .text = text,
-        .text_len = text_len,
-        .scroll_continously = false
-    };
+    args = (scroll_text_args){.text = text, .text_len = text_len, .scroll_continously = false};
 
     return led_text_scroll_text(&args);
 }
@@ -211,15 +211,10 @@ void led_text_scroll_text_async(char *text, size_t text_len, bool scroll_contino
             default:
                 ESP_LOGI(TAG, "Got unsupported switch case when checking scroll text task state: %d", state);
                 break;
-
         }
     }
 
-    args = (scroll_text_args) {
-        .text = text,
-        .text_len = text_len,
-        .scroll_continously = scroll_continously
-    };
+    args = (scroll_text_args){.text = text, .text_len = text_len, .scroll_continously = scroll_continously};
 
     xTaskCreate(&led_text_scroll_text, "scroll-text", 4096 / 4, &args, tskIDLE_PRIORITY, &scroll_text_task_handle);
 }

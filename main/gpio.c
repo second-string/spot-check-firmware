@@ -1,5 +1,5 @@
-#include "freertos/FreeRTOS.h"
 #include "driver/gpio.h"
+#include "freertos/FreeRTOS.h"
 
 #include "constants.h"
 #include "gpio.h"
@@ -7,20 +7,15 @@
 
 #include "esp_log.h"
 
-#define GPIO_INPUT_PIN_SEL   (1 << GPIO_BUTTON_PIN)
+#define GPIO_INPUT_PIN_SEL (1 << GPIO_BUTTON_PIN)
 
-typedef enum {
-    WAITING_FOR_PRESS,
-    DEBOUNCING_PRESS,
-    DEBOUNCING_RELEASE,
-    WAITING_FOR_RELEASE
-} debounce_state;
+typedef enum { WAITING_FOR_PRESS, DEBOUNCING_PRESS, DEBOUNCING_RELEASE, WAITING_FOR_RELEASE } debounce_state;
 
 static volatile debounce_state current_state;
 
 void gpio_init_local(gpio_isr_t button_isr_handler) {
     button_pressed = false;
-    current_state = WAITING_FOR_PRESS;
+    current_state  = WAITING_FOR_PRESS;
 
     // Cheater init for LED output compared to full config for button input below
     gpio_reset_pin(LED_PIN);
@@ -28,11 +23,11 @@ void gpio_init_local(gpio_isr_t button_isr_handler) {
     gpio_set_direction(LED_PIN, GPIO_MODE_INPUT_OUTPUT);
 
     gpio_config_t input_config;
-    input_config.intr_type = GPIO_INTR_ANYEDGE;
-    input_config.mode = GPIO_MODE_INPUT;
+    input_config.intr_type    = GPIO_INTR_ANYEDGE;
+    input_config.mode         = GPIO_MODE_INPUT;
     input_config.pin_bit_mask = GPIO_INPUT_PIN_SEL;
     input_config.pull_down_en = 0;
-    input_config.pull_up_en = 1;
+    input_config.pull_up_en   = 1;
 
     gpio_config(&input_config);
     ESP_ERROR_CHECK(gpio_install_isr_service(0));
@@ -55,7 +50,7 @@ bool button_was_released(timer_info_handle debounce_handle) {
                     current_state = WAITING_FOR_PRESS;
                 }
             }
-        break;
+            break;
         case WAITING_FOR_RELEASE:
             if (!button_pressed) {
                 timer_reset(debounce_handle, false);

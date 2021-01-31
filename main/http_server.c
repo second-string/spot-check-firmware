@@ -1,14 +1,13 @@
 #include "constants.h"
 
-#include <sys/param.h>
-#include <esp_system.h>
 #include <esp_http_server.h>
 #include <esp_log.h>
+#include <esp_system.h>
+#include <sys/param.h>
 
 #include "http_server.h"
 #include "json.h"
 #include "nvs.h"
-
 
 static httpd_handle_t server_handle;
 
@@ -18,32 +17,16 @@ static esp_err_t current_config_get_handler(httpd_req_t *req);
 static esp_err_t clear_nvs_post_handler(httpd_req_t *req);
 
 static const httpd_uri_t health_uri = {
-    .uri       = "/health",
-    .method    = HTTP_GET,
-    .handler   = health_get_handler,
-    .user_ctx  = NULL
-};
+    .uri = "/health", .method = HTTP_GET, .handler = health_get_handler, .user_ctx = NULL};
 
 static const httpd_uri_t configure_uri = {
-    .uri       = "/configure",
-    .method    = HTTP_POST,
-    .handler   = configure_post_handler,
-    .user_ctx  = NULL
-};
+    .uri = "/configure", .method = HTTP_POST, .handler = configure_post_handler, .user_ctx = NULL};
 
 static const httpd_uri_t current_config_uri = {
-    .uri       = "/current_configuration",
-    .method    = HTTP_GET,
-    .handler   = current_config_get_handler,
-    .user_ctx  = NULL
-};
+    .uri = "/current_configuration", .method = HTTP_GET, .handler = current_config_get_handler, .user_ctx = NULL};
 
 static const httpd_uri_t clear_nvs_uri = {
-    .uri       = "/clear_nvs",
-    .method    = HTTP_POST,
-    .handler   = clear_nvs_post_handler,
-    .user_ctx  = NULL
-};
+    .uri = "/clear_nvs", .method = HTTP_POST, .handler = clear_nvs_post_handler, .user_ctx = NULL};
 
 static esp_err_t health_get_handler(httpd_req_t *req) {
     httpd_resp_send(req, "Surviving not thriving", HTTPD_RESP_USE_STRLEN);
@@ -52,7 +35,7 @@ static esp_err_t health_get_handler(httpd_req_t *req) {
 
 static esp_err_t configure_post_handler(httpd_req_t *req) {
     const int rx_buf_size = 300;
-    char buf[rx_buf_size];
+    char      buf[rx_buf_size];
 
     if (req->content_len > rx_buf_size) {
         ESP_LOGE(TAG, "Payload is too big (%d bytes), bailing out", req->content_len);
@@ -90,18 +73,19 @@ static esp_err_t configure_post_handler(httpd_req_t *req) {
     // any more memory than the json takes because nvs will use those
     // pointers to write directly to flash
     spot_check_config config;
-    char *default_number_of_days = "2";
-    char *default_spot_name = "The Wedge";
-    char *default_spot_lat = "33.5930302087";
-    char *default_spot_lon = "-117.8819918632";
-    char *default_spot_uid = "5842041f4e65fad6a770882b";
-    char *default_forecast_type = "tides";
+    char *            default_number_of_days = "2";
+    char *            default_spot_name      = "The Wedge";
+    char *            default_spot_lat       = "33.5930302087";
+    char *            default_spot_lon       = "-117.8819918632";
+    char *            default_spot_uid       = "5842041f4e65fad6a770882b";
+    char *            default_forecast_type  = "tides";
 
     cJSON *json_number_of_days = cJSON_GetObjectItem(payload, "number_of_days");
     if (cJSON_IsString(json_number_of_days)) {
         config.number_of_days = cJSON_GetStringValue(json_number_of_days);
         if (strlen(config.number_of_days) > MAX_LENGTH_NUMBER_OF_DAYS_PARAM) {
-            ESP_LOGI(TAG, "Received number > %d digits, invalid. Defaulting to %s", MAX_LENGTH_NUMBER_OF_DAYS_PARAM, default_number_of_days);
+            ESP_LOGI(TAG, "Received number > %d digits, invalid. Defaulting to %s", MAX_LENGTH_NUMBER_OF_DAYS_PARAM,
+                     default_number_of_days);
             config.number_of_days = default_number_of_days;
         }
     } else {
@@ -113,7 +97,8 @@ static esp_err_t configure_post_handler(httpd_req_t *req) {
     if (cJSON_IsString(json_spot_name)) {
         config.spot_name = cJSON_GetStringValue(json_spot_name);
         if (strlen(config.spot_name) > MAX_LENGTH_SPOT_NAME_PARAM) {
-            ESP_LOGI(TAG, "Received spot_name > %d chars, invalid. Defaulting to %s", MAX_LENGTH_SPOT_NAME_PARAM, default_spot_name);
+            ESP_LOGI(TAG, "Received spot_name > %d chars, invalid. Defaulting to %s", MAX_LENGTH_SPOT_NAME_PARAM,
+                     default_spot_name);
             config.spot_name = default_spot_name;
         }
     } else {
@@ -125,7 +110,8 @@ static esp_err_t configure_post_handler(httpd_req_t *req) {
     if (cJSON_IsString(json_spot_lat)) {
         config.spot_lat = cJSON_GetStringValue(json_spot_lat);
         if (strlen(config.spot_lat) > MAX_LENGTH_SPOT_LAT_PARAM) {
-            ESP_LOGI(TAG, "Received spot_lat > %d chars, invalid. Defaulting to %s", MAX_LENGTH_SPOT_LAT_PARAM, default_spot_lat);
+            ESP_LOGI(TAG, "Received spot_lat > %d chars, invalid. Defaulting to %s", MAX_LENGTH_SPOT_LAT_PARAM,
+                     default_spot_lat);
             config.spot_lat = default_spot_lat;
         }
     } else {
@@ -137,7 +123,8 @@ static esp_err_t configure_post_handler(httpd_req_t *req) {
     if (cJSON_IsString(json_spot_lon)) {
         config.spot_lon = cJSON_GetStringValue(json_spot_lon);
         if (strlen(config.spot_lon) > MAX_LENGTH_SPOT_LON_PARAM) {
-            ESP_LOGI(TAG, "Received spot_lon > %d chars, invalid. Defaulting to %s", MAX_LENGTH_SPOT_LON_PARAM, default_spot_lon);
+            ESP_LOGI(TAG, "Received spot_lon > %d chars, invalid. Defaulting to %s", MAX_LENGTH_SPOT_LON_PARAM,
+                     default_spot_lon);
             config.spot_lon = default_spot_lon;
         }
     } else {
@@ -149,7 +136,8 @@ static esp_err_t configure_post_handler(httpd_req_t *req) {
     if (cJSON_IsString(json_spot_uid)) {
         config.spot_uid = cJSON_GetStringValue(json_spot_uid);
         if (strlen(config.spot_uid) > MAX_LENGTH_SPOT_UID_PARAM) {
-            ESP_LOGI(TAG, "Received spot_uid > %d chars, invalid. Defaulting to wedge uid (%s)", MAX_LENGTH_SPOT_UID_PARAM, default_spot_uid);
+            ESP_LOGI(TAG, "Received spot_uid > %d chars, invalid. Defaulting to wedge uid (%s)",
+                     MAX_LENGTH_SPOT_UID_PARAM, default_spot_uid);
             config.spot_uid = default_spot_uid;
         }
     } else {
@@ -157,15 +145,16 @@ static esp_err_t configure_post_handler(httpd_req_t *req) {
         config.spot_uid = default_spot_uid;
     }
 
-    bool one_valid_forecast_type = false;
-    cJSON *json_forecast_types = cJSON_GetObjectItem(payload, "forecast_types");
+    bool   one_valid_forecast_type = false;
+    cJSON *json_forecast_types     = cJSON_GetObjectItem(payload, "forecast_types");
     if (cJSON_IsArray(json_forecast_types)) {
-        int index = 0;
+        int    index              = 0;
         cJSON *json_forecast_type = NULL;
         cJSON_ArrayForEach(json_forecast_type, json_forecast_types) {
             config.forecast_types[index] = cJSON_GetStringValue(json_forecast_type);
             if (strlen(config.forecast_types[index]) > MAX_LENGTH_FORECAST_TYPE_PARAM) {
-                ESP_LOGI(TAG, "Received forecast type > %d chars, invalid. Defaulting to empty", MAX_LENGTH_FORECAST_TYPE_PARAM);
+                ESP_LOGI(TAG, "Received forecast type > %d chars, invalid. Defaulting to empty",
+                         MAX_LENGTH_FORECAST_TYPE_PARAM);
                 config.forecast_types[index] = NULL;
             } else {
                 one_valid_forecast_type = true;
@@ -175,7 +164,8 @@ static esp_err_t configure_post_handler(httpd_req_t *req) {
         }
 
         if (!one_valid_forecast_type) {
-            ESP_LOGI(TAG, "Didn't get a single valid forecast type, defaulting to a single '%s'", default_forecast_type);
+            ESP_LOGI(TAG, "Didn't get a single valid forecast type, defaulting to a single '%s'",
+                     default_forecast_type);
             config.forecast_types[0] = default_forecast_type;
             nvs_zero_forecast_types(1, config.forecast_types);
         } else {
@@ -189,7 +179,7 @@ static esp_err_t configure_post_handler(httpd_req_t *req) {
 
     // Packs our forecast_types down so we have contiguous types in the pointer array
     // (if we got invalid types at indices in between valid ones)
-    int i;
+    int          i;
     unsigned int next_valid_index = 0;
     for (i = 0; i < MAX_NUM_FORECAST_TYPES; i++) {
         if (config.forecast_types[i] != 0 && *config.forecast_types[i] != 0) {
@@ -209,15 +199,15 @@ static esp_err_t configure_post_handler(httpd_req_t *req) {
 }
 
 static esp_err_t current_config_get_handler(httpd_req_t *req) {
-    spot_check_config *current_config = nvs_get_config();
-    const char **forecast_types_ptr = (const char **)current_config->forecast_types;
+    spot_check_config *current_config     = nvs_get_config();
+    const char **      forecast_types_ptr = (const char **)current_config->forecast_types;
 
-    cJSON *root = cJSON_CreateObject();
-    cJSON *num_days_json = cJSON_CreateString(current_config->number_of_days);
-    cJSON *spot_name_json = cJSON_CreateString(current_config->spot_name);
-    cJSON *spot_lat_json = cJSON_CreateString(current_config->spot_lat);
-    cJSON *spot_lon_json = cJSON_CreateString(current_config->spot_lon);
-    cJSON *spot_uid_json = cJSON_CreateString(current_config->spot_uid);
+    cJSON *root                = cJSON_CreateObject();
+    cJSON *num_days_json       = cJSON_CreateString(current_config->number_of_days);
+    cJSON *spot_name_json      = cJSON_CreateString(current_config->spot_name);
+    cJSON *spot_lat_json       = cJSON_CreateString(current_config->spot_lat);
+    cJSON *spot_lon_json       = cJSON_CreateString(current_config->spot_lon);
+    cJSON *spot_uid_json       = cJSON_CreateString(current_config->spot_uid);
     cJSON *forecast_types_json = cJSON_CreateStringArray(forecast_types_ptr, current_config->forecast_type_count);
     cJSON_AddItemToObject(root, "number_of_days", num_days_json);
     cJSON_AddItemToObject(root, "spot_name", spot_name_json);
@@ -235,9 +225,9 @@ static esp_err_t current_config_get_handler(httpd_req_t *req) {
 }
 
 static esp_err_t clear_nvs_post_handler(httpd_req_t *req) {
-    int query_buf_len = 30;
+    int  query_buf_len = 30;
     char query_buf[query_buf_len];
-    int actual_query_len = httpd_req_get_url_query_len(req) + 1;
+    int  actual_query_len = httpd_req_get_url_query_len(req) + 1;
     if (actual_query_len > query_buf_len) {
         ESP_LOGI(TAG, "Query str too long for buffer (%d long, can only fit %d)", actual_query_len, query_buf_len);
         httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid query string");
@@ -260,7 +250,7 @@ static esp_err_t clear_nvs_post_handler(httpd_req_t *req) {
         ESP_LOGI(TAG, "Failed to get query string");
         httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to get query string");
     }
-    
+
     return ESP_OK;
 }
 

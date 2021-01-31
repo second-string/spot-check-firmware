@@ -1,7 +1,7 @@
 #include <string.h>
-#include "freertos/FreeRTOS.h"
-#include "esp_http_client.h"
 #include "esp_err.h"
+#include "esp_http_client.h"
+#include "freertos/FreeRTOS.h"
 
 #include "constants.h"
 #include "http_client.h"
@@ -18,7 +18,7 @@ bool http_client_inited = false;
 
 /* Technically unnecessary, should be stubbed out for non-debug build */
 esp_err_t http_event_handler(esp_http_client_event_t *event) {
-    switch(event->event_id) {
+    switch (event->event_id) {
         case HTTP_EVENT_ERROR:
             ESP_LOGD(TAG, "HTTP_EVENT_ERROR");
             break;
@@ -60,11 +60,9 @@ void http_client_init() {
     // TODO :: build this URL with the same logic that
     // build_request uses to prevent wasting time forgetting
     // to update BASE_URL #define...
-    esp_http_client_config_t http_config = {
-        .url = "http://192.168.1.70/tides?spot_name=wedge&days=2",
-        .event_handler = http_event_handler,
-        .buffer_size = MAX_READ_BUFFER_SIZE
-    };
+    esp_http_client_config_t http_config = {.url           = "http://192.168.1.70/tides?spot_name=wedge&days=2",
+                                            .event_handler = http_event_handler,
+                                            .buffer_size   = MAX_READ_BUFFER_SIZE};
 
     client = esp_http_client_init(&http_config);
     if (!client) {
@@ -79,37 +77,21 @@ void http_client_init() {
 // Caller passes in endpoint (tides/swell) the values for the 2 query params,
 // a pointer to a block of already-allocated memory for the base url + endpoint,
 // and a pointer to a block of already-allocated memory to hold the query params structs
-request http_client_build_request(char* endpoint, spot_check_config *config, char *url_buf, query_param *params) {
+request http_client_build_request(char *endpoint, spot_check_config *config, char *url_buf, query_param *params) {
     query_param temp_params[2];
     if (strcmp(endpoint, "weather") == 0) {
-        temp_params[0] = (query_param){
-            .key = "lat",
-            .value = config->spot_lat
-        };
-        temp_params[1] = (query_param){
-            .key = "lon",
-            .value = config->spot_lon
-        };
+        temp_params[0] = (query_param){.key = "lat", .value = config->spot_lat};
+        temp_params[1] = (query_param){.key = "lon", .value = config->spot_lon};
     } else {
-        temp_params[0] = (query_param){
-            .key = "days",
-            .value = config->number_of_days
-        };
-        temp_params[1] = (query_param){
-            .key = "spot_id",
-            .value = config->spot_uid
-        };
+        temp_params[0] = (query_param){.key = "days", .value = config->number_of_days};
+        temp_params[1] = (query_param){.key = "spot_id", .value = config->spot_uid};
     }
 
     memcpy(params, temp_params, sizeof(temp_params));
 
     strcpy(url_buf, URL_BASE);
     strcat(url_buf, endpoint);
-    request tide_request = {
-        .url = url_buf,
-        .params = params,
-        .num_params = sizeof(temp_params) / sizeof(query_param)
-    };
+    request tide_request = {.url = url_buf, .params = params, .num_params = sizeof(temp_params) / sizeof(query_param)};
 
     return tide_request;
 }
@@ -153,7 +135,7 @@ int http_client_perform_request(request *request_obj, char **read_buffer) {
     }
 
     int content_length = esp_http_client_get_content_length(client);
-    int status = esp_http_client_get_status_code(client);
+    int status         = esp_http_client_get_status_code(client);
     if (status >= 200 && status <= 299) {
         if (content_length < 0) {
             ESP_LOGI(TAG, "Got success status (%d) but no content in response, bailing", status);
@@ -177,10 +159,10 @@ int http_client_perform_request(request *request_obj, char **read_buffer) {
         // inside client is inited to ~512 bytes but something's borked in the SDK. This is technically
         // double-allocating buffers of MAX_READ_BUFFER_SIZE since there's one internally and another
         // here, but hopefully the quick malloc/free shouldn't cause any issues
-        *read_buffer = malloc(content_length + 1);
-        int length_received = esp_http_client_read(client, *read_buffer, content_length);
+        *read_buffer                    = malloc(content_length + 1);
+        int length_received             = esp_http_client_read(client, *read_buffer, content_length);
         (*read_buffer)[length_received] = '\0';
-        alloced_space_used = length_received + 1;
+        alloced_space_used              = length_received + 1;
     } else {
         ESP_LOGI(TAG, "Not enough room in read buffer: buffer=%d, content=%d", MAX_READ_BUFFER_SIZE, content_length);
     }

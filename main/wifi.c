@@ -4,10 +4,10 @@
 #include <wifi_provisioning/manager.h>
 #include <wifi_provisioning/scheme_softap.h>
 
+#include "esp_log.h"
+#include "esp_wifi.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "esp_wifi.h"
-#include "esp_log.h"
 
 #include "lwip/err.h"
 #include "lwip/sys.h"
@@ -15,7 +15,7 @@
 #include "wifi.h"
 
 // Local configuration network
-#define CONFIG_AP_SSID          CONFIG_CONFIGURATION_ACCESS_POINT_SSID
+#define CONFIG_AP_SSID CONFIG_CONFIGURATION_ACCESS_POINT_SSID
 
 bool wifi_is_provisioning_inited = false;
 
@@ -35,14 +35,16 @@ static void wifi_start_sta() {
 
 void wifi_start_provisioning(bool force_reprovision) {
     if (main_event_handler == NULL) {
-        ESP_LOGE(TAG, "wifi_init() not called before trying to start provisioning or connect to sta, failing irrecoverably");
+        ESP_LOGE(TAG,
+                 "wifi_init() not called before trying to start provisioning or connect to sta, failing irrecoverably");
         return;
     }
 
     bool already_provisioned = false;
     ESP_ERROR_CHECK(wifi_prov_mgr_is_provisioned(&already_provisioned));
     if (!already_provisioned || force_reprovision) {
-        const char *log = force_reprovision ? "Forcing reprovisioning process" : "No saved provisioning info, starting provisioning process";
+        const char *log = force_reprovision ? "Forcing reprovisioning process"
+                                            : "No saved provisioning info, starting provisioning process";
         ESP_LOGI(TAG, "%s", log);
 
         // SSID / device name (softap / ble respectively)
@@ -98,16 +100,14 @@ void wifi_init_provisioning() {
     }
 
     // Provisioning-specific event handler deprecated, subscribe on default event loop handler.
-    ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_PROV_EVENT,
-                                                        ESP_EVENT_ANY_ID,
-                                                        main_event_handler,
-                                                        NULL,
+    ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_PROV_EVENT, ESP_EVENT_ANY_ID, main_event_handler, NULL,
                                                         &provisioning_manager_event_handler));
 
     wifi_prov_mgr_config_t config = {
-        .scheme = wifi_prov_scheme_softap,
-        .scheme_event_handler = WIFI_PROV_EVENT_HANDLER_NONE,              // Only needed for BT/BLE provisioning
-        // .app_event_handler = { .event_cb = provisioning_event_handler }         // deprecated in favor of default event loop
+        .scheme               = wifi_prov_scheme_softap,
+        .scheme_event_handler = WIFI_PROV_EVENT_HANDLER_NONE,  // Only needed for BT/BLE provisioning
+        // .app_event_handler = { .event_cb = provisioning_event_handler }         // deprecated in favor of default
+        // event loop
     };
 
     ESP_ERROR_CHECK(wifi_prov_mgr_init(config));

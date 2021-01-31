@@ -3,6 +3,6 @@
 
 #include "cJSON.h"
 
-cJSON* parse_json(char *server_response);
+cJSON* parse_json(char* server_response);
 
 #endif

@@ -1,43 +1,40 @@
 #include "constants.h"
 
-#include <stdlib.h>
 #include <ctype.h>
+#include <stdlib.h>
 #include <string.h>
 
-#include "esp_log.h"
 #include "esp_err.h"
+#include "esp_log.h"
 
 #include "url_decode.h"
 
-void urldecode2(char *dst, const char *src)
-{
-        char a, b;
-        while (*src) {
-                if ((*src == '%') &&
-                    ((a = src[1]) && (b = src[2])) &&
-                    (isxdigit(a) && isxdigit(b))) {
-                        if (a >= 'a')
-                                a -= 'a'-'A';
-                        if (a >= 'A')
-                                a -= ('A' - 10);
-                        else
-                                a -= '0';
-                        if (b >= 'a')
-                                b -= 'a'-'A';
-                        if (b >= 'A')
-                                b -= ('A' - 10);
-                        else
-                                b -= '0';
-                        *dst++ = 16*a+b;
-                        src+=3;
-                } else if (*src == '+') {
-                        *dst++ = ' ';
-                        src++;
-                } else {
-                        *dst++ = *src++;
-                }
+void urldecode2(char *dst, const char *src) {
+    char a, b;
+    while (*src) {
+        if ((*src == '%') && ((a = src[1]) && (b = src[2])) && (isxdigit(a) && isxdigit(b))) {
+            if (a >= 'a')
+                a -= 'a' - 'A';
+            if (a >= 'A')
+                a -= ('A' - 10);
+            else
+                a -= '0';
+            if (b >= 'a')
+                b -= 'a' - 'A';
+            if (b >= 'A')
+                b -= ('A' - 10);
+            else
+                b -= '0';
+            *dst++ = 16 * a + b;
+            src += 3;
+        } else if (*src == '+') {
+            *dst++ = ' ';
+            src++;
+        } else {
+            *dst++ = *src++;
         }
-        *dst++ = '\0';
+    }
+    *dst++ = '\0';
 }
 
 /*
@@ -45,13 +42,13 @@ void urldecode2(char *dst, const char *src)
  * for allocating array of tuples passed in.
  */
 esp_err_t get_key_values(char *decoded_str, Tuple *tuple_array, int num_tuples_available) {
-    const char *initial_delim = "&";
-    char inner_delim = '=';
-    int current_tuple_index = 0;
+    const char *initial_delim       = "&";
+    char        inner_delim         = '=';
+    int         current_tuple_index = 0;
 
     // strtok modifies string in place, copy to not bork callers pointer
     size_t input_str_len = strlen(decoded_str) + 1;
-    char temp_input_str[input_str_len];
+    char   temp_input_str[input_str_len];
     strncpy(temp_input_str, decoded_str, input_str_len);
 
     // Outer loops splits up key/value strings by & delimiter,
@@ -68,7 +65,7 @@ esp_err_t get_key_values(char *decoded_str, Tuple *tuple_array, int num_tuples_a
 
         // Lengths do not include null terms. value_len subtracts an extra to account
         // the position of equals_location used in key_len calculation
-        int key_len = equals_location - next_key_value_str;
+        int key_len   = equals_location - next_key_value_str;
         int value_len = strlen(next_key_value_str) - key_len - 1;
 
         strncpy(tuple_array[current_tuple_index].key, next_key_value_str, key_len);

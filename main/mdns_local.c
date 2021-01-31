@@ -1,17 +1,17 @@
 #include "constants.h"
 
-#include "mdns.h"
 #include "esp_log.h"
+#include "mdns.h"
 
 #include "mdns_local.h"
 
 static char *hostname = "spot-check";
 
 void mdns_init_local() {
-    //initialize mDNS service
+    // initialize mDNS service
     ESP_ERROR_CHECK(mdns_init());
 
-    //set hostname that ESP will be available under. Usually this would need to be
+    // set hostname that ESP will be available under. Usually this would need to be
     // discovered by an external device by querying the _spot-check mDNS service
     mdns_hostname_set(hostname);
 
