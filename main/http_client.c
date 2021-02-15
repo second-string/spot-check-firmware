@@ -1,6 +1,4 @@
 #include <string.h>
-#include "esp_err.h"
-#include "esp_http_client.h"
 #include "freertos/FreeRTOS.h"
 
 #include "constants.h"

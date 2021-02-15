@@ -1,4 +1,4 @@
-#include "constants.h"
+
 
 #include <stdio.h>
 #include <string.h>
@@ -26,6 +26,7 @@
 #include "led_text.h"
 #include "mdns_local.h"
 #include "nvs.h"
+#include "ota_task.h"
 #include "timer.h"
 #include "wifi.h"
 
@@ -39,8 +40,7 @@ typedef struct {
     char    tide_height[7];  // minus sign, two digits, decimal point, two digits, null
 } conditions_t;
 
-static volatile int  sta_connect_attempts = 0;
-static volatile bool connected_to_network = false;
+static volatile int sta_connect_attempts = 0;
 
 /*
  * Initialize this to pass our check is (since we normally divide this num by 60)
@@ -262,6 +262,7 @@ void app_main(void) {
     // first setup.
     // https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-guides/wifi.html#wi-fi-configuration-phase
     nvs_init();
+
     timer_info_handle debounce_handle =
         timer_init("debounce", button_timer_expired_callback, BUTTON_TIMER_PERIOD_MS * 1000);
     gpio_init_local(button_isr_handler);
@@ -281,6 +282,8 @@ void app_main(void) {
     TaskHandle_t update_conditions_task_handle;
     xTaskCreate(&update_conditions, "update-conditions", 8192 / 4, NULL, tskIDLE_PRIORITY,
                 &update_conditions_task_handle);
+    TaskHandle_t ota_task_handle;
+    xTaskCreate(&check_ota_update_task, "check-ota-update", 8192, NULL, tskIDLE_PRIORITY, &ota_task_handle);
 
     led_text_state previous_text_state = led_text_current_state;
     led_text_state current_state;

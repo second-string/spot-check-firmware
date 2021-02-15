@@ -9,4 +9,6 @@ idf_component_register(
                                  "http_client.c"
                                  "json.c"
                                  "http_server.c"
-                    INCLUDE_DIRS "include")
+                                 "ota_task.c"
+                    INCLUDE_DIRS "include"
+                    EMBED_TXTFILES ${project_dir}/server_certs/ca_cert.pem)

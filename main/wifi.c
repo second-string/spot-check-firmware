@@ -19,6 +19,10 @@
 
 bool wifi_is_provisioning_inited = false;
 
+// Flag for knowing if we've been provisioned and successfully connected to new wifi network (does not verify that
+// network as external internet access)
+volatile bool connected_to_network = false;
+
 static esp_event_handler_instance_t provisioning_manager_event_handler;
 
 /*
