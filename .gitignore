@@ -8,3 +8,6 @@ build/
 
 *.sublime-project
 *.sublime-workspace
+
+# clangd cache for YCM
+.cache/

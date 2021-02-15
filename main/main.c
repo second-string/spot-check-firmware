@@ -32,27 +32,35 @@
 #define LED_ROWS 6
 #define LEDS_PER_ROW 50
 
+typedef struct {
+    int8_t  temperature;
+    uint8_t wind_speed;
+    char    wind_dir[4];     // 3 characters for dir (SSW, etc) plus null
+    char    tide_height[7];  // minus sign, two digits, decimal point, two digits, null
+} conditions_t;
+
 static volatile int  sta_connect_attempts = 0;
 static volatile bool connected_to_network = false;
 
 /*
  * Initialize this to pass our check is (since we normally divide this num by 60)
- * to force a weather request on startup
+ * to force a conditions request on startup
  */
-static volatile unsigned int seconds_elapsed            = WEATHER_UPDATE_INTERVAL_MINUTES * 60;
-static volatile bool         fetch_new_weather          = false;
-static volatile int          last_retrieved_temperature = 0;
+static volatile unsigned int seconds_elapsed      = CONDITIONS_UPDATE_INTERVAL_MINUTES * 60;
+static volatile bool         fetch_new_conditions = false;
+static conditions_t          last_retrieved_conditions;
 
 void button_timer_expired_callback(void *timer_args) {
     button_timer_expired = true;
 }
-void weather_timer_expired_callback(void *timer_args) {
+
+void conditions_timer_expired_callback(void *timer_args) {
     seconds_elapsed++;
 
-    if ((seconds_elapsed / 60) >= WEATHER_UPDATE_INTERVAL_MINUTES || new_location_set) {
-        new_location_set;
-        seconds_elapsed   = 0;
-        fetch_new_weather = true;
+    if ((seconds_elapsed / 60) >= CONDITIONS_UPDATE_INTERVAL_MINUTES || new_location_set) {
+        new_location_set     = false;
+        seconds_elapsed      = 0;
+        fetch_new_conditions = true;
     }
 }
 
@@ -153,55 +161,96 @@ void default_event_handler(void *arg, esp_event_base_t event_base, int32_t event
     }
 }
 
-int refresh_weather() {
+void refresh_conditions(conditions_t *new_conditions) {
     spot_check_config *config = nvs_get_config();
     char               url_buf[strlen(URL_BASE) + 20];
-    query_param        params[2];
-    request            request = http_client_build_request("weather", config, url_buf, params);
+    query_param        params[3];
+    request            request = http_client_build_request("conditions", config, url_buf, params, 3);
 
     char *server_response = NULL;
     int   data_length     = http_client_perform_request(&request, &server_response);
+    bool  parse_success   = false;
     if (data_length != 0) {
         cJSON *json               = parse_json(server_response);
         cJSON *data_value         = cJSON_GetObjectItem(json, "data");
         cJSON *temperature_object = cJSON_GetObjectItem(data_value, "temp");
+        cJSON *wind_speed_object  = cJSON_GetObjectItem(data_value, "wind_speed");
+        cJSON *wind_dir_object    = cJSON_GetObjectItem(data_value, "wind_dir");
+        cJSON *tide_height_object = cJSON_GetObjectItem(data_value, "tide_height");
 
-        last_retrieved_temperature = temperature_object->valueint;
+        char *wind_dir_str    = cJSON_GetStringValue(wind_dir_object);
+        char *tide_height_str = cJSON_GetStringValue(tide_height_object);
+
+        // Set ints before copying string into buffer
+        new_conditions->temperature = temperature_object->valueint;
+        new_conditions->wind_speed  = wind_speed_object->valueint;
+        strncpy(new_conditions->wind_dir, wind_dir_str, sizeof(new_conditions->wind_dir) - 1);
+        new_conditions->wind_dir[sizeof(new_conditions->wind_dir) - 1] = '\0';
+        strncpy(new_conditions->tide_height, tide_height_str, sizeof(new_conditions->tide_height) - 1);
+        new_conditions->tide_height[sizeof(new_conditions->tide_height) - 1] = '\0';
 
         cJSON_free(data_value);
         cJSON_free(json);
+
+        parse_success = true;
     } else {
-        ESP_LOGI(TAG, "Failed to get new temperature value, falling back to last saved value (%d)",
-                 last_retrieved_temperature);
+        ESP_LOGI(TAG, "Failed to get new conditions, falling back to last saved values");
+        new_conditions->temperature = last_retrieved_conditions.temperature;
+        new_conditions->wind_speed  = last_retrieved_conditions.wind_speed;
+        strncpy(new_conditions->wind_dir, last_retrieved_conditions.wind_dir,
+                sizeof(last_retrieved_conditions.wind_dir) - 1);
+        new_conditions->wind_dir[sizeof(new_conditions->wind_dir) - 1] = '\0';
+        strncpy(new_conditions->tide_height, last_retrieved_conditions.tide_height,
+                sizeof(last_retrieved_conditions.tide_height) - 1);
+        new_conditions->tide_height[sizeof(new_conditions->tide_height) - 1] = '\0';
+
+        parse_success = false;
+    }
+
+    // If all good, save values back to our persisted state
+    // This is technically irrelevant - we don't need to pass in a struct to use those values, we should just save to
+    // local variables to test validity then assign to global struct
+    if (parse_success) {
+        last_retrieved_conditions.temperature = new_conditions->temperature;
+        last_retrieved_conditions.wind_speed  = new_conditions->wind_speed;
+        strncpy(last_retrieved_conditions.wind_dir, new_conditions->wind_dir,
+                sizeof(last_retrieved_conditions.wind_dir) - 1);
+        new_conditions->wind_dir[sizeof(last_retrieved_conditions.wind_dir) - 1] = '\0';
+        strncpy(last_retrieved_conditions.tide_height, new_conditions->tide_height,
+                sizeof(last_retrieved_conditions.tide_height) - 1);
+        new_conditions->tide_height[sizeof(last_retrieved_conditions.tide_height) - 1] = '\0';
     }
 
     // Caller responsible for freeing buffer if non-null on return
     if (server_response != NULL) {
         free(server_response);
     }
-
-    return last_retrieved_temperature;
 }
 
-void update_weather(void *args) {
-    timer_info_handle weather_handle =
-        timer_init("weather", weather_timer_expired_callback, ONE_SECOND_TIMER_MS * 1000);
-    timer_reset(weather_handle, true);
+void display_conditions(conditions_t *conditions) {
+    char conditions_str[40] = {0};
+    sprintf(conditions_str, "%d F - %s at %d mph - %s ft", conditions->temperature, conditions->wind_dir,
+            conditions->wind_speed, conditions->tide_height);
+    ESP_LOGI(TAG, "Showing: '%s'", conditions_str);
+    led_text_show_text(conditions_str, strlen(conditions_str));
+}
+
+void update_conditions(void *args) {
+    timer_info_handle conditions_handle =
+        timer_init("conditions", conditions_timer_expired_callback, ONE_SECOND_TIMER_MS * 1000);
+    timer_reset(conditions_handle, true);
 
     while (1) {
         vTaskDelay(5000 / portTICK_PERIOD_MS);
 
-        if (!connected_to_network || !fetch_new_weather) {
+        if (!connected_to_network || !fetch_new_conditions) {
             continue;
         }
-        fetch_new_weather = false;
+        fetch_new_conditions = false;
 
-        int new_temperature = refresh_weather();
-
-        char temperature_str[10] = {0};
-        sprintf(temperature_str, "%d F", new_temperature);
-        ESP_LOGI(TAG, "Showing: '%s'", temperature_str);
-        led_text_show_text(temperature_str, strlen(temperature_str));
+        conditions_t new_conditions;
+        refresh_conditions(&new_conditions);
+        display_conditions(&new_conditions);
     }
 }
 
@@ -229,8 +278,9 @@ void app_main(void) {
     http_client_init();
     wifi_start_provisioning(false);
 
-    TaskHandle_t update_weather_task_handle;
-    xTaskCreate(&update_weather, "update-weather", 8192 / 4, NULL, tskIDLE_PRIORITY, &update_weather_task_handle);
+    TaskHandle_t update_conditions_task_handle;
+    xTaskCreate(&update_conditions, "update-conditions", 8192 / 4, NULL, tskIDLE_PRIORITY,
+                &update_conditions_task_handle);
 
     led_text_state previous_text_state = led_text_current_state;
     led_text_state current_state;
@@ -252,14 +302,11 @@ void app_main(void) {
                 } else {
                     if (previous_text_state == SCROLLING) {
                         // We just became idle after scrolling and we have no more text to scroll,
-                        // "clear" our buffer and index and re-show the weather
+                        // "clear" our buffer and index and re-show the conditions
                         num_available_text_to_scroll = 0;
                         next_index_to_scroll         = 0;
 
-                        char temperature_str[10] = {0};
-                        sprintf(temperature_str, "%d F", last_retrieved_temperature);
-                        ESP_LOGI(TAG, "Re showing temp after scrolling: '%s'", temperature_str);
-                        led_text_show_text(temperature_str, strlen(temperature_str));
+                        display_conditions(&last_retrieved_conditions);
                     }
                 }
                 break;
@@ -281,7 +328,7 @@ void app_main(void) {
             spot_check_config *config = nvs_get_config();
 
             char *next_forecast_type = get_next_forecast_type(config->forecast_types);
-            request                  = http_client_build_request(next_forecast_type, config, url_buf, params);
+            request                  = http_client_build_request(next_forecast_type, config, url_buf, params, 2);
 
             char *server_response = NULL;
             int   data_length     = http_client_perform_request(&request, &server_response);

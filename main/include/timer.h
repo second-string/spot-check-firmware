@@ -8,7 +8,7 @@
 #define RELOAD_ON_EXPIRATION true
 
 #define BUTTON_TIMER_PERIOD_MS (100)
-#define WEATHER_UPDATE_INTERVAL_MINUTES (20)
+#define CONDITIONS_UPDATE_INTERVAL_MINUTES (20)
 #define ONE_SECOND_TIMER_MS (1000)
 
 typedef struct timer_info_t *timer_info_handle;

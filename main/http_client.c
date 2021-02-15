@@ -77,11 +77,14 @@ void http_client_init() {
 // Caller passes in endpoint (tides/swell) the values for the 2 query params,
 // a pointer to a block of already-allocated memory for the base url + endpoint,
 // and a pointer to a block of already-allocated memory to hold the query params structs
-request http_client_build_request(char *endpoint, spot_check_config *config, char *url_buf, query_param *params) {
-    query_param temp_params[2];
-    if (strcmp(endpoint, "weather") == 0) {
+request http_client_build_request(char *endpoint, spot_check_config *config, char *url_buf, query_param *params,
+                                  uint8_t num_params) {
+    query_param temp_params[num_params];
+    if (strcmp(endpoint, "conditions") == 0) {
         temp_params[0] = (query_param){.key = "lat", .value = config->spot_lat};
         temp_params[1] = (query_param){.key = "lon", .value = config->spot_lon};
+        temp_params[2] = (query_param){.key = "spot_id", .value = config->spot_uid};
+        ESP_LOGI(TAG, "succesfully copied to temp");
     } else {
         temp_params[0] = (query_param){.key = "days", .value = config->number_of_days};
         temp_params[1] = (query_param){.key = "spot_id", .value = config->spot_uid};
@@ -104,7 +107,7 @@ request http_client_build_request(char *endpoint, spot_check_config *config, cha
 int http_client_perform_request(request *request_obj, char **read_buffer) {
     if (request_obj) {
         // assume we won't have that many query params. Could calc this too
-        char req_url[strlen(request_obj->url) + 30];
+        char req_url[strlen(request_obj->url) + 60];
         strcpy(req_url, request_obj->url);
         strcat(req_url, "?");
         for (int i = 0; i < request_obj->num_params; i++) {
