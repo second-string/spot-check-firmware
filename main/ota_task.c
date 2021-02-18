@@ -23,8 +23,8 @@ static esp_err_t http_client_init_callback(esp_http_client_handle_t http_client)
     return err;
 }
 
-static esp_err_t validate_image_header(esp_app_desc_t *image_info) {
-    if (image_info == NULL) {
+static esp_err_t validate_image_header(esp_app_desc_t *new_image_info) {
+    if (new_image_info == NULL) {
         return ESP_ERR_INVALID_ARG;
     }
 
@@ -34,16 +34,18 @@ static esp_err_t validate_image_header(esp_app_desc_t *image_info) {
         ESP_LOGI(TAG, "Running firmware version: %s", current_image_info.version);
     }
 
-    int version_comparison = memcmp(image_info->version, current_image_info.version, sizeof(image_info->version));
+    int version_comparison =
+        memcmp(new_image_info->version, current_image_info.version, sizeof(new_image_info->version));
     if (version_comparison == 0) {
         ESP_LOGI(TAG, "OTA image version same as current version, no update needed");
         return ESP_FAIL;
     } else if (version_comparison < 0) {
-        ESP_LOGI(TAG, "Current version less than OTA image version (%s), starting OTA update", image_info->version);
+        ESP_LOGI(TAG, "Current version greater than OTA image version (%s), something is wrong!!",
+                 new_image_info->version);
+        // return ESP_FAIL;
         return ESP_OK;
     } else if (version_comparison > 0) {
-        ESP_LOGI(TAG, "Current version greater than OTA image version (%s), something is wrong!!", image_info->version);
-        // return ESP_FAIL;
+        ESP_LOGI(TAG, "Current version less than OTA image version (%s), starting OTA update", new_image_info->version);
         return ESP_OK;
     }
 
@@ -52,6 +54,11 @@ static esp_err_t validate_image_header(esp_app_desc_t *image_info) {
 }
 void check_ota_update_task(void *args) {
     ESP_LOGI(TAG, "Starting OTA task to check update status");
+
+#ifdef CONFIG_DISABLE_OTA
+    ESP_LOGI(TAG, "FW compiled with ENABLE_OTA menuconfig option disabled, bailing out of OTA task");
+    vTaskDelete(NULL);
+#endif
 
     while (!connected_to_network) {
         ESP_LOGI(TAG, "Not connected to wifi yet, OTA task will sleep and periodically check connection");
