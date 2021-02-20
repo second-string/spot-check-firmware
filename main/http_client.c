@@ -10,6 +10,8 @@
 #define MAX_QUERY_PARAM_LENGTH 15
 #define MAX_READ_BUFFER_SIZE 4096
 
+extern const uint8_t server_cert_pem_start[] asm("_binary_ca_cert_pem_start");
+
 static esp_http_client_handle_t client;
 
 bool http_client_inited = false;
@@ -55,12 +57,14 @@ void http_client_init() {
 
     ESP_LOGI(TAG, "initing http client...");
 
-    // TODO :: build this URL with the same logic that
-    // build_request uses to prevent wasting time forgetting
-    // to update BASE_URL #define...
-    esp_http_client_config_t http_config = {.url           = "http://192.168.1.70/tides?spot_name=wedge&days=2",
-                                            .event_handler = http_event_handler,
-                                            .buffer_size   = MAX_READ_BUFFER_SIZE};
+    esp_http_client_config_t http_config = {
+        .host           = "spotcheck.brianteam.dev",
+        .path           = "/",
+        .event_handler  = http_event_handler,
+        .buffer_size    = MAX_READ_BUFFER_SIZE,
+        .cert_pem       = (char *)&server_cert_pem_start,
+        .transport_type = HTTP_TRANSPORT_OVER_SSL,
+    };
 
     client = esp_http_client_init(&http_config);
     if (!client) {
@@ -75,8 +79,11 @@ void http_client_init() {
 // Caller passes in endpoint (tides/swell) the values for the 2 query params,
 // a pointer to a block of already-allocated memory for the base url + endpoint,
 // and a pointer to a block of already-allocated memory to hold the query params structs
-request http_client_build_request(char *endpoint, spot_check_config *config, char *url_buf, query_param *params,
-                                  uint8_t num_params) {
+request http_client_build_request(char *             endpoint,
+                                  spot_check_config *config,
+                                  char *             url_buf,
+                                  query_param *      params,
+                                  uint8_t            num_params) {
     query_param temp_params[num_params];
     if (strcmp(endpoint, "conditions") == 0) {
         temp_params[0] = (query_param){.key = "lat", .value = config->spot_lat};

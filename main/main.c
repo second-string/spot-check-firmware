@@ -292,12 +292,7 @@ void app_main(void) {
     wifi_start_provisioning(false);
 
     TaskHandle_t update_conditions_task_handle;
-    xTaskCreate(&update_conditions,
-                "update-conditions",
-                8192 / 4,
-                NULL,
-                tskIDLE_PRIORITY,
-                &update_conditions_task_handle);
+    xTaskCreate(&update_conditions, "update-conditions", 8192, NULL, tskIDLE_PRIORITY, &update_conditions_task_handle);
     TaskHandle_t ota_task_handle;
     xTaskCreate(&check_ota_update_task, "check-ota-update", 8192, NULL, tskIDLE_PRIORITY, &ota_task_handle);
 
