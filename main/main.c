@@ -132,13 +132,17 @@ void default_event_handler(void *arg, esp_event_base_t event_base, int32_t event
             case WIFI_PROV_CRED_RECV: {
                 wifi_sta_config_t *wifi_sta_cfg = (wifi_sta_config_t *)event_data;
                 size_t             ssid_len     = strnlen((char *)wifi_sta_cfg->ssid, sizeof(wifi_sta_cfg->ssid));
-                ESP_LOGI(TAG, "Received provisioning creds event - SSID: %s (length %d), PW: %s", wifi_sta_cfg->ssid,
-                         ssid_len, wifi_sta_cfg->password);
+                ESP_LOGI(TAG,
+                         "Received provisioning creds event - SSID: %s (length %d), PW: %s",
+                         wifi_sta_cfg->ssid,
+                         ssid_len,
+                         wifi_sta_cfg->password);
                 break;
             }
             case WIFI_PROV_CRED_FAIL: {
                 wifi_prov_sta_fail_reason_t *reason = (wifi_prov_sta_fail_reason_t *)event_data;
-                ESP_LOGE(TAG, "Provisioning failed: %s",
+                ESP_LOGE(TAG,
+                         "Provisioning failed: %s",
                          (*reason == WIFI_PROV_STA_AUTH_ERROR) ? "AP PW incorrect" : "AP not found");
                 break;
             }
@@ -197,10 +201,12 @@ void refresh_conditions(conditions_t *new_conditions) {
         ESP_LOGI(TAG, "Failed to get new conditions, falling back to last saved values");
         new_conditions->temperature = last_retrieved_conditions.temperature;
         new_conditions->wind_speed  = last_retrieved_conditions.wind_speed;
-        strncpy(new_conditions->wind_dir, last_retrieved_conditions.wind_dir,
+        strncpy(new_conditions->wind_dir,
+                last_retrieved_conditions.wind_dir,
                 sizeof(last_retrieved_conditions.wind_dir) - 1);
         new_conditions->wind_dir[sizeof(new_conditions->wind_dir) - 1] = '\0';
-        strncpy(new_conditions->tide_height, last_retrieved_conditions.tide_height,
+        strncpy(new_conditions->tide_height,
+                last_retrieved_conditions.tide_height,
                 sizeof(last_retrieved_conditions.tide_height) - 1);
         new_conditions->tide_height[sizeof(new_conditions->tide_height) - 1] = '\0';
 
@@ -213,10 +219,12 @@ void refresh_conditions(conditions_t *new_conditions) {
     if (parse_success) {
         last_retrieved_conditions.temperature = new_conditions->temperature;
         last_retrieved_conditions.wind_speed  = new_conditions->wind_speed;
-        strncpy(last_retrieved_conditions.wind_dir, new_conditions->wind_dir,
+        strncpy(last_retrieved_conditions.wind_dir,
+                new_conditions->wind_dir,
                 sizeof(last_retrieved_conditions.wind_dir) - 1);
         new_conditions->wind_dir[sizeof(last_retrieved_conditions.wind_dir) - 1] = '\0';
-        strncpy(last_retrieved_conditions.tide_height, new_conditions->tide_height,
+        strncpy(last_retrieved_conditions.tide_height,
+                new_conditions->tide_height,
                 sizeof(last_retrieved_conditions.tide_height) - 1);
         new_conditions->tide_height[sizeof(last_retrieved_conditions.tide_height) - 1] = '\0';
     }
@@ -229,8 +237,12 @@ void refresh_conditions(conditions_t *new_conditions) {
 
 void display_conditions(conditions_t *conditions) {
     char conditions_str[40] = {0};
-    sprintf(conditions_str, "%d F - %s at %d mph - %s ft", conditions->temperature, conditions->wind_dir,
-            conditions->wind_speed, conditions->tide_height);
+    sprintf(conditions_str,
+            "%d F - %s at %d mph - %s ft",
+            conditions->temperature,
+            conditions->wind_dir,
+            conditions->wind_speed,
+            conditions->tide_height);
     ESP_LOGI(TAG, "Showing: '%s'", conditions_str);
     led_text_show_text(conditions_str, strlen(conditions_str));
 }
@@ -280,7 +292,11 @@ void app_main(void) {
     wifi_start_provisioning(false);
 
     TaskHandle_t update_conditions_task_handle;
-    xTaskCreate(&update_conditions, "update-conditions", 8192 / 4, NULL, tskIDLE_PRIORITY,
+    xTaskCreate(&update_conditions,
+                "update-conditions",
+                8192 / 4,
+                NULL,
+                tskIDLE_PRIORITY,
                 &update_conditions_task_handle);
     TaskHandle_t ota_task_handle;
     xTaskCreate(&check_ota_update_task, "check-ota-update", 8192, NULL, tskIDLE_PRIORITY, &ota_task_handle);
@@ -342,7 +358,9 @@ void app_main(void) {
                     cJSON *data_list_value = NULL;
                     cJSON_ArrayForEach(data_list_value, data_value) {
                         char *text = cJSON_GetStringValue(data_list_value);
-                        ESP_LOGI(TAG, "Adding new text to the buffer at index %d: '%s'", num_available_text_to_scroll,
+                        ESP_LOGI(TAG,
+                                 "Adding new text to the buffer at index %d: '%s'",
+                                 num_available_text_to_scroll,
                                  text);
                         strcpy(text_to_scroll_buffer[num_available_text_to_scroll], text);
                         num_available_text_to_scroll++;
