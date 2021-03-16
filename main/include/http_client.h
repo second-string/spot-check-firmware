@@ -32,5 +32,10 @@ request   http_client_build_request(char *             endpoint,
                                     query_param *      params,
                                     uint8_t            num_params);
 int       http_client_perform_request(request *request_obj, char **read_buffer);
+int       http_client_perform_post(request *request_obj,
+                                   char *   post_data,
+                                   size_t   post_data_size,
+                                   char *   response_data,
+                                   size_t * response_data_size);
 
 #endif

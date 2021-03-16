@@ -178,3 +178,59 @@ int http_client_perform_request(request *request_obj, char **read_buffer) {
 
     return alloced_space_used;
 }
+
+// 0 for success, error code if not
+int http_client_perform_post(request *request_obj,
+                             char *   post_data,
+                             size_t   post_data_size,
+                             char *   response_data,
+                             size_t * response_data_size) {
+    int retval = 0;
+
+    ESP_ERROR_CHECK(esp_http_client_set_url(client, request_obj->url));
+    ESP_ERROR_CHECK(esp_http_client_set_method(client, HTTP_METHOD_POST));
+    ESP_ERROR_CHECK(esp_http_client_set_header(client, "Content-type", "application/json"));
+    ESP_ERROR_CHECK(esp_http_client_set_post_field(client, post_data, post_data_size));
+
+    ESP_LOGI(TAG, "Performing POST to %s with data size %u", request_obj->url, post_data_size);
+    esp_err_t err = esp_http_client_perform(client);
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Error performing POST, error: %s", esp_err_to_name(err));
+        retval = -1;
+    } else {
+        retval = esp_http_client_get_status_code(client);
+    }
+
+    int content_length = esp_http_client_get_content_length(client);
+    int status         = esp_http_client_get_status_code(client);
+    if (status >= 200 && status <= 299) {
+        if (content_length < 0) {
+            ESP_LOGI(TAG, "Got success status (%d) but no content in response, bailing", status);
+            return retval;
+        }
+
+        ESP_LOGI(TAG, "POST success! Status=%d, Content-length=%d", status, content_length);
+    } else {
+        ESP_LOGI(TAG, "POST failed. Status=%d, Content-length=%d", status, content_length);
+        err = esp_http_client_close(client);
+        if (err != ESP_OK) {
+            const char *err_str = esp_err_to_name(err);
+            ESP_LOGI(TAG, "Error closing http client connection: %s", err_str);
+            return 0;
+        }
+    }
+
+    int alloced_space_used = 0;
+    if (content_length < MAX_READ_BUFFER_SIZE) {
+        int length_received            = esp_http_client_read(client, response_data, content_length);
+        response_data[length_received] = '\0';
+        alloced_space_used             = length_received + 1;
+    } else {
+        ESP_LOGI(TAG, "Not enough room in read buffer: buffer=%d, content=%d", MAX_READ_BUFFER_SIZE, content_length);
+    }
+
+    *response_data_size = alloced_space_used;
+
+    // Return 0 if successful, the error code or -1 if anything else
+    return retval >= 200 && retval <= 200 ? 0 : retval;
+}
