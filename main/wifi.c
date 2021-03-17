@@ -8,7 +8,6 @@
 #include "esp_wifi.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "mdns.h"
 
 #include "lwip/err.h"
 #include "lwip/sys.h"
@@ -82,9 +81,6 @@ void wifi_start_provisioning(bool force_reprovision) {
 
 void wifi_init(void *event_handler) {
     main_event_handler = event_handler;
-
-    // initialize mDNS service. Don't know for sure if this is necessary or not
-    ESP_ERROR_CHECK(mdns_init());
 
     ESP_ERROR_CHECK(esp_netif_init());
 

@@ -5,6 +5,7 @@ idf_component_register(
                                  "wifi.c"
                                  "gpio.c"
                                  "timer.c"
+                                 "mdns_local.c"
                                  "http_client.c"
                                  "json.c"
                                  "http_server.c"

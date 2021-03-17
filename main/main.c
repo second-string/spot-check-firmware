@@ -23,6 +23,7 @@
 #include "json.h"
 #include "led_strip.h"
 #include "led_text.h"
+#include "mdns_local.h"
 #include "nvs.h"
 #include "ota_task.h"
 #include "timer.h"
@@ -103,6 +104,8 @@ void default_event_handler(void *arg, esp_event_base_t event_base, int32_t event
                 ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
                 ESP_LOGI(TAG, "Setting CONNECTED bit, got ip:" IPSTR, IP2STR(&event->ip_info.ip));
                 sta_connect_attempts = 0;
+                // mdns_advertise_tcp_service();
+
                 connected_to_network = true;
 
                 // We only start our http server upon IP assignment if this is a normal startup
@@ -214,8 +217,8 @@ void refresh_conditions(conditions_t *new_conditions) {
     }
 
     // If all good, save values back to our persisted state
-    // This is technically irrelevant - we don't need to pass in a struct to use those values, we should just save to
-    // local variables to test validity then assign to global struct
+    // This is technically irrelevant - we don't need to pass in a struct to use those values, we should just save
+    // to local variables to test validity then assign to global struct
     if (parse_success) {
         last_retrieved_conditions.temperature = new_conditions->temperature;
         last_retrieved_conditions.wind_speed  = new_conditions->wind_speed;
@@ -285,6 +288,7 @@ void app_main(void) {
     led_text_init(fonts_4x6, LED_ROWS, LEDS_PER_ROW, ZIGZAG, strip_funcs);
 
     ESP_ERROR_CHECK(esp_event_loop_create_default());
+    mdns_local_init();
     wifi_init(default_event_handler);
     wifi_init_provisioning();
     http_client_init();
@@ -306,7 +310,8 @@ void app_main(void) {
         switch (current_state) {
             case IDLE:
             case STATIC:
-                // If there's text available to scroll, doesn't matter if we got here from SCROLLING or IDLE, scroll it
+                // If there's text available to scroll, doesn't matter if we got here from SCROLLING or IDLE, scroll
+                // it
                 if (num_available_text_to_scroll > 0 && next_index_to_scroll < num_available_text_to_scroll) {
                     ESP_LOGI(TAG, "text in the buffer to scrolling, scrolling index %d", next_index_to_scroll);
                     char *text_to_scroll = text_to_scroll_buffer[next_index_to_scroll];
@@ -334,7 +339,8 @@ void app_main(void) {
         if (button_was_released(debounce_handle)) {
             ESP_ERROR_CHECK(gpio_set_level(LED_PIN, !gpio_get_level(LED_PIN)));
 
-            // Space for base url + endpoint. Query param space handled when building full url in perform_request func
+            // Space for base url + endpoint. Query param space handled when building full url in perform_request
+            // func
             char               url_buf[strlen(URL_BASE) + 20];
             request            request;
             query_param        params[2];
