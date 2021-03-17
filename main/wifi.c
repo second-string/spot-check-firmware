@@ -8,11 +8,14 @@
 #include "esp_wifi.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "mdns.h"
 
 #include "lwip/err.h"
 #include "lwip/sys.h"
 
 #include "wifi.h"
+
+#define TAG "sc-wifi"
 
 // Local configuration network
 #define CONFIG_AP_SSID CONFIG_CONFIGURATION_ACCESS_POINT_SSID
@@ -79,6 +82,10 @@ void wifi_start_provisioning(bool force_reprovision) {
 
 void wifi_init(void *event_handler) {
     main_event_handler = event_handler;
+
+    // initialize mDNS service. Don't know for sure if this is necessary or not
+    ESP_ERROR_CHECK(mdns_init());
+
     ESP_ERROR_CHECK(esp_netif_init());
 
     // Set up IP and WIFI event handlers. The PROV handler will set up a full connection by itself
@@ -104,7 +111,10 @@ void wifi_init_provisioning() {
     }
 
     // Provisioning-specific event handler deprecated, subscribe on default event loop handler.
-    ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_PROV_EVENT, ESP_EVENT_ANY_ID, main_event_handler, NULL,
+    ESP_ERROR_CHECK(esp_event_handler_instance_register(WIFI_PROV_EVENT,
+                                                        ESP_EVENT_ANY_ID,
+                                                        main_event_handler,
+                                                        NULL,
                                                         &provisioning_manager_event_handler));
 
     wifi_prov_mgr_config_t config = {

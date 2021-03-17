@@ -8,6 +8,8 @@
 // Must included below constants.h where we overwite the define of LOG_LOCAL_LEVEL
 #include "esp_log.h"
 
+#define TAG "sc-json"
+
 cJSON *parse_json(char *server_response) {
     cJSON *json = cJSON_Parse(server_response);
     if (json == NULL) {

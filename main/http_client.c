@@ -7,6 +7,8 @@
 // Must included below constants.h where we overwite the define of LOG_LOCAL_LEVEL
 #include "esp_log.h"
 
+#define TAG "sc-http-client"
+
 #define MAX_QUERY_PARAM_LENGTH 15
 #define MAX_READ_BUFFER_SIZE 4096
 
@@ -110,6 +112,11 @@ request http_client_build_request(char *             endpoint,
  * performed using whatever was last set.
  */
 int http_client_perform_request(request *request_obj, char **read_buffer) {
+    if (!connected_to_network) {
+        ESP_LOGI(TAG, "Attempted to make GET request, not connected to internet yet so bailing");
+        return 0;
+    }
+
     if (request_obj) {
         // assume we won't have that many query params. Could calc this too
         char req_url[strlen(request_obj->url) + 60];
@@ -190,6 +197,11 @@ int http_client_perform_post(request *request_obj,
                              size_t   post_data_size,
                              char *   response_data,
                              size_t * response_data_size) {
+    if (!connected_to_network) {
+        ESP_LOGI(TAG, "Attempted to make POST request, not connected to internet yet so bailing");
+        return 0;
+    }
+
     int retval = 0;
 
     ESP_ERROR_CHECK(esp_http_client_set_url(client, request_obj->url));

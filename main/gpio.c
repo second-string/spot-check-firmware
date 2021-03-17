@@ -7,6 +7,8 @@
 
 #include "esp_log.h"
 
+#define TAG "sc-gpio"
+
 #define GPIO_INPUT_PIN_SEL (1 << GPIO_BUTTON_PIN)
 
 typedef enum { WAITING_FOR_PRESS, DEBOUNCING_PRESS, DEBOUNCING_RELEASE, WAITING_FOR_RELEASE } debounce_state;

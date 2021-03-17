@@ -8,6 +8,8 @@
 #include "http_server.h"
 #include "nvs.h"
 
+#define TAG "sc-nvs"
+
 static nvs_handle_t handle = 0;
 
 // Allocate backing field buffers for our settings
@@ -75,7 +77,8 @@ void nvs_save_config(spot_check_config *config) {
             case ESP_ERR_NVS_NOT_FOUND:
                 break;
             default:
-                printf("Error (%s) saving forecast_type to flash with key %s!\n", esp_err_to_name(err),
+                printf("Error (%s) saving forecast_type to flash with key %s!\n",
+                       esp_err_to_name(err),
                        forecast_type_key);
         }
     }
@@ -173,7 +176,8 @@ spot_check_config *nvs_get_config() {
             case ESP_ERR_NVS_NOT_FOUND:
                 break;
             default:
-                printf("Error (%s) reading forecast_type from flash with key %s!\n", esp_err_to_name(err),
+                printf("Error (%s) reading forecast_type from flash with key %s!\n",
+                       esp_err_to_name(err),
                        forecast_type_key);
         }
     }

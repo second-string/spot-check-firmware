@@ -12,7 +12,6 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
 #include "freertos/task.h"
-#include "mdns.h"
 #include "sdkconfig.h"
 
 #include "driver/gpio.h"
@@ -24,11 +23,12 @@
 #include "json.h"
 #include "led_strip.h"
 #include "led_text.h"
-#include "mdns_local.h"
 #include "nvs.h"
 #include "ota_task.h"
 #include "timer.h"
 #include "wifi.h"
+
+#define TAG "sc-main"
 
 #define LED_ROWS 6
 #define LEDS_PER_ROW 50
@@ -103,7 +103,6 @@ void default_event_handler(void *arg, esp_event_base_t event_base, int32_t event
                 ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
                 ESP_LOGI(TAG, "Setting CONNECTED bit, got ip:" IPSTR, IP2STR(&event->ip_info.ip));
                 sta_connect_attempts = 0;
-                mdns_advertise_tcp_service();
                 connected_to_network = true;
 
                 // We only start our http server upon IP assignment if this is a normal startup
@@ -287,7 +286,6 @@ void app_main(void) {
 
     ESP_ERROR_CHECK(esp_event_loop_create_default());
     wifi_init(default_event_handler);
-    mdns_init_local();
     wifi_init_provisioning();
     http_client_init();
     wifi_start_provisioning(false);

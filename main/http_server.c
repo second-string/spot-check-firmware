@@ -9,6 +9,8 @@
 #include "json.h"
 #include "nvs.h"
 
+#define TAG "sc-http-server"
+
 static httpd_handle_t server_handle;
 
 static esp_err_t health_get_handler(httpd_req_t *req);
@@ -16,17 +18,25 @@ static esp_err_t configure_post_handler(httpd_req_t *req);
 static esp_err_t current_config_get_handler(httpd_req_t *req);
 static esp_err_t clear_nvs_post_handler(httpd_req_t *req);
 
-static const httpd_uri_t health_uri = {
-    .uri = "/health", .method = HTTP_GET, .handler = health_get_handler, .user_ctx = NULL};
+static const httpd_uri_t health_uri = {.uri      = "/health",
+                                       .method   = HTTP_GET,
+                                       .handler  = health_get_handler,
+                                       .user_ctx = NULL};
 
-static const httpd_uri_t configure_uri = {
-    .uri = "/configure", .method = HTTP_POST, .handler = configure_post_handler, .user_ctx = NULL};
+static const httpd_uri_t configure_uri = {.uri      = "/configure",
+                                          .method   = HTTP_POST,
+                                          .handler  = configure_post_handler,
+                                          .user_ctx = NULL};
 
-static const httpd_uri_t current_config_uri = {
-    .uri = "/current_configuration", .method = HTTP_GET, .handler = current_config_get_handler, .user_ctx = NULL};
+static const httpd_uri_t current_config_uri = {.uri      = "/current_configuration",
+                                               .method   = HTTP_GET,
+                                               .handler  = current_config_get_handler,
+                                               .user_ctx = NULL};
 
-static const httpd_uri_t clear_nvs_uri = {
-    .uri = "/clear_nvs", .method = HTTP_POST, .handler = clear_nvs_post_handler, .user_ctx = NULL};
+static const httpd_uri_t clear_nvs_uri = {.uri      = "/clear_nvs",
+                                          .method   = HTTP_POST,
+                                          .handler  = clear_nvs_post_handler,
+                                          .user_ctx = NULL};
 
 static esp_err_t health_get_handler(httpd_req_t *req) {
     httpd_resp_send(req, "Surviving not thriving", HTTPD_RESP_USE_STRLEN);
@@ -84,7 +94,9 @@ static esp_err_t configure_post_handler(httpd_req_t *req) {
     if (cJSON_IsString(json_number_of_days)) {
         config.number_of_days = cJSON_GetStringValue(json_number_of_days);
         if (strlen(config.number_of_days) > MAX_LENGTH_NUMBER_OF_DAYS_PARAM) {
-            ESP_LOGI(TAG, "Received number > %d digits, invalid. Defaulting to %s", MAX_LENGTH_NUMBER_OF_DAYS_PARAM,
+            ESP_LOGI(TAG,
+                     "Received number > %d digits, invalid. Defaulting to %s",
+                     MAX_LENGTH_NUMBER_OF_DAYS_PARAM,
                      default_number_of_days);
             config.number_of_days = default_number_of_days;
         }
@@ -97,7 +109,9 @@ static esp_err_t configure_post_handler(httpd_req_t *req) {
     if (cJSON_IsString(json_spot_name)) {
         config.spot_name = cJSON_GetStringValue(json_spot_name);
         if (strlen(config.spot_name) > MAX_LENGTH_SPOT_NAME_PARAM) {
-            ESP_LOGI(TAG, "Received spot_name > %d chars, invalid. Defaulting to %s", MAX_LENGTH_SPOT_NAME_PARAM,
+            ESP_LOGI(TAG,
+                     "Received spot_name > %d chars, invalid. Defaulting to %s",
+                     MAX_LENGTH_SPOT_NAME_PARAM,
                      default_spot_name);
             config.spot_name = default_spot_name;
         }
@@ -110,7 +124,9 @@ static esp_err_t configure_post_handler(httpd_req_t *req) {
     if (cJSON_IsString(json_spot_lat)) {
         config.spot_lat = cJSON_GetStringValue(json_spot_lat);
         if (strlen(config.spot_lat) > MAX_LENGTH_SPOT_LAT_PARAM) {
-            ESP_LOGI(TAG, "Received spot_lat > %d chars, invalid. Defaulting to %s", MAX_LENGTH_SPOT_LAT_PARAM,
+            ESP_LOGI(TAG,
+                     "Received spot_lat > %d chars, invalid. Defaulting to %s",
+                     MAX_LENGTH_SPOT_LAT_PARAM,
                      default_spot_lat);
             config.spot_lat = default_spot_lat;
         }
@@ -123,7 +139,9 @@ static esp_err_t configure_post_handler(httpd_req_t *req) {
     if (cJSON_IsString(json_spot_lon)) {
         config.spot_lon = cJSON_GetStringValue(json_spot_lon);
         if (strlen(config.spot_lon) > MAX_LENGTH_SPOT_LON_PARAM) {
-            ESP_LOGI(TAG, "Received spot_lon > %d chars, invalid. Defaulting to %s", MAX_LENGTH_SPOT_LON_PARAM,
+            ESP_LOGI(TAG,
+                     "Received spot_lon > %d chars, invalid. Defaulting to %s",
+                     MAX_LENGTH_SPOT_LON_PARAM,
                      default_spot_lon);
             config.spot_lon = default_spot_lon;
         }
@@ -136,8 +154,10 @@ static esp_err_t configure_post_handler(httpd_req_t *req) {
     if (cJSON_IsString(json_spot_uid)) {
         config.spot_uid = cJSON_GetStringValue(json_spot_uid);
         if (strlen(config.spot_uid) > MAX_LENGTH_SPOT_UID_PARAM) {
-            ESP_LOGI(TAG, "Received spot_uid > %d chars, invalid. Defaulting to wedge uid (%s)",
-                     MAX_LENGTH_SPOT_UID_PARAM, default_spot_uid);
+            ESP_LOGI(TAG,
+                     "Received spot_uid > %d chars, invalid. Defaulting to wedge uid (%s)",
+                     MAX_LENGTH_SPOT_UID_PARAM,
+                     default_spot_uid);
             config.spot_uid = default_spot_uid;
         }
     } else {
@@ -153,7 +173,8 @@ static esp_err_t configure_post_handler(httpd_req_t *req) {
         cJSON_ArrayForEach(json_forecast_type, json_forecast_types) {
             config.forecast_types[index] = cJSON_GetStringValue(json_forecast_type);
             if (strlen(config.forecast_types[index]) > MAX_LENGTH_FORECAST_TYPE_PARAM) {
-                ESP_LOGI(TAG, "Received forecast type > %d chars, invalid. Defaulting to empty",
+                ESP_LOGI(TAG,
+                         "Received forecast type > %d chars, invalid. Defaulting to empty",
                          MAX_LENGTH_FORECAST_TYPE_PARAM);
                 config.forecast_types[index] = NULL;
             } else {
@@ -164,7 +185,8 @@ static esp_err_t configure_post_handler(httpd_req_t *req) {
         }
 
         if (!one_valid_forecast_type) {
-            ESP_LOGI(TAG, "Didn't get a single valid forecast type, defaulting to a single '%s'",
+            ESP_LOGI(TAG,
+                     "Didn't get a single valid forecast type, defaulting to a single '%s'",
                      default_forecast_type);
             config.forecast_types[0] = default_forecast_type;
             nvs_zero_forecast_types(1, config.forecast_types);

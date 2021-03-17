@@ -5,6 +5,8 @@
 
 #include "timer.h"
 
+#define TAG "sc-timer"
+
 typedef struct timer_info_t {
     esp_timer_handle_t timer_handle;
     unsigned int       timeout_microseconds;

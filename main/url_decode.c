@@ -9,6 +9,8 @@
 
 #include "url_decode.h"
 
+#define TAG "sc-url-decode"
+
 void urldecode2(char *dst, const char *src) {
     char a, b;
     while (*src) {
