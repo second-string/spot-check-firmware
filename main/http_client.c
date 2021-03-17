@@ -127,6 +127,10 @@ int http_client_perform_request(request *request_obj, char **read_buffer) {
         ESP_LOGI(TAG, "Setting url to %s", req_url);
     }
 
+    // Superfluous unless we called the POST method since the client shares underlying settings
+    ESP_ERROR_CHECK(esp_http_client_set_method(client, HTTP_METHOD_GET));
+    ESP_ERROR_CHECK(esp_http_client_set_header(client, "Content-type", "text/html"));
+
     esp_err_t error = esp_http_client_perform(client);
     if (error != ESP_OK) {
         const char *err_text = esp_err_to_name(error);
@@ -153,6 +157,7 @@ int http_client_perform_request(request *request_obj, char **read_buffer) {
         ESP_LOGI(TAG, "GET success! Status=%d, Content-length=%d", status, content_length);
     } else {
         ESP_LOGI(TAG, "GET failed. Status=%d, Content-length=%d", status, content_length);
+
         error = esp_http_client_close(client);
         if (error != ESP_OK) {
             const char *err_str = esp_err_to_name(error);
