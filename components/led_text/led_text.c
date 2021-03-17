@@ -40,8 +40,11 @@ static led_strip_funcs strip_funcs;
 
 led_text_state led_text_current_state;
 
-void led_text_init(const unsigned char *font, int rows, int num_per_row, row_orientation row_direction,
-                   led_strip_funcs funcs) {
+void led_text_init(const unsigned char *font,
+                   int                  rows,
+                   int                  num_per_row,
+                   row_orientation      row_direction,
+                   led_strip_funcs      funcs) {
     font_ptr         = font;
     width_of_letter  = font_ptr[0];
     height_of_letter = font_ptr[1];
@@ -60,7 +63,8 @@ void led_text_init(const unsigned char *font, int rows, int num_per_row, row_ori
     ESP_LOGI(TAG, "First ASCII value in array: %d", font_start_char);
     ESP_LOGI(TAG, "# led strip rows: %d", led_rows);
     ESP_LOGI(TAG, "# LEDs per row: %d", leds_per_row);
-    ESP_LOGI(TAG, "Row orientation: %s",
+    ESP_LOGI(TAG,
+             "Row orientation: %s",
              orientation == ZIGZAG ? "ZIGZAG" : orientation == STRAIGHT ? "STRAIGHT" : "undefined");
 }
 
