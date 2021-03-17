@@ -32,6 +32,7 @@
 
 #define LED_ROWS 6
 #define LEDS_PER_ROW 50
+#define MAX_TEXT_ROWS_TO_SCROLL 5
 
 typedef struct {
     int8_t  temperature;
@@ -298,7 +299,7 @@ void app_main(void) {
 
     led_text_state previous_text_state = led_text_current_state;
     led_text_state current_state;
-    char           text_to_scroll_buffer[5][50];
+    char           text_to_scroll_buffer[MAX_TEXT_ROWS_TO_SCROLL][50];
     unsigned int   next_index_to_scroll         = 0;
     unsigned int   num_available_text_to_scroll = 0;
     while (1) {
@@ -352,6 +353,11 @@ void app_main(void) {
                 if (cJSON_IsArray(data_value)) {
                     cJSON *data_list_value = NULL;
                     cJSON_ArrayForEach(data_list_value, data_value) {
+                        if (num_available_text_to_scroll >= MAX_TEXT_ROWS_TO_SCROLL) {
+                            ESP_LOGI(TAG, "No more room in scroll buffer to add text, dropping");
+                            break;
+                        }
+
                         char *text = cJSON_GetStringValue(data_list_value);
                         ESP_LOGI(TAG,
                                  "Adding new text to the buffer at index %d: '%s'",
@@ -364,8 +370,12 @@ void app_main(void) {
                     ESP_LOGI(TAG, "Didn't get json array of strings to print, bailing");
                 }
 
-                cJSON_free(data_value);
-                cJSON_free(json);
+                if (data_value != NULL) {
+                    cJSON_free(data_value);
+                }
+                if (json != NULL) {
+                    cJSON_free(json);
+                }
             }
 
             // Caller responsible for freeing buffer if non-null on return
