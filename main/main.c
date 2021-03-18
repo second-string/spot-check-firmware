@@ -241,10 +241,10 @@ void refresh_conditions(conditions_t *new_conditions) {
 void display_conditions(conditions_t *conditions) {
     char conditions_str[40] = {0};
     sprintf(conditions_str,
-            "%d F - %s at %d mph - %s ft",
+            "%dF %d%s %sft",
             conditions->temperature,
-            conditions->wind_dir,
             conditions->wind_speed,
+            conditions->wind_dir,
             conditions->tide_height);
     ESP_LOGI(TAG, "Showing: '%s'", conditions_str);
     led_text_show_text(conditions_str, strlen(conditions_str));
