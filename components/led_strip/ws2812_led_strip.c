@@ -7,10 +7,10 @@
 #define LED_RMT_TX_GPIO CONFIG_WS2812_LED_RMT_TX_GPIO
 
 /* ws2812 high and low pulse times for a 0 or 1 bit */
-#define WS2812_T0H_NS (350)
-#define WS2812_T1H_NS (1000)
-#define WS2812_T0L_NS (1000)
-#define WS2812_T1L_NS (350)
+#define WS2812_T0H_NS (400)
+#define WS2812_T1H_NS (800)
+#define WS2812_T0L_NS (850)
+#define WS2812_T1L_NS (450)
 
 /* ws2812-specific implementation of our led_strip behavior.
  * led_data array is NUM_LEDS * 3 because each led needs 24 bits,
@@ -44,8 +44,12 @@ static uint32_t ws2812_t1l_ticks = 0;
  * element item_num[out]: The number of rmt_items that were appended to the dest buffer. This should exactly equal
  *           translated_size * 8, since there are 8 rmt_items per single src element
  */
-static void IRAM_ATTR ws2812_rmt_translator(const void *src, rmt_item32_t *dest, size_t src_size, size_t wanted_num,
-                                            size_t *translated_size, size_t *item_num) {
+static void IRAM_ATTR ws2812_rmt_translator(const void *  src,
+                                            rmt_item32_t *dest,
+                                            size_t        src_size,
+                                            size_t        wanted_num,
+                                            size_t *      translated_size,
+                                            size_t *      item_num) {
     if (src == NULL || dest == NULL) {
         *translated_size = 0;
         *item_num        = 0;

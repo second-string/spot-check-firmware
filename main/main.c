@@ -60,6 +60,11 @@ void conditions_timer_expired_callback(void *timer_args) {
     seconds_elapsed++;
 
     if ((seconds_elapsed / 60) >= CONDITIONS_UPDATE_INTERVAL_MINUTES || new_location_set) {
+        if (new_location_set) {
+            // If we have currently scrolling text, clear the LEDs for us to push a new conditions string
+            led_text_stop_scroll();
+        }
+
         new_location_set     = false;
         seconds_elapsed      = 0;
         fetch_new_conditions = true;

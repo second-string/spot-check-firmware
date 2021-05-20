@@ -119,7 +119,7 @@ static void led_text_set_static_text(char *text, size_t text_len, int first_lett
             int     pixel_idx       = current_led_row * leds_per_row + current_row_column_offset;
             if (is_font_bit_set) {
                 LED_TEXT_LOG("X");
-                ESP_ERROR_CHECK(strip_funcs.set_pixel(pixel_idx, 0x00FF00));
+                ESP_ERROR_CHECK(strip_funcs.set_pixel(pixel_idx, 0x3F0000));
             } else {
                 LED_TEXT_LOG(" ");
                 ESP_ERROR_CHECK(strip_funcs.set_pixel(pixel_idx, 0x000000));
@@ -225,6 +225,10 @@ void led_text_scroll_text_async(char *text, size_t text_len, bool scroll_contino
 
 void led_text_stop_scroll() {
     // TODO :: I think clear all the leds otherwise they'll be frozen on last write
-    vTaskDelete(scroll_text_task_handle);
+    if (scroll_text_task_handle) {
+        vTaskDelete(scroll_text_task_handle);
+    }
+
+    led_text_current_state  = IDLE;
     scroll_text_task_handle = NULL;
 }

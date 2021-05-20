@@ -6,6 +6,16 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
+/*
+
+  Scrolling logic contained in led_text.c borrowed and apapted from Allen C. Huffman's Library here:
+  https://github.com/allenhuffman/LEDSign
+  Simple LED Scrolling Message
+  By Allen C. Huffman (alsplace@pobox.com)
+  www.subethasoftware.com
+
+*/
+
 /* Set to true to enable printing the led pattern serially each scroll increment */
 #define DEBUG_LOG_LED_TEXT false
 
@@ -26,8 +36,11 @@ typedef struct {
 
 led_text_state led_text_current_state;
 
-void led_text_init(const unsigned char *font, int rows, int num_per_row, row_orientation row_direction,
-                   led_strip_funcs strip_funcs);
+void led_text_init(const unsigned char *font,
+                   int                  rows,
+                   int                  num_per_row,
+                   row_orientation      row_direction,
+                   led_strip_funcs      strip_funcs);
 
 void led_text_show_text(char *text, size_t text_len);
 
