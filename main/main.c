@@ -56,6 +56,10 @@ void button_timer_expired_callback(void *timer_args) {
     button_timer_expired = true;
 }
 
+void button_hold_timer_expired_callback(void *timer_args) {
+    button_hold_timer_expired = true;
+}
+
 void conditions_timer_expired_callback(void *timer_args) {
     seconds_elapsed++;
 
@@ -285,6 +289,8 @@ void app_main(void) {
 
     timer_info_handle debounce_handle =
         timer_init("debounce", button_timer_expired_callback, BUTTON_TIMER_PERIOD_MS * 1000);
+    timer_info_handle button_hold_handle =
+        timer_init("button_hold", button_hold_timer_expired_callback, BUTTON_HOLD_TIMER_PERIOD_MS * 1000);
     gpio_init_local(button_isr_handler);
     led_strip_t *strip = led_strip_init_ws2812();
     strip->clear(strip);
@@ -341,7 +347,8 @@ void app_main(void) {
 
         previous_text_state = current_state;
 
-        if (button_was_released(debounce_handle)) {
+        button_state_t current_button_state = button_was_released(debounce_handle, button_hold_handle);
+        if (current_button_state == BUTTON_STATE_SINGLE_PRESS) {
             ESP_ERROR_CHECK(gpio_set_level(LED_PIN, !gpio_get_level(LED_PIN)));
 
             // Space for base url + endpoint. Query param space handled when building full url in perform_request
@@ -390,6 +397,17 @@ void app_main(void) {
             // Caller responsible for freeing buffer if non-null on return
             if (server_response != NULL) {
                 free(server_response);
+            }
+        } else if (current_button_state == BUTTON_STATE_HOLD) {
+            // Currently erase full NVM when gpio button is held - can be scoped in the future just to stored wifi
+            // provisioning data. Throw away return value, internal function will print out error if occurs. Reboot
+            // after to get back into provisoning state
+            ESP_LOGI(TAG, "GPIO button held, erasing NVM then rebooting");
+            esp_err_t err = nvs_full_erase();
+            (void)err;
+            esp_restart();
+            while (1) {
+                ;
             }
         }
     }

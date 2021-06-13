@@ -13,7 +13,8 @@ typedef struct timer_info_t {
     void *             callback;
 } timer_info_t;
 
-static timer_info_t timer_infos[2];
+// Used for button debounce, button hold, and conditions re-fetch
+static timer_info_t timer_infos[3];
 static unsigned int next_timer_info_idx = 0;
 
 timer_info_handle timer_init(char *timer_name, void *timer_expired_callback, unsigned int timeout_microseconds) {
