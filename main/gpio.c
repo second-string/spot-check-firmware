@@ -36,7 +36,14 @@ void gpio_init_local(gpio_isr_t button_isr_handler) {
     input_config.mode         = GPIO_MODE_INPUT;
     input_config.pin_bit_mask = GPIO_INPUT_PIN_SEL;
     input_config.pull_down_en = 0;
-    input_config.pull_up_en   = 1;
+// The hardware debounce circuit on custom revs doesn't work correctly if the button GPIO is pulled up internally
+#ifdef CONFIG_ESP32_DEVBOARD
+    input_config.pull_up_en = 0;
+#elif defined(CONFIG_SPOT_CHECK_REV_2)
+    input_config.pull_up_en = 1;
+#else
+#error Cannot intialize button GPIO, no dev board HW rev set in menuconfig!
+#endif
 
     gpio_config(&input_config);
     ESP_ERROR_CHECK(gpio_install_isr_service(0));

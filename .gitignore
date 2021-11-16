@@ -1,7 +1,6 @@
 .DS_Store
 
 sdkconfig*
-*.projbuild
 
 build/
 
@@ -13,3 +12,5 @@ build/
 
 # clangd cache for YCM
 .cache/
+
+board_builds/

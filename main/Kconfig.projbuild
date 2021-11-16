@@ -1,0 +1,32 @@
+menu "Spot Check Configuration"
+    config CONFIGURATION_ACCESS_POINT_SSID
+        string "Configuation AP SSID"
+        default "Spot Check configuration"
+        help
+            SSID of the configuration network that users connect to to provision device
+
+    config OTA_URL
+        string "OTA URL"
+        default "https://192.168.1.242:8070/blink.bin"
+        help
+            URL to check for firmware updates on startupendmenu
+
+    config DISABLE_OTA
+        bool "Disable OTA updates"
+        default false
+        help
+            Flag to indicate whether or not this FW should reach out to OTA_URL to check for FW update
+
+    choice BOARD_REVISION
+        prompt "Board revision / type"
+        default ESP32_DEVBOARD
+        help
+            The board revision / type to compile for
+
+        config ESP32_DEVBOARD
+            bool "ESP32 dev board"
+
+        config SPOT_CHECK_REV_2
+            bool "Spot Check rev 2"
+    endchoice
+endmenu
