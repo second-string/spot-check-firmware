@@ -117,6 +117,11 @@ int http_client_perform_request(request *request_obj, char **read_buffer) {
         return 0;
     }
 
+    if (!http_client_inited) {
+        ESP_LOGI(TAG, "Attempted to make http request but http_client_inited is false. Re-calling init function");
+        http_client_init();
+    }
+
     if (request_obj) {
         // assume we won't have that many query params. Could calc this too
         char req_url[strlen(request_obj->url) + 60];

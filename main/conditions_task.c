@@ -23,11 +23,17 @@ static conditions_t          last_retrieved_conditions;
 static void conditions_timer_expired_callback(void *timer_args) {
     seconds_elapsed++;
 
+    if (seconds_elapsed % 60 == 0) {
+        ESP_LOGI(TAG, "seconds elapsed minute elapsed: %d", seconds_elapsed);
+    }
+
     if ((seconds_elapsed / 60) >= CONDITIONS_UPDATE_INTERVAL_MINUTES || new_location_set) {
         if (new_location_set) {
             // If we have currently scrolling text, clear the LEDs for us to push a new conditions string
             led_text_stop_scroll();
         }
+
+        ESP_LOGI(TAG, "passed conditions update interval, fetch_new_conditions = true");
 
         new_location_set     = false;
         seconds_elapsed      = 0;
@@ -132,8 +138,10 @@ void update_conditions_task(void *args) {
         if (!connected_to_network || !fetch_new_conditions) {
             continue;
         }
+
         fetch_new_conditions = false;
 
+        ESP_LOGI(TAG, "Made it to second half of conditions task main loop, running refresh then display");
         conditions_t new_conditions;
         refresh_conditions(&new_conditions);
         display_conditions(&new_conditions);

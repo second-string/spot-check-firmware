@@ -10,7 +10,7 @@
 
 #define BUTTON_TIMER_PERIOD_MS (40)
 #define BUTTON_HOLD_TIMER_PERIOD_MS (3000)
-#define CONDITIONS_UPDATE_INTERVAL_MINUTES (20)
+#define CONDITIONS_UPDATE_INTERVAL_MINUTES (3)
 #define ONE_SECOND_TIMER_MS (1000)
 
 typedef struct timer_info_t *timer_info_handle;
