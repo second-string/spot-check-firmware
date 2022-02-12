@@ -220,7 +220,7 @@ void app_main(void) {
 
         previous_text_state = current_state;
 
-        button_state_t current_button_state = button_was_released(debounce_handle, button_hold_handle);
+        button_state_t current_button_state = gpio_debounce(debounce_handle, button_hold_handle);
         if (current_button_state == BUTTON_STATE_SINGLE_PRESS) {
             ESP_ERROR_CHECK(gpio_set_level(LED_PIN, !gpio_get_level(LED_PIN)));
 

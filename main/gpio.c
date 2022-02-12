@@ -50,7 +50,7 @@ void gpio_init_local(gpio_isr_t button_isr_handler) {
     ESP_ERROR_CHECK(gpio_isr_handler_add(GPIO_BUTTON_PIN, button_isr_handler, (void *)GPIO_BUTTON_PIN));
 }
 
-button_state_t button_was_released(timer_info_handle debounce_handle, timer_info_handle button_hold_handle) {
+button_state_t gpio_debounce(timer_info_handle debounce_handle, timer_info_handle button_hold_handle) {
     switch (current_state) {
         case WAITING_FOR_PRESS:
             if (button_pressed) {
@@ -61,12 +61,12 @@ button_state_t button_was_released(timer_info_handle debounce_handle, timer_info
             }
             break;
         case DEBOUNCING_PRESS:
-            if (button_timer_expired) {
-                if (button_pressed) {
+            if (button_pressed) {
+                if (button_timer_expired) {
                     current_state = WAITING_FOR_RELEASE;
-                } else {
-                    current_state = WAITING_FOR_PRESS;
                 }
+            } else {
+                current_state = WAITING_FOR_PRESS;
             }
             break;
         case WAITING_FOR_RELEASE:
@@ -78,6 +78,7 @@ button_state_t button_was_released(timer_info_handle debounce_handle, timer_info
             } else if (button_hold_timer_expired && !button_hold_signalled) {
                 // If we're still pressed but hold timer expired, signal
                 button_hold_signalled = true;
+                ESP_LOGI(TAG, "Returning BUTTON_STATE_HOLD");
                 return BUTTON_STATE_HOLD;
             }
             break;
@@ -87,6 +88,7 @@ button_state_t button_was_released(timer_info_handle debounce_handle, timer_info
                     current_state = WAITING_FOR_RELEASE;
                 } else {
                     current_state = WAITING_FOR_PRESS;
+                    ESP_LOGI(TAG, "Returning BUTTON_STATE_SINGLE_PRESS");
                     return BUTTON_STATE_SINGLE_PRESS;
                 }
             }

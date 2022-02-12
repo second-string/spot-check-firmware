@@ -23,6 +23,6 @@ typedef enum {
 volatile uint8_t button_pressed;
 
 void           gpio_init_local(gpio_isr_t button_isr_handler);
-button_state_t button_was_released(timer_info_handle debounce_handle, timer_info_handle button_hold_handle);
+button_state_t gpio_debounce(timer_info_handle debounce_handle, timer_info_handle button_hold_handle);
 
 #endif
