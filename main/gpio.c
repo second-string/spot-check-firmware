@@ -77,19 +77,22 @@ button_state_t gpio_debounce(timer_info_handle debounce_handle, timer_info_handl
                 current_state         = DEBOUNCING_RELEASE;
             } else if (button_hold_timer_expired && !button_hold_signalled) {
                 // If we're still pressed but hold timer expired, signal
-                button_hold_signalled = true;
-                ESP_LOGI(TAG, "Returning BUTTON_STATE_HOLD");
+                button_hold_timer_expired = false;
+                button_hold_signalled     = true;
                 return BUTTON_STATE_HOLD;
             }
             break;
         case DEBOUNCING_RELEASE:
             if (button_timer_expired) {
-                if (button_pressed) {
-                    current_state = WAITING_FOR_RELEASE;
-                } else {
+                if (!button_pressed) {
                     current_state = WAITING_FOR_PRESS;
-                    ESP_LOGI(TAG, "Returning BUTTON_STATE_SINGLE_PRESS");
                     return BUTTON_STATE_SINGLE_PRESS;
+                } else {
+                    // If we're debouncing the button being released but we're registering another press after timer
+                    // expired, kick it back to waiting for release and reset timer
+                    current_state = WAITING_FOR_RELEASE;
+                    timer_reset(debounce_handle, false);
+                    timer_reset(button_hold_handle, false);
                 }
             }
             break;
