@@ -13,3 +13,7 @@ debug:
 # Run this manually - you want the second cert, the root CA one
 server_cert:
 	echo -n | openssl s_client -connect spotcheck.brianteam.dev:443 -verify 5
+
+# Assumes current commit is the one to be released and is tagged with correct version
+release:
+	./release.sh
