@@ -34,7 +34,7 @@ typedef struct {
     esp_err_t (*show)(void);
 } led_strip_funcs;
 
-led_text_state led_text_current_state;
+extern led_text_state led_text_current_state;
 
 void led_text_init(const unsigned char *font,
                    int                  rows,
