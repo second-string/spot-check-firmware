@@ -4,10 +4,10 @@
 #include <wifi_provisioning/manager.h>
 #include <wifi_provisioning/scheme_softap.h>
 
-#include "esp_log.h"
 #include "esp_wifi.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "log.h"
 
 #include "lwip/err.h"
 #include "lwip/sys.h"
@@ -41,8 +41,10 @@ static void wifi_start_sta() {
 
 void wifi_start_provisioning(bool force_reprovision) {
     if (main_event_handler == NULL) {
-        ESP_LOGE(TAG,
-                 "wifi_init() not called before trying to start provisioning or connect to sta, failing irrecoverably");
+        log_printf(
+            TAG,
+            LOG_LEVEL_ERROR,
+            "wifi_init() not called before trying to start provisioning or connect to sta, failing irrecoverably");
         return;
     }
 
@@ -51,7 +53,7 @@ void wifi_start_provisioning(bool force_reprovision) {
     if (!already_provisioned || force_reprovision) {
         const char *log = force_reprovision ? "Forcing reprovisioning process"
                                             : "No saved provisioning info, starting provisioning process";
-        ESP_LOGI(TAG, "%s", log);
+        log_printf(TAG, LOG_LEVEL_INFO, "%s", log);
 
         // SSID / device name (softap / ble respectively)
         char *service_name = CONFIG_AP_SSID;
@@ -73,7 +75,7 @@ void wifi_start_provisioning(bool force_reprovision) {
 
     } else {
         // Start STA mode and connect to known existing network
-        ESP_LOGI(TAG, "Already provisioned, starting Wi-Fi STA");
+        log_printf(TAG, LOG_LEVEL_INFO, "Already provisioned, starting Wi-Fi STA");
         wifi_deinit_provisioning();
         wifi_start_sta();
     }
@@ -98,7 +100,9 @@ void wifi_init(void *event_handler) {
 
 void wifi_init_provisioning() {
     if (main_event_handler == NULL) {
-        ESP_LOGE(TAG, "wifi_init() not called before trying to set up provisioning, failing irrecoverably");
+        log_printf(TAG,
+                   LOG_LEVEL_ERROR,
+                   "wifi_init() not called before trying to set up provisioning, failing irrecoverably");
         return;
     }
 

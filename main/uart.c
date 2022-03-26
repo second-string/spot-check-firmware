@@ -18,7 +18,9 @@ void uart_init(uart_port_t    port,
         uart_set_pin(UART_NUM_0, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE));
 
     // Don't know what the INTR flags last arg is for
-    ESP_ERROR_CHECK(uart_driver_install(port, rx_buffer_size, tx_buffer_size, event_queue_size, &handle->queue, 0));
+    handle->port = port;
+    ESP_ERROR_CHECK(
+        uart_driver_install(handle->port, rx_buffer_size, tx_buffer_size, event_queue_size, &handle->queue, 0));
 }
 
 void uart_start() {

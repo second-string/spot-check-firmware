@@ -4,7 +4,7 @@
 #include "constants.h"
 #include "gpio_local.h"
 
-#include "esp_log.h"
+#include "log.h"
 
 #define TAG "sc-gpio"
 

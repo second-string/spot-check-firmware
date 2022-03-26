@@ -13,5 +13,6 @@ idf_component_register(
                                  "conditions_task.c"
                                  "cli_task.c"
                                  "uart.c"
+                                 "log.c"
                     INCLUDE_DIRS "include"
                     EMBED_TXTFILES ${project_dir}/server_certs/ca_cert.pem)

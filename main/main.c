@@ -27,7 +27,7 @@
 #include "uart.h"
 #include "wifi.h"
 
-#include "esp_log.h"
+#include "log.h"
 
 #define TAG "sc-main"
 
@@ -60,22 +60,24 @@ void default_event_handler(void *arg, esp_event_base_t event_base, int32_t event
                 esp_wifi_connect();
                 break;
             case WIFI_EVENT_STA_CONNECTED:
-                ESP_LOGI(TAG, "Got STA_CONN event");
+                log_printf(TAG, LOG_LEVEL_INFO, "Got STA_CONN event");
                 break;
             case WIFI_EVENT_STA_DISCONNECTED: {
                 if (sta_connect_attempts < PROVISIONED_NETWORK_CONNECTION_MAXIMUM_RETRY) {
-                    ESP_LOGI(TAG, "Got STA_DISCON, retrying to connect to the AP");
+                    log_printf(TAG, LOG_LEVEL_INFO, "Got STA_DISCON, retrying to connect to the AP");
                     esp_wifi_connect();
                     sta_connect_attempts++;
                 } else {
-                    ESP_LOGI(TAG, "Got STA_DISCON and max retries, setting FAIL bit and kicking provision process");
+                    log_printf(TAG,
+                               LOG_LEVEL_INFO,
+                               "Got STA_DISCON and max retries, setting FAIL bit and kicking provision process");
                     wifi_init_provisioning();
                     wifi_start_provisioning(true);
                 }
                 break;
             }
             default:
-                ESP_LOGI(TAG, "Got unknown WIFI event id: %d", event_id);
+                log_printf(TAG, LOG_LEVEL_INFO, "Got unknown WIFI event id: %d", event_id);
         }
     }
 
@@ -84,7 +86,7 @@ void default_event_handler(void *arg, esp_event_base_t event_base, int32_t event
         switch (event_id) {
             case IP_EVENT_STA_GOT_IP: {
                 ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
-                ESP_LOGI(TAG, "Setting CONNECTED bit, got ip:" IPSTR, IP2STR(&event->ip_info.ip));
+                log_printf(TAG, LOG_LEVEL_INFO, "Setting CONNECTED bit, got ip:" IPSTR, IP2STR(&event->ip_info.ip));
                 sta_connect_attempts = 0;
                 // mdns_advertise_tcp_service();
 
@@ -101,7 +103,7 @@ void default_event_handler(void *arg, esp_event_base_t event_base, int32_t event
                 break;
             }
             default:
-                ESP_LOGI(TAG, "Got unknown IP event id: %d", event_id);
+                log_printf(TAG, LOG_LEVEL_INFO, "Got unknown IP event id: %d", event_id);
         }
     }
 
@@ -109,42 +111,44 @@ void default_event_handler(void *arg, esp_event_base_t event_base, int32_t event
     if (event_base == WIFI_PROV_EVENT) {
         switch (event_id) {
             case WIFI_PROV_INIT:
-                ESP_LOGI(TAG, "Provisioning inited event emitted");
+                log_printf(TAG, LOG_LEVEL_INFO, "Provisioning inited event emitted");
                 break;
             case WIFI_PROV_START:
-                ESP_LOGI(TAG, "Provisioning started event emitted");
+                log_printf(TAG, LOG_LEVEL_INFO, "Provisioning started event emitted");
                 break;
             case WIFI_PROV_CRED_RECV: {
                 wifi_sta_config_t *wifi_sta_cfg = (wifi_sta_config_t *)event_data;
                 size_t             ssid_len     = strnlen((char *)wifi_sta_cfg->ssid, sizeof(wifi_sta_cfg->ssid));
-                ESP_LOGI(TAG,
-                         "Received provisioning creds event - SSID: %s (length %d), PW: %s",
-                         wifi_sta_cfg->ssid,
-                         ssid_len,
-                         wifi_sta_cfg->password);
+                log_printf(TAG,
+                           LOG_LEVEL_INFO,
+                           "Received provisioning creds event - SSID: %s (length %d), PW: %s",
+                           wifi_sta_cfg->ssid,
+                           ssid_len,
+                           wifi_sta_cfg->password);
                 break;
             }
             case WIFI_PROV_CRED_FAIL: {
                 wifi_prov_sta_fail_reason_t *reason = (wifi_prov_sta_fail_reason_t *)event_data;
-                ESP_LOGE(TAG,
-                         "Provisioning failed: %s",
-                         (*reason == WIFI_PROV_STA_AUTH_ERROR) ? "AP PW incorrect" : "AP not found");
+                log_printf(TAG,
+                           LOG_LEVEL_ERROR,
+                           "Provisioning failed: %s",
+                           (*reason == WIFI_PROV_STA_AUTH_ERROR) ? "AP PW incorrect" : "AP not found");
                 break;
             }
             case WIFI_PROV_CRED_SUCCESS:
-                ESP_LOGI(TAG, "Provisioning successful event emitted");
+                log_printf(TAG, LOG_LEVEL_INFO, "Provisioning successful event emitted");
                 break;
             case WIFI_PROV_END: {
-                ESP_LOGI(TAG, "Provisioning complete event emitted, de-initing prov mgr");
+                log_printf(TAG, LOG_LEVEL_INFO, "Provisioning complete event emitted, de-initing prov mgr");
                 wifi_deinit_provisioning();
                 esp_restart();
                 break;
             }
             case WIFI_PROV_DEINIT:
-                ESP_LOGI(TAG, "Provisioning deinited event emitted");
+                log_printf(TAG, LOG_LEVEL_INFO, "Provisioning deinited event emitted");
                 break;
             default:
-                ESP_LOGI(TAG, "Received unsupported provisioning event: %d", event_id);
+                log_printf(TAG, LOG_LEVEL_INFO, "Received unsupported provisioning event: %d", event_id);
                 break;
         }
     }
@@ -157,8 +161,9 @@ static void app_init() {
     // This enables us to pull config info directly out of flash after
     // first setup.
     // https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-guides/wifi.html#wi-fi-configuration-phase
-    nvs_init();
     uart_init(CLI_UART, CLI_UART_RX_BUFFER_BYTES, CLI_UART_TX_BUFFER_BYTES, CLI_UART_QUEUE_SIZE, &cli_uart_handle);
+    log_init(&cli_uart_handle);
+    nvs_init();
 
     debounce_handle = timer_init("debounce", button_timer_expired_callback, BUTTON_TIMER_PERIOD_MS * 1000);
     button_hold_handle =
@@ -201,7 +206,6 @@ static void app_start() {
 }
 
 void app_main(void) {
-    ESP_LOGE(TAG, "minimal: %u", configMINIMAL_STACK_SIZE);
     app_init();
     app_start();
 
@@ -235,10 +239,10 @@ void app_main(void) {
                 if (cJSON_IsArray(data_value)) {
                     cJSON *data_list_value = NULL;
                     cJSON_ArrayForEach(data_list_value, data_value) {
-                        ESP_LOGI(TAG, "Used to execute logic for adding text to scroll buffer here");
+                        log_printf(TAG, LOG_LEVEL_INFO, "Used to execute logic for adding text to scroll buffer here");
                     }
                 } else {
-                    ESP_LOGI(TAG, "Didn't get json array of strings to print, bailing");
+                    log_printf(TAG, LOG_LEVEL_INFO, "Didn't get json array of strings to print, bailing");
                 }
 
                 if (data_value != NULL) {
@@ -257,7 +261,7 @@ void app_main(void) {
             // Currently erase full NVM when gpio button is held - can be scoped in the future just to stored wifi
             // provisioning data. Throw away return value, internal function will print out error if occurs. Reboot
             // after to get back into provisoning state
-            ESP_LOGI(TAG, "GPIO button held, erasing NVM then rebooting");
+            log_printf(TAG, LOG_LEVEL_INFO, "GPIO button held, erasing NVM then rebooting");
             esp_err_t err = nvs_full_erase();
             (void)err;
             esp_restart();

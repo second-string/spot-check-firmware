@@ -8,7 +8,7 @@
 #include "cli_task.h"
 #include "constants.h"
 
-#include "esp_log.h"
+#include "log.h"
 
 #define TAG "sc-cli"
 

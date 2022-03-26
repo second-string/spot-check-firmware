@@ -4,10 +4,10 @@
 
 #include "esp_http_client.h"
 #include "esp_https_ota.h"
-#include "esp_log.h"
 #include "esp_ota_ops.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "log.h"
 #include "sdkconfig.h"
 
 #include "http_client.h"
@@ -45,7 +45,7 @@ static void ota_start_ota(char *binary_url) {
 
     esp_err_t error = esp_https_ota_begin(&ota_config, &ota_handle);
     if (error != ESP_OK) {
-        ESP_LOGE(TAG, "OTA failed at esp_https_ota_begin: %s", esp_err_to_name(error));
+        log_printf(TAG, LOG_LEVEL_ERROR, "OTA failed at esp_https_ota_begin: %s", esp_err_to_name(error));
         vTaskDelete(NULL);
     }
 }
@@ -55,21 +55,25 @@ static esp_err_t ota_validate_image_header(esp_app_desc_t *new_image_info, esp_a
         return ESP_ERR_INVALID_ARG;
     }
 
-    ESP_LOGI(TAG, "Running firmware version: %s", current_image_info->version);
+    log_printf(TAG, LOG_LEVEL_INFO, "Running firmware version: %s", current_image_info->version);
 
     int version_comparison =
         memcmp(new_image_info->version, current_image_info->version, sizeof(new_image_info->version));
     if (version_comparison == 0) {
-        ESP_LOGI(TAG, "OTA image version same as current version, no update needed");
+        log_printf(TAG, LOG_LEVEL_INFO, "OTA image version same as current version, no update needed");
         return ESP_FAIL;
     } else if (version_comparison < 0) {
-        ESP_LOGI(TAG,
-                 "Current version greater than OTA image version (%s), something is wrong!!",
-                 new_image_info->version);
+        log_printf(TAG,
+                   LOG_LEVEL_INFO,
+                   "Current version greater than OTA image version (%s), something is wrong!!",
+                   new_image_info->version);
         // return ESP_FAIL;
         return ESP_OK;
     } else if (version_comparison > 0) {
-        ESP_LOGI(TAG, "Current version less than OTA image version (%s), starting OTA update", new_image_info->version);
+        log_printf(TAG,
+                   LOG_LEVEL_INFO,
+                   "Current version less than OTA image version (%s), starting OTA update",
+                   new_image_info->version);
         return ESP_OK;
     }
 
@@ -82,7 +86,7 @@ static bool check_forced_update(esp_app_desc_t *current_image_info, char *versio
     char post_data[60];
     int  err = sprintf(post_data, "{\"current_version\": \"%s\"}", current_image_info->version);
     if (err < 0) {
-        ESP_LOGE(TAG, "Error sprintfing version string into version_info endpoint post body");
+        log_printf(TAG, LOG_LEVEL_ERROR, "Error sprintfing version string into version_info endpoint post body");
         return ESP_FAIL;
     }
 
@@ -101,7 +105,7 @@ static bool check_forced_update(esp_app_desc_t *current_image_info, char *versio
     ESP_ERROR_CHECK(
         http_client_perform_post(&request_obj, post_data, strlen(post_data), response_data, &response_data_size));
 
-    ESP_LOGI(TAG, "%s", response_data);
+    log_printf(TAG, LOG_LEVEL_INFO, "%s", response_data);
     bool   force_update      = false;
     cJSON *response_json     = parse_json(response_data);
     cJSON *needs_update_json = cJSON_GetObjectItem(response_json, "needs_update");
@@ -120,15 +124,17 @@ static bool check_forced_update(esp_app_desc_t *current_image_info, char *versio
 }
 
 void check_ota_update_task(void *args) {
-    ESP_LOGI(TAG, "Starting OTA task to check update status");
+    log_printf(TAG, LOG_LEVEL_INFO, "Starting OTA task to check update status");
 
 #ifdef CONFIG_DISABLE_OTA
-    ESP_LOGI(TAG, "FW compiled with ENABLE_OTA menuconfig option disabled, bailing out of OTA task");
+    log_printf(TAG, LOG_LEVEL_INFO, "FW compiled with ENABLE_OTA menuconfig option disabled, bailing out of OTA task");
     vTaskDelete(NULL);
 #endif
 
     while (!connected_to_network) {
-        ESP_LOGI(TAG, "Not connected to wifi yet, OTA task will sleep and periodically check connection");
+        log_printf(TAG,
+                   LOG_LEVEL_INFO,
+                   "Not connected to wifi yet, OTA task will sleep and periodically check connection");
         vTaskDelay(10000 / portTICK_PERIOD_MS);
     }
 
@@ -144,25 +150,27 @@ void check_ota_update_task(void *args) {
     esp_app_desc_t ota_image_desc;
     esp_err_t      error = esp_https_ota_get_img_desc(ota_handle, &ota_image_desc);
     if (error != ESP_OK) {
-        ESP_LOGE(TAG, "OTA failed at esp_https_ota_get_img_desc: %s", esp_err_to_name(error));
+        log_printf(TAG, LOG_LEVEL_ERROR, "OTA failed at esp_https_ota_get_img_desc: %s", esp_err_to_name(error));
         vTaskDelete(NULL);
     }
 
     // Check to see if a basic version comparison results in an update from a newer version on the server
     error = ota_validate_image_header(&ota_image_desc, &current_image_info);
     if (error != ESP_OK) {
-        ESP_LOGI(TAG,
-                 "Image validation resulted in no go-ahead for update. Now checking custom endpoint for forced "
-                 "upgrades/downgrades...");
+        log_printf(TAG,
+                   LOG_LEVEL_INFO,
+                   "Image validation resulted in no go-ahead for update. Now checking custom endpoint for forced "
+                   "upgrades/downgrades...");
 
         // If we get anything other than success, we don't do our basic upgrade. Check our force upgrade/downgrade
         // endpoint for us to manually apply a specific version
         char version_to_download[10];
         bool force_download = check_forced_update(&current_image_info, version_to_download);
         if (force_download) {
-            ESP_LOGI(TAG,
-                     "Received force_download command from server for version %s, getting now",
-                     version_to_download);
+            log_printf(TAG,
+                       LOG_LEVEL_INFO,
+                       "Received force_download command from server for version %s, getting now",
+                       version_to_download);
             size_t ota_url_size = strlen(CONFIG_OTA_URL);
             char   forced_version_url[ota_url_size + 25];
             char   query_str[] = "?version=";
@@ -170,11 +178,14 @@ void check_ota_update_task(void *args) {
             memcpy(forced_version_url + ota_url_size, query_str, strlen(query_str));
             strcpy(forced_version_url + ota_url_size + strlen(query_str), version_to_download);
 
-            ESP_LOGI(TAG, "Attempting to restart OTA with specific version url: %s", forced_version_url);
+            log_printf(TAG,
+                       LOG_LEVEL_INFO,
+                       "Attempting to restart OTA with specific version url: %s",
+                       forced_version_url);
             // Restart OTA process with new url specific to forced version
             ota_start_ota(forced_version_url);
         } else {
-            ESP_LOGI(TAG, "Still got no go-ahead from force OTA endpoint, deleting OTA task");
+            log_printf(TAG, LOG_LEVEL_INFO, "Still got no go-ahead from force OTA endpoint, deleting OTA task");
             vTaskDelete(NULL);
         }
     }
@@ -185,9 +196,9 @@ void check_ota_update_task(void *args) {
         error = esp_https_ota_perform(ota_handle);
         if (error != ESP_ERR_HTTPS_OTA_IN_PROGRESS) {
             if (error == ESP_OK) {
-                ESP_LOGI(TAG, "Successfully received full OTA image");
+                log_printf(TAG, LOG_LEVEL_INFO, "Successfully received full OTA image");
             } else {
-                ESP_LOGE(TAG, "OTA failed during esp_https_ota_perform: %s", esp_err_to_name(error));
+                log_printf(TAG, LOG_LEVEL_ERROR, "OTA failed during esp_https_ota_perform: %s", esp_err_to_name(error));
             }
             break;
         }
@@ -195,7 +206,7 @@ void check_ota_update_task(void *args) {
         bytes_received = esp_https_ota_get_image_len_read(ota_handle);
 
         if (iter_counter >= 100) {
-            ESP_LOGI(TAG, "Received %d bytes of image so far", bytes_received);
+            log_printf(TAG, LOG_LEVEL_INFO, "Received %d bytes of image so far", bytes_received);
             iter_counter = 0;
         }
 
@@ -204,20 +215,23 @@ void check_ota_update_task(void *args) {
 
     bool received_full_image = esp_https_ota_is_complete_data_received(ota_handle);
     if (!received_full_image) {
-        ESP_LOGE(TAG, "Did not receive full image package from server, aborting.");
+        log_printf(TAG, LOG_LEVEL_ERROR, "Did not receive full image package from server, aborting.");
         vTaskDelete(NULL);
     }
 
     error = esp_https_ota_finish(ota_handle);
     if (error == ESP_OK) {
-        ESP_LOGI(TAG, "OTA update successful, rebooting in 3 seconds...");
+        log_printf(TAG, LOG_LEVEL_INFO, "OTA update successful, rebooting in 3 seconds...");
         vTaskDelay(3000 / portTICK_PERIOD_MS);
         esp_restart();
     } else {
         if (error == ESP_ERR_OTA_VALIDATE_FAILED) {
-            ESP_LOGE(TAG, "OTA failed in esp_https_ota_finish, image validation unsuccessful.");
+            log_printf(TAG, LOG_LEVEL_ERROR, "OTA failed in esp_https_ota_finish, image validation unsuccessful.");
         } else {
-            ESP_LOGE(TAG, "Error in esp_https_ota_finish, OTA update unsuccessful: %s", esp_err_to_name(error));
+            log_printf(TAG,
+                       LOG_LEVEL_ERROR,
+                       "Error in esp_https_ota_finish, OTA update unsuccessful: %s",
+                       esp_err_to_name(error));
         }
     }
 

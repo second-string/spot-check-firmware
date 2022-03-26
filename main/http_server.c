@@ -1,8 +1,8 @@
 #include "constants.h"
 
 #include <esp_http_server.h>
-#include <esp_log.h>
 #include <esp_system.h>
+#include <log.h>
 #include <sys/param.h>
 
 #include "http_server.h"
@@ -48,7 +48,7 @@ static esp_err_t configure_post_handler(httpd_req_t *req) {
     char      buf[rx_buf_size];
 
     if (req->content_len > rx_buf_size) {
-        ESP_LOGE(TAG, "Payload is too big (%d bytes), bailing out", req->content_len);
+        log_printf(TAG, LOG_LEVEL_ERROR, "Payload is too big (%d bytes), bailing out", req->content_len);
         httpd_resp_send(req, "err", HTTPD_RESP_USE_STRLEN);
         return ESP_FAIL;
     }
@@ -58,7 +58,7 @@ static esp_err_t configure_post_handler(httpd_req_t *req) {
         if (bytes_received == HTTPD_SOCK_ERR_TIMEOUT) {
             /* Retry receiving if timeout occurred */
             // continue;
-            ESP_LOGE(TAG, "Received timeout, bailing out (could retry though)");
+            log_printf(TAG, LOG_LEVEL_ERROR, "Received timeout, bailing out (could retry though)");
             httpd_resp_send(req, "err", HTTPD_RESP_USE_STRLEN);
             return ESP_FAIL;
         }
@@ -66,15 +66,15 @@ static esp_err_t configure_post_handler(httpd_req_t *req) {
     }
 
     /* Log data received */
-    ESP_LOGI(TAG, "=========== RECEIVED DATA ==========");
-    ESP_LOGI(TAG, "%.*s", bytes_received, buf);
-    ESP_LOGI(TAG, "====================================");
+    log_printf(TAG, LOG_LEVEL_INFO, "=========== RECEIVED DATA ==========");
+    log_printf(TAG, LOG_LEVEL_INFO, "%.*s", bytes_received, buf);
+    log_printf(TAG, LOG_LEVEL_INFO, "====================================");
 
     // Should really be parsing this with prealloced buf. If user sends fat payload
     // we'll crash from heap overflow
     cJSON *payload = parse_json(buf);
     if (payload == NULL) {
-        ESP_LOGE(TAG, "Couldn't parse json (TODO return the right code");
+        log_printf(TAG, LOG_LEVEL_ERROR, "Couldn't parse json (TODO return the right code");
         httpd_resp_send(req, "err", HTTPD_RESP_USE_STRLEN);
         return ESP_FAIL;
     }
@@ -83,25 +83,29 @@ static esp_err_t configure_post_handler(httpd_req_t *req) {
     // any more memory than the json takes because nvs will use those
     // pointers to write directly to flash
     spot_check_config config;
-    char *            default_number_of_days = "2";
-    char *            default_spot_name      = "The Wedge";
-    char *            default_spot_lat       = "33.5930302087";
-    char *            default_spot_lon       = "-117.8819918632";
-    char *            default_spot_uid       = "5842041f4e65fad6a770882b";
-    char *            default_forecast_type  = "tides";
+    char             *default_number_of_days = "2";
+    char             *default_spot_name      = "The Wedge";
+    char             *default_spot_lat       = "33.5930302087";
+    char             *default_spot_lon       = "-117.8819918632";
+    char             *default_spot_uid       = "5842041f4e65fad6a770882b";
+    char             *default_forecast_type  = "tides";
 
     cJSON *json_number_of_days = cJSON_GetObjectItem(payload, "number_of_days");
     if (cJSON_IsString(json_number_of_days)) {
         config.number_of_days = cJSON_GetStringValue(json_number_of_days);
         if (strlen(config.number_of_days) > MAX_LENGTH_NUMBER_OF_DAYS_PARAM) {
-            ESP_LOGI(TAG,
-                     "Received number > %d digits, invalid. Defaulting to %s",
-                     MAX_LENGTH_NUMBER_OF_DAYS_PARAM,
-                     default_number_of_days);
+            log_printf(TAG,
+                       LOG_LEVEL_INFO,
+                       "Received number > %d digits, invalid. Defaulting to %s",
+                       MAX_LENGTH_NUMBER_OF_DAYS_PARAM,
+                       default_number_of_days);
             config.number_of_days = default_number_of_days;
         }
     } else {
-        ESP_LOGI(TAG, "Unable to parse number_of_days param, defaulting to %s", default_number_of_days);
+        log_printf(TAG,
+                   LOG_LEVEL_INFO,
+                   "Unable to parse number_of_days param, defaulting to %s",
+                   default_number_of_days);
         config.number_of_days = default_number_of_days;
     }
 
@@ -109,14 +113,15 @@ static esp_err_t configure_post_handler(httpd_req_t *req) {
     if (cJSON_IsString(json_spot_name)) {
         config.spot_name = cJSON_GetStringValue(json_spot_name);
         if (strlen(config.spot_name) > MAX_LENGTH_SPOT_NAME_PARAM) {
-            ESP_LOGI(TAG,
-                     "Received spot_name > %d chars, invalid. Defaulting to %s",
-                     MAX_LENGTH_SPOT_NAME_PARAM,
-                     default_spot_name);
+            log_printf(TAG,
+                       LOG_LEVEL_INFO,
+                       "Received spot_name > %d chars, invalid. Defaulting to %s",
+                       MAX_LENGTH_SPOT_NAME_PARAM,
+                       default_spot_name);
             config.spot_name = default_spot_name;
         }
     } else {
-        ESP_LOGI(TAG, "Unable to parse spot_name param, defaulting to %s", default_spot_name);
+        log_printf(TAG, LOG_LEVEL_INFO, "Unable to parse spot_name param, defaulting to %s", default_spot_name);
         config.spot_name = default_spot_name;
     }
 
@@ -124,14 +129,15 @@ static esp_err_t configure_post_handler(httpd_req_t *req) {
     if (cJSON_IsString(json_spot_lat)) {
         config.spot_lat = cJSON_GetStringValue(json_spot_lat);
         if (strlen(config.spot_lat) > MAX_LENGTH_SPOT_LAT_PARAM) {
-            ESP_LOGI(TAG,
-                     "Received spot_lat > %d chars, invalid. Defaulting to %s",
-                     MAX_LENGTH_SPOT_LAT_PARAM,
-                     default_spot_lat);
+            log_printf(TAG,
+                       LOG_LEVEL_INFO,
+                       "Received spot_lat > %d chars, invalid. Defaulting to %s",
+                       MAX_LENGTH_SPOT_LAT_PARAM,
+                       default_spot_lat);
             config.spot_lat = default_spot_lat;
         }
     } else {
-        ESP_LOGI(TAG, "Unable to parse spot_lat param, defaulting to %s", default_spot_lat);
+        log_printf(TAG, LOG_LEVEL_INFO, "Unable to parse spot_lat param, defaulting to %s", default_spot_lat);
         config.spot_lat = default_spot_lat;
     }
 
@@ -139,14 +145,15 @@ static esp_err_t configure_post_handler(httpd_req_t *req) {
     if (cJSON_IsString(json_spot_lon)) {
         config.spot_lon = cJSON_GetStringValue(json_spot_lon);
         if (strlen(config.spot_lon) > MAX_LENGTH_SPOT_LON_PARAM) {
-            ESP_LOGI(TAG,
-                     "Received spot_lon > %d chars, invalid. Defaulting to %s",
-                     MAX_LENGTH_SPOT_LON_PARAM,
-                     default_spot_lon);
+            log_printf(TAG,
+                       LOG_LEVEL_INFO,
+                       "Received spot_lon > %d chars, invalid. Defaulting to %s",
+                       MAX_LENGTH_SPOT_LON_PARAM,
+                       default_spot_lon);
             config.spot_lon = default_spot_lon;
         }
     } else {
-        ESP_LOGI(TAG, "Unable to parse spot_lon param, defaulting to %s", default_spot_lon);
+        log_printf(TAG, LOG_LEVEL_INFO, "Unable to parse spot_lon param, defaulting to %s", default_spot_lon);
         config.spot_lon = default_spot_lon;
     }
 
@@ -154,14 +161,18 @@ static esp_err_t configure_post_handler(httpd_req_t *req) {
     if (cJSON_IsString(json_spot_uid)) {
         config.spot_uid = cJSON_GetStringValue(json_spot_uid);
         if (strlen(config.spot_uid) > MAX_LENGTH_SPOT_UID_PARAM) {
-            ESP_LOGI(TAG,
-                     "Received spot_uid > %d chars, invalid. Defaulting to wedge uid (%s)",
-                     MAX_LENGTH_SPOT_UID_PARAM,
-                     default_spot_uid);
+            log_printf(TAG,
+                       LOG_LEVEL_INFO,
+                       "Received spot_uid > %d chars, invalid. Defaulting to wedge uid (%s)",
+                       MAX_LENGTH_SPOT_UID_PARAM,
+                       default_spot_uid);
             config.spot_uid = default_spot_uid;
         }
     } else {
-        ESP_LOGI(TAG, "Unable to parse spot_uid param, defaulting to wedge uid (%s)", default_spot_uid);
+        log_printf(TAG,
+                   LOG_LEVEL_INFO,
+                   "Unable to parse spot_uid param, defaulting to wedge uid (%s)",
+                   default_spot_uid);
         config.spot_uid = default_spot_uid;
     }
 
@@ -173,9 +184,10 @@ static esp_err_t configure_post_handler(httpd_req_t *req) {
         cJSON_ArrayForEach(json_forecast_type, json_forecast_types) {
             config.forecast_types[index] = cJSON_GetStringValue(json_forecast_type);
             if (strlen(config.forecast_types[index]) > MAX_LENGTH_FORECAST_TYPE_PARAM) {
-                ESP_LOGI(TAG,
-                         "Received forecast type > %d chars, invalid. Defaulting to empty",
-                         MAX_LENGTH_FORECAST_TYPE_PARAM);
+                log_printf(TAG,
+                           LOG_LEVEL_INFO,
+                           "Received forecast type > %d chars, invalid. Defaulting to empty",
+                           MAX_LENGTH_FORECAST_TYPE_PARAM);
                 config.forecast_types[index] = NULL;
             } else {
                 one_valid_forecast_type = true;
@@ -185,16 +197,20 @@ static esp_err_t configure_post_handler(httpd_req_t *req) {
         }
 
         if (!one_valid_forecast_type) {
-            ESP_LOGI(TAG,
-                     "Didn't get a single valid forecast type, defaulting to a single '%s'",
-                     default_forecast_type);
+            log_printf(TAG,
+                       LOG_LEVEL_INFO,
+                       "Didn't get a single valid forecast type, defaulting to a single '%s'",
+                       default_forecast_type);
             config.forecast_types[0] = default_forecast_type;
             nvs_zero_forecast_types(1, config.forecast_types);
         } else {
             nvs_zero_forecast_types(index, config.forecast_types);
         }
     } else {
-        ESP_LOGI(TAG, "Unable to parse forecast_types param, defaulting to [\"%s\"]", default_forecast_type);
+        log_printf(TAG,
+                   LOG_LEVEL_INFO,
+                   "Unable to parse forecast_types param, defaulting to [\"%s\"]",
+                   default_forecast_type);
         config.forecast_types[0] = default_forecast_type;
         nvs_zero_forecast_types(1, config.forecast_types);
     }
@@ -222,7 +238,7 @@ static esp_err_t configure_post_handler(httpd_req_t *req) {
 
 static esp_err_t current_config_get_handler(httpd_req_t *req) {
     spot_check_config *current_config     = nvs_get_config();
-    const char **      forecast_types_ptr = (const char **)current_config->forecast_types;
+    const char       **forecast_types_ptr = (const char **)current_config->forecast_types;
 
     cJSON *root                = cJSON_CreateObject();
     cJSON *num_days_json       = cJSON_CreateString(current_config->number_of_days);
@@ -251,7 +267,11 @@ static esp_err_t clear_nvs_post_handler(httpd_req_t *req) {
     char query_buf[query_buf_len];
     int  actual_query_len = httpd_req_get_url_query_len(req) + 1;
     if (actual_query_len > query_buf_len) {
-        ESP_LOGI(TAG, "Query str too long for buffer (%d long, can only fit %d)", actual_query_len, query_buf_len);
+        log_printf(TAG,
+                   LOG_LEVEL_INFO,
+                   "Query str too long for buffer (%d long, can only fit %d)",
+                   actual_query_len,
+                   query_buf_len);
         httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid query string");
         return ESP_OK;
     }
@@ -264,12 +284,12 @@ static esp_err_t clear_nvs_post_handler(httpd_req_t *req) {
                 httpd_resp_send(req, "Successfully cleared nvs, restarting", HTTPD_RESP_USE_STRLEN);
                 esp_restart();
             } else {
-                ESP_LOGI(TAG, "Received incorrect key for erasing flash: %s", value);
+                log_printf(TAG, LOG_LEVEL_INFO, "Received incorrect key for erasing flash: %s", value);
                 httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid query string");
             }
         }
     } else {
-        ESP_LOGI(TAG, "Failed to get query string");
+        log_printf(TAG, LOG_LEVEL_INFO, "Failed to get query string");
         httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Failed to get query string");
     }
 
@@ -280,13 +300,16 @@ void http_server_start() {
     httpd_handle_t server = NULL;
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
 
-    ESP_LOGI(TAG, "Starting server on port: '%d'", 80);
+    log_printf(TAG, LOG_LEVEL_INFO, "Starting server on port: '%d'", 80);
     esp_err_t err;
     if ((err = httpd_start(&server, &config)) != ESP_OK) {
-        ESP_LOGI(TAG, "Error starting webserver (%s), trying one more time", esp_err_to_name(err));
+        log_printf(TAG, LOG_LEVEL_INFO, "Error starting webserver (%s), trying one more time", esp_err_to_name(err));
         err = httpd_start(&server, &config);
         if (err != ESP_OK) {
-            ESP_LOGI(TAG, "Error starting webserver (%s) for the second time, rebooting...", esp_err_to_name(err));
+            log_printf(TAG,
+                       LOG_LEVEL_INFO,
+                       "Error starting webserver (%s) for the second time, rebooting...",
+                       esp_err_to_name(err));
             esp_restart();
         }
     }

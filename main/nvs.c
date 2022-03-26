@@ -1,8 +1,8 @@
 #include <string.h>
 #include "constants.h"
 
-#include "esp_log.h"
 #include "freertos/FreeRTOS.h"
+#include "log.h"
 #include "nvs_flash.h"
 
 #include "http_server.h"
@@ -38,12 +38,12 @@ void nvs_init() {
 
     new_location_set = false;
 
-    ESP_LOGI(TAG, "NVS successfully inited and opened");
+    log_printf(TAG, LOG_LEVEL_INFO, "NVS successfully inited and opened");
 }
 
 void nvs_save_config(spot_check_config *config) {
     if (handle == 0) {
-        ESP_LOGE(TAG, "Attempting to save to NVS before calling nvs_init(), not saving values");
+        log_printf(TAG, LOG_LEVEL_ERROR, "Attempting to save to NVS before calling nvs_init(), not saving values");
         return;
     }
 
@@ -90,7 +90,9 @@ void nvs_save_config(spot_check_config *config) {
 
 spot_check_config *nvs_get_config() {
     if (handle == 0) {
-        ESP_LOGE(TAG, "Attempting to retrive from NVS before calling nvs_init(), returning null ptr");
+        log_printf(TAG,
+                   LOG_LEVEL_ERROR,
+                   "Attempting to retrive from NVS before calling nvs_init(), returning null ptr");
         return NULL;
     }
 
@@ -185,7 +187,7 @@ spot_check_config *nvs_get_config() {
     }
 
     if (num_forecast_types == 0) {
-        ESP_LOGI(TAG, "Read zero forecast types out of flash, defaulting to ['swell']");
+        log_printf(TAG, LOG_LEVEL_INFO, "Read zero forecast types out of flash, defaulting to ['swell']");
         strcpy(_forecast_types[0], "swell");
         num_forecast_types = 1;
     }
@@ -206,7 +208,7 @@ spot_check_config *nvs_get_config() {
 esp_err_t nvs_full_erase() {
     esp_err_t err = nvs_flash_erase();
     if (err != ESP_OK) {
-        ESP_LOGE(TAG, "Failed to erase NVS flash! %s", esp_err_to_name(err));
+        log_printf(TAG, LOG_LEVEL_ERROR, "Failed to erase NVS flash! %s", esp_err_to_name(err));
     }
 
     return err;

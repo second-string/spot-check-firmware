@@ -1,6 +1,6 @@
 #include <string.h>
 
-#include "esp_log.h"
+#include "log.h"
 #include "freertos/FreeRTOS.h"
 
 #include "conditions_task.h"
@@ -34,7 +34,7 @@ static void conditions_timer_expired_callback(void *timer_args) {
         new_location_set     = false;
         seconds_elapsed      = 0;
         fetch_new_conditions = true;
-        ESP_LOGI(TAG, "Reached %d minutes elapsed, updating conditions...", seconds_elapsed / 60);
+        log_printf(TAG, LOG_LEVEL_INFO, "Reached %d minutes elapsed, updating conditions...", seconds_elapsed / 60);
     }
 }
 
@@ -71,7 +71,7 @@ static void refresh_conditions(conditions_t *new_conditions) {
 
         parse_success = true;
     } else {
-        ESP_LOGI(TAG, "Failed to get new conditions, falling back to last saved values");
+        log_printf(TAG, LOG_LEVEL_INFO, "Failed to get new conditions, falling back to last saved values");
         new_conditions->temperature = last_retrieved_conditions.temperature;
         new_conditions->wind_speed  = last_retrieved_conditions.wind_speed;
         strncpy(new_conditions->wind_dir,
@@ -116,7 +116,7 @@ void display_conditions(conditions_t *conditions) {
             conditions->wind_speed,
             conditions->wind_dir,
             conditions->tide_height);
-    ESP_LOGI(TAG, "Showing: '%s'", conditions_str);
+    log_printf(TAG, LOG_LEVEL_INFO, "Showing: '%s'", conditions_str);
     led_text_show_text(conditions_str, strlen(conditions_str));
 }
 
@@ -138,7 +138,7 @@ void update_conditions_task(void *args) {
 
         fetch_new_conditions = false;
 
-        ESP_LOGI(TAG,
+        log_printf(TAG, LOG_LEVEL_INFO,
                  "Picked up fetch_new_conditions flag set in conditions task main loop, running refresh then display");
         conditions_t new_conditions;
         refresh_conditions(&new_conditions);

@@ -5,7 +5,7 @@
 #include <string.h>
 
 #include "esp_err.h"
-#include "esp_log.h"
+#include "log.h"
 
 #include "url_decode.h"
 
@@ -59,7 +59,9 @@ esp_err_t get_key_values(char *decoded_str, Tuple *tuple_array, int num_tuples_a
     char *next_key_value_str = strtok(temp_input_str, initial_delim);
     while (next_key_value_str != NULL) {
         if (current_tuple_index == num_tuples_available) {
-            ESP_LOGE(TAG, "Attempting to decode querystring with more key/value pairs than allocated Tuples!");
+            log_printf(TAG,
+                       LOG_LEVEL_ERROR,
+                       "Attempting to decode querystring with more key/value pairs than allocated Tuples!");
             return ESP_ERR_INVALID_SIZE;
         }
 

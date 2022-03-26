@@ -11,6 +11,7 @@
 #define CLI_UART_QUEUE_SIZE (10)
 
 typedef struct {
+    uart_port_t   port;
     uart_config_t config;
     QueueHandle_t queue;
 } uart_handle_t;
