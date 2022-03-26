@@ -6,6 +6,7 @@
 
 #include "driver/uart.h"
 
+#include "FreeRTOS_CLI.h"
 #include "cli_task.h"
 #include "constants.h"
 #include "uart.h"
