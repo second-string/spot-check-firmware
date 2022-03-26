@@ -20,8 +20,6 @@
 #include "http_client.h"
 #include "http_server.h"
 #include "json.h"
-// #include "led_strip.h"
-// #include "led_text.h"
 #include "mdns_local.h"
 #include "nvs.h"
 #include "ota_task.h"
@@ -33,10 +31,6 @@
 #define TAG "sc-main"
 
 #define CLI_UART UART_NUM_0
-
-// #define LED_ROWS 6
-// #define LEDS_PER_ROW 50
-// #define MAX_TEXT_ROWS_TO_SCROLL 5
 
 static volatile int sta_connect_attempts = 0;
 
@@ -166,10 +160,6 @@ static void app_init() {
     button_hold_handle =
         timer_init("button_hold", button_hold_timer_expired_callback, BUTTON_HOLD_TIMER_PERIOD_MS * 1000);
     gpio_init_local(button_isr_handler);
-    // strip->clear(strip);
-
-    // led_strip_funcs strip_funcs = {.set_pixel = strip->set_pixel, .show = strip->show};
-    // led_text_init(fonts_4x6, LED_ROWS, LEDS_PER_ROW, ZIGZAG, strip_funcs);
 
     ESP_ERROR_CHECK(esp_event_loop_create_default());
     mdns_local_init();
@@ -206,44 +196,8 @@ void app_main(void) {
     app_init();
     app_start();
 
-    // TODO :: led text task or embed task in led text component
-    // led_text_state previous_text_state = led_text_current_state;
-    // led_text_state current_state;
-    // char         text_to_scroll_buffer[MAX_TEXT_ROWS_TO_SCROLL][50];
-    // unsigned int next_index_to_scroll         = 0;
-    // unsigned int num_available_text_to_scroll = 0;
     while (1) {
         // ESP_ERROR_CHECK(esp_task_wdt_reset());
-        /*
-        current_state = led_text_current_state;
-        switch (current_state) {
-            case IDLE:
-            case STATIC:
-                // If there's text available to scroll, doesn't matter if we got here from SCROLLING or IDLE, scroll
-                // it
-                if (num_available_text_to_scroll > 0 && next_index_to_scroll < num_available_text_to_scroll) {
-                    ESP_LOGI(TAG, "text in the buffer to scrolling, scrolling index %d", next_index_to_scroll);
-                    char *text_to_scroll = text_to_scroll_buffer[next_index_to_scroll];
-                    led_text_scroll_text_async(text_to_scroll, strlen(text_to_scroll), false);
-                    next_index_to_scroll++;
-                } else {
-                    if (previous_text_state == SCROLLING) {
-                        // We just became idle after scrolling and we have no more text to scroll,
-                        // "clear" our buffer and index and re-show the conditions
-                        num_available_text_to_scroll = 0;
-                        next_index_to_scroll         = 0;
-
-                        display_last_retrieved_conditions();
-                    }
-                }
-                break;
-            case SCROLLING:
-                break;
-        }
-
-
-        previous_text_state = current_state;
-        */
 
         vTaskDelay(100 / portTICK_PERIOD_MS);
 
@@ -262,6 +216,8 @@ void app_main(void) {
             char *next_forecast_type = get_next_forecast_type(config->forecast_types);
             request                  = http_client_build_request(next_forecast_type, config, url_buf, params, 2);
 
+            // TODO :: both the request performing and the executed logic for doing something with the spot check
+            // response strings should be in another task / file
             char *server_response = NULL;
             int   data_length     = http_client_perform_request(&request, &server_response);
             if (data_length != 0) {
@@ -270,21 +226,7 @@ void app_main(void) {
                 if (cJSON_IsArray(data_value)) {
                     cJSON *data_list_value = NULL;
                     cJSON_ArrayForEach(data_list_value, data_value) {
-                        ESP_LOGI(TAG, "Would normally execute logic for adding text to scroll buffer here");
-                        /*
-                        if (num_available_text_to_scroll >= MAX_TEXT_ROWS_TO_SCROLL) {
-                            ESP_LOGI(TAG, "No more room in scroll buffer to add text, dropping");
-                            break;
-                        }
-
-                        char *text = cJSON_GetStringValue(data_list_value);
-                        ESP_LOGI(TAG,
-                                 "Adding new text to the buffer at index %d: '%s'",
-                                 num_available_text_to_scroll,
-                                 text);
-                        strcpy(text_to_scroll_buffer[num_available_text_to_scroll], text);
-                        num_available_text_to_scroll++;
-                        */
+                        ESP_LOGI(TAG, "Used to execute logic for adding text to scroll buffer here");
                     }
                 } else {
                     ESP_LOGI(TAG, "Didn't get json array of strings to print, bailing");
