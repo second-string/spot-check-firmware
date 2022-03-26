@@ -157,12 +157,20 @@ void default_event_handler(void *arg, esp_event_base_t event_base, int32_t event
 static void app_init() {
     // ESP_ERROR_CHECK(esp_task_wdt_init());
 
+    // NULL passed for process_char callback, see cli_task_init for reasoning
+    uart_init(CLI_UART,
+              CLI_UART_RX_RING_BUFFER_BYTES,
+              CLI_UART_TX_RING_BUFFER_BYTES,
+              CLI_UART_QUEUE_SIZE,
+              CLI_UART_RX_BUFFER_BYTES,
+              NULL,
+              &cli_uart_handle);
+    log_init(&cli_uart_handle);
+
     // Init nvs to allow storage of wifi config directly to flash.
     // This enables us to pull config info directly out of flash after
     // first setup.
     // https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-guides/wifi.html#wi-fi-configuration-phase
-    uart_init(CLI_UART, CLI_UART_RX_BUFFER_BYTES, CLI_UART_TX_BUFFER_BYTES, CLI_UART_QUEUE_SIZE, &cli_uart_handle);
-    log_init(&cli_uart_handle);
     nvs_init();
 
     debounce_handle = timer_init("debounce", button_timer_expired_callback, BUTTON_TIMER_PERIOD_MS * 1000);
@@ -176,7 +184,7 @@ static void app_init() {
     wifi_init_provisioning();
     http_client_init();
 
-    cli_task_init(CLI_UART);
+    cli_task_init(&cli_uart_handle);
 }
 
 static void app_start() {

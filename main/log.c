@@ -10,7 +10,7 @@
 // Should match CLI_UART_TX_BYTES probably
 #define LOG_OUT_BUFFER_BYTES (512)
 
-static uart_handle_t    *console_handle;
+static uart_handle_t    *cli_uart_handle;
 static char             *log_out_buffer;
 static SemaphoreHandle_t mutex_handle;
 static StaticSemaphore_t mutex_buffer;
@@ -21,13 +21,16 @@ static const char *level_strs[] = {
     [LOG_LEVEL_DEBUG] = "[DBG]",
 };
 
-void log_init(uart_handle_t *console) {
+void log_init(uart_handle_t *cli_handle) {
+    assert(cli_handle);
+
     log_out_buffer = pvPortMalloc(LOG_OUT_BUFFER_BYTES * sizeof(uint8_t));
+    assert(log_out_buffer);
 
     mutex_handle = xSemaphoreCreateMutexStatic(&mutex_buffer);
     assert(mutex_handle);
 
-    console_handle = console;
+    cli_uart_handle = cli_handle;
 }
 
 void log_log_line(char *tag, log_level_t level, char *fmt, ...) {
@@ -63,5 +66,5 @@ void log_log_line(char *tag, log_level_t level, char *fmt, ...) {
 
     // Let go of the mutex before sending to serial, it'll handle re-entrancy with it's own internal queueing
     // (maybe?)
-    uart_write_bytes(console_handle->port, log_out_buffer, bytes_written + formatted_size + 1);
+    uart_write_bytes(cli_uart_handle->port, log_out_buffer, bytes_written + formatted_size + 1);
 }

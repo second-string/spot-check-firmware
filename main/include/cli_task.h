@@ -1,4 +1,6 @@
-#include "driver/uart.h"
+#pragma once
 
-void cli_task_init(uart_port_t uart);
+#include "uart.h"
+
+void cli_task_init(uart_handle_t *uart_handle);
 void cli_task_start();
