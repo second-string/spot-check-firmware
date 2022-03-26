@@ -16,7 +16,7 @@
 
 #include "conditions_task.h"
 #include "fonts.h"
-#include "gpio.h"
+#include "gpio_local.h"
 #include "http_client.h"
 #include "http_server.h"
 #include "json.h"

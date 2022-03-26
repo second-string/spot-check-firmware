@@ -2,7 +2,7 @@
 #include "freertos/FreeRTOS.h"
 
 #include "constants.h"
-#include "gpio.h"
+#include "gpio_local.h"
 
 #include "esp_log.h"
 
@@ -16,6 +16,8 @@ typedef enum {
     DEBOUNCING_RELEASE,
     WAITING_FOR_RELEASE,
 } debounce_state;
+
+volatile bool button_pressed;
 
 static volatile debounce_state current_state;
 

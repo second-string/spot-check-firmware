@@ -2,6 +2,7 @@
 #define GPIO_H
 
 #include "constants.h"
+#include "driver/gpio.h"
 #include "timer.h"
 
 #define LED_PIN (2)
@@ -20,7 +21,7 @@ typedef enum {
     BUTTON_STATE_HOLD,
 } button_state_t;
 
-volatile uint8_t button_pressed;
+extern volatile bool button_pressed;
 
 void           gpio_init_local(gpio_isr_t button_isr_handler);
 button_state_t gpio_debounce(timer_info_handle debounce_handle, timer_info_handle button_hold_handle);

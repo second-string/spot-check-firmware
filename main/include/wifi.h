@@ -6,13 +6,14 @@
 #define PROVISIONED_NETWORK_CONNECTION_MAXIMUM_RETRY 3
 
 typedef struct {
-    char * ssid;
-    char * password;
+    char  *ssid;
+    char  *password;
     size_t ssid_len;
     size_t password_len;
 } connect_to_network_task_args;
 
-bool wifi_is_provisioning_inited;
+extern bool          wifi_is_provisioning_inited;
+extern volatile bool connected_to_network;
 
 /* Base init that needs to be done on boot no matter what mode we're headed for */
 void wifi_init(void *event_handler);

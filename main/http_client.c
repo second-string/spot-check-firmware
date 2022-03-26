@@ -13,6 +13,7 @@
 #define MAX_READ_BUFFER_SIZE 4096
 
 extern const uint8_t server_cert_pem_start[] asm("_binary_ca_cert_pem_start");
+extern bool          connected_to_network;
 
 /* Technically unnecessary, should be stubbed out for non-debug build */
 esp_err_t http_event_handler(esp_http_client_event_t *event) {
@@ -38,6 +39,9 @@ esp_err_t http_event_handler(esp_http_client_event_t *event) {
         case HTTP_EVENT_DISCONNECTED:
             ESP_LOGD(TAG, "HTTP_EVENT_DISCONNECTED");
             break;
+        case HTTP_EVENT_REDIRECT:
+            ESP_LOGD(TAG, "HTTP_EVENT_REDIRECT");
+            break;
     }
     return ESP_OK;
 }
@@ -48,10 +52,10 @@ void http_client_init() {
 // Caller passes in endpoint (tides/swell) the values for the 2 query params,
 // a pointer to a block of already-allocated memory for the base url + endpoint,
 // and a pointer to a block of already-allocated memory to hold the query params structs
-request http_client_build_request(char *             endpoint,
+request http_client_build_request(char              *endpoint,
                                   spot_check_config *config,
-                                  char *             url_buf,
-                                  query_param *      params,
+                                  char              *url_buf,
+                                  query_param       *params,
                                   uint8_t            num_params) {
     query_param temp_params[num_params];
     if (strcmp(endpoint, "conditions") == 0) {
@@ -183,10 +187,10 @@ int http_client_perform_request(request *request_obj, char **read_buffer) {
 
 // 0 for success, error code if not
 int http_client_perform_post(request *request_obj,
-                             char *   post_data,
+                             char    *post_data,
                              size_t   post_data_size,
-                             char *   response_data,
-                             size_t * response_data_size) {
+                             char    *response_data,
+                             size_t  *response_data_size) {
     if (!connected_to_network) {
         ESP_LOGI(TAG, "Attempted to make POST request, not connected to internet yet so bailing");
         return 0;

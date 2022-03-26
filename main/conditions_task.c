@@ -4,11 +4,13 @@
 #include "freertos/FreeRTOS.h"
 
 #include "conditions_task.h"
+#include "gpio_local.h"
 #include "http_client.h"
 #include "json.h"
 #include "led_text.h"
 #include "nvs.h"
 #include "timer.h"
+#include "wifi.h"
 
 #define TAG "sc-conditions-task"
 
