@@ -3,7 +3,6 @@
 #include <wifi_provisioning/manager.h>
 #include <wifi_provisioning/scheme_softap.h>
 
-#include "esp_log.h"
 #include "esp_system.h"
 #include "esp_task_wdt.h"
 #include "esp_wifi.h"
@@ -14,27 +13,35 @@
 
 #include "driver/gpio.h"
 
+#include "cli_task.h"
 #include "conditions_task.h"
 #include "fonts.h"
 #include "gpio_local.h"
 #include "http_client.h"
 #include "http_server.h"
 #include "json.h"
-#include "led_strip.h"
-#include "led_text.h"
+// #include "led_strip.h"
+// #include "led_text.h"
 #include "mdns_local.h"
 #include "nvs.h"
 #include "ota_task.h"
 #include "timer.h"
 #include "wifi.h"
 
+#include "esp_log.h"
+
 #define TAG "sc-main"
 
-#define LED_ROWS 6
-#define LEDS_PER_ROW 50
-#define MAX_TEXT_ROWS_TO_SCROLL 5
+#define CLI_UART UART_NUM_0
+
+// #define LED_ROWS 6
+// #define LEDS_PER_ROW 50
+// #define MAX_TEXT_ROWS_TO_SCROLL 5
 
 static volatile int sta_connect_attempts = 0;
+
+static timer_info_handle button_hold_handle;
+static timer_info_handle debounce_handle;
 
 void button_timer_expired_callback(void *timer_args) {
     button_timer_expired = true;
@@ -146,7 +153,7 @@ void default_event_handler(void *arg, esp_event_base_t event_base, int32_t event
     }
 }
 
-void app_main(void) {
+static void app_init() {
     // ESP_ERROR_CHECK(esp_task_wdt_init());
 
     // Init nvs to allow storage of wifi config directly to flash.
@@ -155,41 +162,59 @@ void app_main(void) {
     // https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-guides/wifi.html#wi-fi-configuration-phase
     nvs_init();
 
-    timer_info_handle debounce_handle =
-        timer_init("debounce", button_timer_expired_callback, BUTTON_TIMER_PERIOD_MS * 1000);
-    timer_info_handle button_hold_handle =
+    debounce_handle = timer_init("debounce", button_timer_expired_callback, BUTTON_TIMER_PERIOD_MS * 1000);
+    button_hold_handle =
         timer_init("button_hold", button_hold_timer_expired_callback, BUTTON_HOLD_TIMER_PERIOD_MS * 1000);
     gpio_init_local(button_isr_handler);
-    led_strip_t *strip = led_strip_init_ws2812();
-    strip->clear(strip);
+    // strip->clear(strip);
 
-    led_strip_funcs strip_funcs = {.set_pixel = strip->set_pixel, .show = strip->show};
-    led_text_init(fonts_4x6, LED_ROWS, LEDS_PER_ROW, ZIGZAG, strip_funcs);
+    // led_strip_funcs strip_funcs = {.set_pixel = strip->set_pixel, .show = strip->show};
+    // led_text_init(fonts_4x6, LED_ROWS, LEDS_PER_ROW, ZIGZAG, strip_funcs);
 
     ESP_ERROR_CHECK(esp_event_loop_create_default());
     mdns_local_init();
     wifi_init(default_event_handler);
     wifi_init_provisioning();
     http_client_init();
+
+    cli_task_init(CLI_UART);
+}
+
+static void app_start() {
     wifi_start_provisioning(false);
 
     TaskHandle_t update_conditions_task_handle;
     xTaskCreate(&update_conditions_task,
                 "update-conditions",
-                8192,
+                configMINIMAL_STACK_SIZE,
                 NULL,
                 tskIDLE_PRIORITY,
                 &update_conditions_task_handle);
-    TaskHandle_t ota_task_handle;
-    xTaskCreate(&check_ota_update_task, "check-ota-update", 8192, NULL, tskIDLE_PRIORITY, &ota_task_handle);
 
-    led_text_state previous_text_state = led_text_current_state;
-    led_text_state current_state;
-    char           text_to_scroll_buffer[MAX_TEXT_ROWS_TO_SCROLL][50];
-    unsigned int   next_index_to_scroll         = 0;
-    unsigned int   num_available_text_to_scroll = 0;
+    TaskHandle_t ota_task_handle;
+    xTaskCreate(&check_ota_update_task,
+                "check-ota-update",
+                configMINIMAL_STACK_SIZE,
+                NULL,
+                tskIDLE_PRIORITY,
+                &ota_task_handle);
+
+    cli_task_start();
+}
+
+void app_main(void) {
+    app_init();
+    app_start();
+
+    // TODO :: led text task or embed task in led text component
+    // led_text_state previous_text_state = led_text_current_state;
+    // led_text_state current_state;
+    // char         text_to_scroll_buffer[MAX_TEXT_ROWS_TO_SCROLL][50];
+    // unsigned int next_index_to_scroll         = 0;
+    // unsigned int num_available_text_to_scroll = 0;
     while (1) {
         // ESP_ERROR_CHECK(esp_task_wdt_reset());
+        /*
         current_state = led_text_current_state;
         switch (current_state) {
             case IDLE:
@@ -216,10 +241,13 @@ void app_main(void) {
                 break;
         }
 
-        vTaskDelay(100 / portTICK_PERIOD_MS);
 
         previous_text_state = current_state;
+        */
 
+        vTaskDelay(100 / portTICK_PERIOD_MS);
+
+        // TODO :: move debounce logic to gpio file and register callback
         button_state_t current_button_state = gpio_debounce(debounce_handle, button_hold_handle);
         if (current_button_state == BUTTON_STATE_SINGLE_PRESS) {
             ESP_ERROR_CHECK(gpio_set_level(LED_PIN, !gpio_get_level(LED_PIN)));
@@ -242,6 +270,8 @@ void app_main(void) {
                 if (cJSON_IsArray(data_value)) {
                     cJSON *data_list_value = NULL;
                     cJSON_ArrayForEach(data_list_value, data_value) {
+                        ESP_LOGI(TAG, "Would normally execute logic for adding text to scroll buffer here");
+                        /*
                         if (num_available_text_to_scroll >= MAX_TEXT_ROWS_TO_SCROLL) {
                             ESP_LOGI(TAG, "No more room in scroll buffer to add text, dropping");
                             break;
@@ -254,6 +284,7 @@ void app_main(void) {
                                  text);
                         strcpy(text_to_scroll_buffer[num_available_text_to_scroll], text);
                         num_available_text_to_scroll++;
+                        */
                     }
                 } else {
                     ESP_LOGI(TAG, "Didn't get json array of strings to print, bailing");
