@@ -13,6 +13,7 @@
 #include "http_client.h"
 #include "json.h"
 #include "ota_task.h"
+#include "wifi.h"
 
 #define TAG "sc-ota-task"
 
@@ -107,7 +108,7 @@ static bool check_forced_update(esp_app_desc_t *current_image_info, char *versio
     if (cJSON_IsTrue(needs_update_json)) {
         // This will break if server gives us a string larger than pre-alloced buf passed in. Right now it's 10 bytes
         cJSON *version_to_download_json = cJSON_GetObjectItem(response_json, "server_version");
-        char * temp_version             = cJSON_GetStringValue(version_to_download_json);
+        char  *temp_version             = cJSON_GetStringValue(version_to_download_json);
         strcpy(version_to_download, temp_version);
         force_update = true;
     }

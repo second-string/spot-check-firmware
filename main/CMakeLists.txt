@@ -3,7 +3,7 @@ idf_component_register(
                                  "url_decode.c"
                                  "nvs.c"
                                  "wifi.c"
-                                 "gpio.c"
+                                 "gpio_local.c"
                                  "timer.c"
                                  "mdns_local.c"
                                  "http_client.c"

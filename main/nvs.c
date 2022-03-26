@@ -10,6 +10,8 @@
 
 #define TAG "sc-nvs"
 
+bool new_location_set;
+
 static nvs_handle_t handle = 0;
 
 // Allocate backing field buffers for our settings

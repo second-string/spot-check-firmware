@@ -7,10 +7,13 @@
 
 #define TAG "sc-timer"
 
+volatile bool button_timer_expired;
+volatile bool button_hold_timer_expired;
+
 typedef struct timer_info_t {
     esp_timer_handle_t timer_handle;
     unsigned int       timeout_microseconds;
-    void *             callback;
+    void              *callback;
 } timer_info_t;
 
 // Used for button debounce, button hold, and conditions re-fetch
