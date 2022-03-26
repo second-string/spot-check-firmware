@@ -6,3 +6,6 @@ set(PROJECT_VER "0.0.7")
 
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 project(spot-check-embedded)
+
+# TODO :: figure this out
+# target_compile_options("${COMPONENT_LIB}" PUBLIC -Wall)

@@ -18,7 +18,7 @@
 #endif
 
 typedef struct {
-    char * text;
+    char  *text;
     size_t text_len;
     bool   scroll_continously;
 } scroll_text_args;
@@ -65,7 +65,9 @@ void led_text_init(const unsigned char *font,
     ESP_LOGI(TAG, "# LEDs per row: %d", leds_per_row);
     ESP_LOGI(TAG,
              "Row orientation: %s",
-             orientation == ZIGZAG ? "ZIGZAG" : orientation == STRAIGHT ? "STRAIGHT" : "undefined");
+             orientation == ZIGZAG     ? "ZIGZAG"
+             : orientation == STRAIGHT ? "STRAIGHT"
+                                       : "undefined");
 }
 
 /*
@@ -151,7 +153,7 @@ static void led_text_scroll_text(void *args) {
     led_text_current_state = SCROLLING;
 
     scroll_text_args *casted_args        = (scroll_text_args *)args;
-    char *            text               = casted_args->text;
+    char             *text               = casted_args->text;
     size_t            text_len           = casted_args->text_len;
     bool              scroll_continously = casted_args->scroll_continously;
 
