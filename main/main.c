@@ -24,6 +24,7 @@
 #include "nvs.h"
 #include "ota_task.h"
 #include "timer.h"
+#include "uart.h"
 #include "wifi.h"
 
 #include "esp_log.h"
@@ -31,6 +32,8 @@
 #define TAG "sc-main"
 
 #define CLI_UART UART_NUM_0
+
+uart_handle_t cli_uart_handle;
 
 static volatile int sta_connect_attempts = 0;
 
@@ -155,6 +158,7 @@ static void app_init() {
     // first setup.
     // https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-guides/wifi.html#wi-fi-configuration-phase
     nvs_init();
+    uart_init(CLI_UART, CLI_UART_RX_BUFFER_BYTES, CLI_UART_TX_BUFFER_BYTES, CLI_UART_QUEUE_SIZE, &cli_uart_handle);
 
     debounce_handle = timer_init("debounce", button_timer_expired_callback, BUTTON_TIMER_PERIOD_MS * 1000);
     button_hold_handle =
@@ -176,15 +180,19 @@ static void app_start() {
     TaskHandle_t update_conditions_task_handle;
     xTaskCreate(&update_conditions_task,
                 "update-conditions",
-                configMINIMAL_STACK_SIZE,
+                SPOT_CHECK_MINIMAL_STACK_SIZE_BYTES,
                 NULL,
                 tskIDLE_PRIORITY,
                 &update_conditions_task_handle);
 
+    // minimal * 3 is the smallest we can go w/o SO - are we (or the ota sdk) allocing space for the binary chunks on
+    // the stack????
+    // Actually empty CLI task SOs at single minimal so maybe not. Sheesh big tasks. conditions task seems fine on one
+    // minimal?
     TaskHandle_t ota_task_handle;
     xTaskCreate(&check_ota_update_task,
                 "check-ota-update",
-                configMINIMAL_STACK_SIZE,
+                SPOT_CHECK_MINIMAL_STACK_SIZE_BYTES * 3,
                 NULL,
                 tskIDLE_PRIORITY,
                 &ota_task_handle);
@@ -193,6 +201,7 @@ static void app_start() {
 }
 
 void app_main(void) {
+    ESP_LOGE(TAG, "minimal: %u", configMINIMAL_STACK_SIZE);
     app_init();
     app_start();
 
