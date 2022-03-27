@@ -65,7 +65,7 @@ static int8_t prvGetNumberOfParameters(const char *pcCommandString);
 /* The definition of the "help" command.  This command is always at the front
 of the list of registered commands. */
 static const CLI_Command_Definition_t xHelpCommand = {"help",
-                                                      "\r\nhelp:\r\n Lists all the registered commands\r\n\r\n",
+                                                      "help: Lists all the registered commands\n",
                                                       prvHelpCommand,
                                                       0};
 
@@ -138,6 +138,10 @@ BaseType_t FreeRTOS_CLIProcessCommand(const char *const pcCommandInput, char *pc
             a sub-string of a longer command, check the byte after the expected
             end of the string is either the end of the string or a space before
             a parameter. */
+            // char    temp[50];
+            // uint8_t comp = strncmp(pcCommandInput, pcRegisteredCommandString, xCommandStringLength);
+            // size_t  bs   = sprintf(temp, "Comparing %s to %s: %u\n", pcCommandInput, pcRegisteredCommandString,
+            // comp); printf("%s\n", temp);
             if (strncmp(pcCommandInput, pcRegisteredCommandString, xCommandStringLength) == 0) {
                 if ((pcCommandInput[xCommandStringLength] == ' ') || (pcCommandInput[xCommandStringLength] == 0x00)) {
                     /* The command has been found.  Check it has the expected

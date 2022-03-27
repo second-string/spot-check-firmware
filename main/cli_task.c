@@ -21,6 +21,7 @@
 
 #define CLI_CMD_PROCESS_TASK_PRIORITY (tskIDLE_PRIORITY)
 #define CLI_COMMAND_QUEUE_SIZE (12)
+#define CLI_COMMAND_PROCESS_OUT_BUFFER_BYTES (128)
 
 typedef struct {
     char  *cmd;
@@ -34,18 +35,7 @@ static uint8_t        command_char_idx;
 static QueueHandle_t queue_handle;
 static StaticQueue_t queue_buffer;
 static uint8_t      *queue_data_buffer;
-
-// TaskHandle_t cli_task_handle;
-
-// static void cli_task_loop() {
-//     // RX already set up by sdk for logging, setup tx and install IRQs for both
-
-//     while (1) {
-//         const char *test = "test write out\n";
-//         uart_write_bytes(uart_port, test, strlen(test));
-//         vTaskDelay(pdMS_TO_TICKS(4000));
-//     }
-// }
+static char         *command_processing_out;
 
 static void cli_process_char(char c) {
     command_buffer[command_char_idx++] = c;
@@ -55,17 +45,16 @@ static void cli_process_char(char c) {
     uart_write_bytes(handle->port, &c, 1);
 
     if (c == '\n' || c == '\r') {
-        command_buffer[command_char_idx] = '\0';
-
-        // char  *base = "processing cmd:";
-        // char   full[strlen(base) + strlen(command_buffer) + 1];
-        // size_t full_size = sprintf(full, "%s %s", base, command_buffer);
+        // Overwrite newline with null term FreeRTOS+CLI to be able to process it
+        // This is assuming that we're only getting a single CR or LF - if we get two this will break command parsing
+        command_char_idx--;
+        command_buffer[command_char_idx] = 0x00;
 
         uart_write_bytes(handle->port, "\r\n", 2);
 
         // Either free on failure here or dequeuer responsible for freeing
-        char *cmd_copy = pvPortMalloc(command_char_idx * sizeof(char));
-        memcpy(cmd_copy, command_buffer, command_char_idx);
+        char *cmd_copy = pvPortMalloc((command_char_idx + 1) * sizeof(char));
+        memcpy(cmd_copy, command_buffer, command_char_idx + 1);
         cli_command_t cmd = {
             .cmd = cmd_copy,
             .len = command_char_idx * sizeof(char),
@@ -87,11 +76,21 @@ static void cli_process_char(char c) {
 static void cli_process_command(void *args) {
     QueueHandle_t queue = args;
 
-    BaseType_t    rval = pdFALSE;
+    BaseType_t    rval      = pdFALSE;
+    BaseType_t    more_data = pdFALSE;
     cli_command_t cmd;
     while (1) {
         rval = xQueueReceive(queue, &cmd, portMAX_DELAY);
         assert(rval);
+
+        do {
+            more_data =
+                FreeRTOS_CLIProcessCommand(cmd.cmd, command_processing_out, CLI_COMMAND_PROCESS_OUT_BUFFER_BYTES);
+            log_printf(TAG, LOG_LEVEL_INFO, "%s", command_processing_out);
+        } while (more_data);
+
+        // Free the string malloced by uart rx task
+        // vPortFree(cmd.cmd);
     }
 }
 
@@ -112,6 +111,8 @@ void cli_task_init(uart_handle_t *uart_handle) {
     assert(queue_data_buffer);
     queue_handle = xQueueCreateStatic(CLI_COMMAND_QUEUE_SIZE, sizeof(cli_command_t), queue_data_buffer, &queue_buffer);
     assert(queue_handle);
+    command_processing_out = pvPortMalloc(CLI_COMMAND_PROCESS_OUT_BUFFER_BYTES * sizeof(char));
+    assert(command_processing_out);
 }
 
 void cli_task_start() {

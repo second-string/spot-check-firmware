@@ -13,6 +13,7 @@
 
 #include "driver/gpio.h"
 
+#include "cli_commands.h"
 #include "cli_task.h"
 #include "conditions_task.h"
 #include "fonts.h"
@@ -185,6 +186,7 @@ static void app_init() {
     http_client_init();
 
     cli_task_init(&cli_uart_handle);
+    cli_command_register_all();
 }
 
 static void app_start() {

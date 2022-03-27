@@ -14,5 +14,6 @@ idf_component_register(
                                  "cli_task.c"
                                  "uart.c"
                                  "log.c"
+                                 "cli_commands.c"
                     INCLUDE_DIRS "include"
                     EMBED_TXTFILES ${project_dir}/server_certs/ca_cert.pem)
