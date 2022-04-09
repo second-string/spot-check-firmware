@@ -104,29 +104,11 @@ static BaseType_t cli_command_bq(char *write_buffer, size_t write_buffer_size, c
     }
 
     if (action_len == 8 && strncmp(action, "writereg", action_len) == 0) {
-        strcpy(write_buffer, "bq writereg not currently supported");
-        /*
-        BaseType_t  arg1_len;
-        const char *arg1_str = FreeRTOS_CLIGetParameter(cmd_str, 2, &arg1_len);
-        if (arg1_str == NULL) {
-            strcpy(write_buffer, "Error: usage is 'bq writereg <reg> <byte hex>'");
-            return pdFALSE;
-        }
-
-        BaseType_t  arg2_len;
-        const char *arg2_str = FreeRTOS_CLIGetParameter(cmd_str, 3, &arg2_len);
-        if (arg2_str == NULL) {
-            strcpy(write_buffer, "Error: usage is 'bq writereg <reg> <byte hex>'");
-            return pdFALSE;
-        }
-
-        uint8_t reg = strtoul(arg1_str, NULL, 16);
-        uint8_t val = strtoul(arg2_str, NULL, 16);
-        bq24196_write_reg(reg, val);
+        // strcpy(write_buffer, "bq writereg not currently supported");
+        bq24196_write_fake_reg();
         char msg[40];
-        sprintf(msg, "Successfully wrote 0x%02X to BQ reg 0x%02X", val, reg);
+        sprintf(msg, "Successfully wrote 0x02 to BQ reg 0x01");
         strcpy(write_buffer, msg);
-        */
     } else if (action_len == 7 && strncmp(action, "readreg", action_len) == 0) {
         BaseType_t  reg_len;
         const char *reg_str = FreeRTOS_CLIGetParameter(cmd_str, 2, &reg_len);

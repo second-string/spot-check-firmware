@@ -4,8 +4,8 @@
 
 #define TAG "sc-bq24196"
 
-#define BQ24196_SLAVE_ADDR (0x08)
-// #define BQ24196_SLAVE_ADDR (0x6B)
+// #define BQ24196_SLAVE_ADDR (0x08)
+#define BQ24196_SLAVE_ADDR (0x6B)
 
 // TDOD : remove once we have a function using this (along with void cast in init func)
 static void bq24196_write_reg(uint8_t reg, uint8_t byte);
@@ -82,4 +82,8 @@ static uint8_t bq24196_read_reg(bq24196_reg_t reg) {
 
 uint8_t bq24196_read_status_reg() {
     return bq24196_read_reg(0x08);
+}
+
+void bq24196_write_fake_reg() {
+    return bq24196_write_reg(0x01, 0x02);
 }
