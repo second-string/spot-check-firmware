@@ -13,6 +13,7 @@
 
 #include "driver/gpio.h"
 
+#include "bq24196.h"
 #include "cli_commands.h"
 #include "cli_task.h"
 #include "conditions_task.h"
@@ -20,6 +21,7 @@
 #include "gpio_local.h"
 #include "http_client.h"
 #include "http_server.h"
+#include "i2c.h"
 #include "json.h"
 #include "mdns_local.h"
 #include "nvs.h"
@@ -34,7 +36,8 @@
 
 #define CLI_UART UART_NUM_0
 
-uart_handle_t cli_uart_handle;
+static uart_handle_t cli_uart_handle;
+static i2c_handle_t  bq24196_i2c_handle;
 
 static volatile int sta_connect_attempts = 0;
 
@@ -173,11 +176,12 @@ static void app_init() {
     // first setup.
     // https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-guides/wifi.html#wi-fi-configuration-phase
     nvs_init();
-
+    i2c_init(BQ24196_I2C_PORT, BQ24196_I2C_SDA_PIN, BQ24196_I2C_SCL_PIN, &bq24196_i2c_handle);
     debounce_handle = timer_init("debounce", button_timer_expired_callback, BUTTON_TIMER_PERIOD_MS * 1000);
     button_hold_handle =
         timer_init("button_hold", button_hold_timer_expired_callback, BUTTON_HOLD_TIMER_PERIOD_MS * 1000);
     gpio_init_local(button_isr_handler);
+    bq24196_init(&bq24196_i2c_handle);
 
     ESP_ERROR_CHECK(esp_event_loop_create_default());
     mdns_local_init();
@@ -190,6 +194,8 @@ static void app_init() {
 }
 
 static void app_start() {
+    i2c_start(&bq24196_i2c_handle);
+
     wifi_start_provisioning(false);
 
     TaskHandle_t update_conditions_task_handle;

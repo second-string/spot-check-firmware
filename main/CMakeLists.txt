@@ -15,5 +15,7 @@ idf_component_register(
                                  "uart.c"
                                  "log.c"
                                  "cli_commands.c"
+                                 "i2c.c"
+                                 "bq24196.c"
                     INCLUDE_DIRS "include"
                     EMBED_TXTFILES ${project_dir}/server_certs/ca_cert.pem)

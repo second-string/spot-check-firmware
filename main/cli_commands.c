@@ -6,6 +6,7 @@
 #include "esp_ota_ops.h"
 #include "esp_system.h"
 
+#include "bq24196.h"
 #include "cli_commands.h"
 #include "log.h"
 
@@ -94,6 +95,70 @@ static BaseType_t cli_command_reset(char *write_buffer, size_t write_buffer_size
     return pdFALSE;
 }
 
+static BaseType_t cli_command_bq(char *write_buffer, size_t write_buffer_size, const char *cmd_str) {
+    BaseType_t  action_len;
+    const char *action = FreeRTOS_CLIGetParameter(cmd_str, 1, &action_len);
+    if (action == NULL) {
+        strcpy(write_buffer, "Error: usage is 'bq <action> <arg>'");
+        return pdFALSE;
+    }
+
+    if (action_len == 8 && strncmp(action, "writereg", action_len) == 0) {
+        strcpy(write_buffer, "bq writereg not currently supported");
+        /*
+        BaseType_t  arg1_len;
+        const char *arg1_str = FreeRTOS_CLIGetParameter(cmd_str, 2, &arg1_len);
+        if (arg1_str == NULL) {
+            strcpy(write_buffer, "Error: usage is 'bq writereg <reg> <byte hex>'");
+            return pdFALSE;
+        }
+
+        BaseType_t  arg2_len;
+        const char *arg2_str = FreeRTOS_CLIGetParameter(cmd_str, 3, &arg2_len);
+        if (arg2_str == NULL) {
+            strcpy(write_buffer, "Error: usage is 'bq writereg <reg> <byte hex>'");
+            return pdFALSE;
+        }
+
+        uint8_t reg = strtoul(arg1_str, NULL, 16);
+        uint8_t val = strtoul(arg2_str, NULL, 16);
+        bq24196_write_reg(reg, val);
+        char msg[40];
+        sprintf(msg, "Successfully wrote 0x%02X to BQ reg 0x%02X", val, reg);
+        strcpy(write_buffer, msg);
+        */
+    } else if (action_len == 7 && strncmp(action, "readreg", action_len) == 0) {
+        BaseType_t  reg_len;
+        const char *reg_str = FreeRTOS_CLIGetParameter(cmd_str, 2, &reg_len);
+        if (reg_str == NULL) {
+            strcpy(write_buffer, "Error: usage is 'bq readreg <reg hex>'");
+            return pdFALSE;
+        }
+
+        bq24196_reg_t reg     = strtoul(reg_str, NULL, 16);
+        uint8_t       reg_val = 0xFF;
+        switch (reg) {
+            case BQ24196_REG_STATUS:
+                reg_val = bq24196_read_status_reg();
+                break;
+            default: {
+                char err_msg[40];
+                sprintf(err_msg, "0x%02X is not a valid BQ24196 regsister", reg);
+                strcpy(write_buffer, err_msg);
+                return pdFALSE;
+            }
+        }
+        char msg[40];
+        sprintf(msg, "Successfully read  0x%02X from addr 0x%02X", reg_val, reg);
+        strcpy(write_buffer, msg);
+    } else {
+        strcpy(write_buffer, "Command did not match any available 'bq' subcommands");
+        return pdFALSE;
+    }
+
+    return pdFALSE;
+}
+
 void cli_command_register_all() {
     static const CLI_Command_Definition_t info_cmd = {
         .pcCommand                   = "info",
@@ -109,6 +174,14 @@ void cli_command_register_all() {
         .cExpectedNumberOfParameters = 0,
     };
 
+    static const CLI_Command_Definition_t bq_cmd = {
+        .pcCommand                   = "bq",
+        .pcHelpString                = "bq: Perform actions on the BQ24196 IC",
+        .pxCommandInterpreter        = cli_command_bq,
+        .cExpectedNumberOfParameters = -1,
+    };
+
     FreeRTOS_CLIRegisterCommand(&info_cmd);
     FreeRTOS_CLIRegisterCommand(&reset_cmd);
+    FreeRTOS_CLIRegisterCommand(&bq_cmd);
 }
