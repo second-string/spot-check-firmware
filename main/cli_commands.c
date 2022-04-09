@@ -3,6 +3,7 @@
 #include "FreeRTOS_CLI.h"
 #include "freertos/FreeRTOS.h"
 
+#include "driver/gpio.h"
 #include "esp_ota_ops.h"
 #include "esp_system.h"
 
@@ -85,6 +86,48 @@ static BaseType_t cli_command_info(char *write_buffer, size_t write_buffer_size,
     return rval;
 }
 
+static BaseType_t cli_command_gpio(char *write_buffer, size_t write_buffer_size, const char *cmd_str) {
+    BaseType_t  action_len;
+    const char *action = FreeRTOS_CLIGetParameter(cmd_str, 1, &action_len);
+    if (action == NULL) {
+        strcpy(write_buffer, "Error: usage is 'gpio <action> <arg>'");
+        return pdFALSE;
+    }
+
+    BaseType_t  pin_len;
+    const char *pin_str = FreeRTOS_CLIGetParameter(cmd_str, 2, &pin_len);
+    if (pin_str == NULL) {
+        strcpy(write_buffer,
+               "gpio:\n\tset <pin>: toggle gpio on\n\tclr <pin> toggle gpio off\n\tget <pin>: get gpio level");
+        return pdFALSE;
+    }
+
+    uint8_t pin = strtoul(pin_str, NULL, 10);
+    if (pin > 36) {
+        char msg[50];
+        sprintf("gpio %s %s: Pin must be between 0 and 36", action, pin_str);
+        strcpy(write_buffer, msg);
+        return pdFALSE;
+    }
+
+    if (action_len == 3 && strncmp(action, "set", action_len) == 0) {
+        gpio_set_level(pin, 1);
+        strcpy(write_buffer, "OK");
+    } else if (action_len == 3 && strncmp(action, "clr", action_len) == 0) {
+        gpio_set_level(pin, 0);
+        strcpy(write_buffer, "OK");
+    } else if (action_len == 3 && strncmp(action, "get", action_len) == 0) {
+        char msg[20];
+        sprintf(msg, "IO%u: %u", pin, gpio_get_level(pin));
+        strcpy(write_buffer, msg);
+    } else {
+        strcpy(write_buffer, "Command did not match any available 'gpio' subcommands");
+        return pdFALSE;
+    }
+
+    return pdFALSE;
+}
+
 static BaseType_t cli_command_reset(char *write_buffer, size_t write_buffer_size, const char *cmd_str) {
     esp_restart();
 
@@ -109,6 +152,14 @@ void cli_command_register_all() {
         .cExpectedNumberOfParameters = 0,
     };
 
+    static const CLI_Command_Definition_t gpio_cmd = {
+        .pcCommand    = "gpio",
+        .pcHelpString = "gpio:\n\tset <pin>: toggle gpio on\n\tclr <pin> toggle gpio off\n\tget <pin>: get gpio level",
+        .pxCommandInterpreter        = cli_command_gpio,
+        .cExpectedNumberOfParameters = 2,
+    };
+
     FreeRTOS_CLIRegisterCommand(&info_cmd);
     FreeRTOS_CLIRegisterCommand(&reset_cmd);
+    FreeRTOS_CLIRegisterCommand(&gpio_cmd);
 }
