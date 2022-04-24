@@ -80,10 +80,38 @@ static uint8_t bq24196_read_reg(bq24196_reg_t reg) {
     return reg_val;
 }
 
-uint8_t bq24196_read_status_reg() {
-    return bq24196_read_reg(0x08);
+uint8_t bq24196_read_input_src_ctrl_reg() {
+    return bq24196_read_reg(BQ24196_REG_INPUT_SRC_CTRL);
 }
 
-void bq24196_write_fake_reg() {
-    return bq24196_write_reg(0x01, 0x02);
+void bq24196_write_input_src_ctrl_reg() {
+    bq24196_write_reg(BQ24196_REG_INPUT_SRC_CTRL, 0x34);
+}
+
+uint8_t bq24196_read_charge_term_reg() {
+    return bq24196_read_reg(BQ24196_REG_CHARGE_TERM);
+}
+
+uint8_t bq24196_read_status_reg() {
+    return bq24196_read_reg(BQ24196_REG_STATUS);
+}
+
+uint8_t bq24196_read_fault_reg() {
+    return bq24196_read_reg(BQ24196_REG_FAULT);
+}
+
+void bq24196_disable_watchdog() {
+    uint8_t reg_val     = bq24196_read_reg(BQ24196_REG_CHARGE_TERM);
+    uint8_t new_reg_val = reg_val & ~((1 << 5) | (1 << 4));
+    bq24196_write_reg(BQ24196_REG_CHARGE_TERM, new_reg_val);
+    reg_val = bq24196_read_reg(BQ24196_REG_CHARGE_TERM);
+    assert(reg_val == new_reg_val);
+}
+
+void bq24196_disable_charging() {
+    uint8_t reg_val     = bq24196_read_reg(BQ24196_REG_MISC_CTRL);
+    uint8_t new_reg_val = reg_val | (1 << 5);
+    bq24196_write_reg(BQ24196_REG_MISC_CTRL, new_reg_val);
+    reg_val = bq24196_read_reg(BQ24196_REG_MISC_CTRL);
+    assert(reg_val == new_reg_val);
 }

@@ -147,11 +147,7 @@ static BaseType_t cli_command_bq(char *write_buffer, size_t write_buffer_size, c
     }
 
     if (action_len == 8 && strncmp(action, "writereg", action_len) == 0) {
-        // strcpy(write_buffer, "bq writereg not currently supported");
-        bq24196_write_fake_reg();
-        char msg[40];
-        sprintf(msg, "Successfully wrote 0x02 to BQ reg 0x01");
-        strcpy(write_buffer, msg);
+        strcpy(write_buffer, "bq writereg not currently supported");
     } else if (action_len == 7 && strncmp(action, "readreg", action_len) == 0) {
         BaseType_t  reg_len;
         const char *reg_str = FreeRTOS_CLIGetParameter(cmd_str, 2, &reg_len);
@@ -163,8 +159,17 @@ static BaseType_t cli_command_bq(char *write_buffer, size_t write_buffer_size, c
         bq24196_reg_t reg     = strtoul(reg_str, NULL, 16);
         uint8_t       reg_val = 0xFF;
         switch (reg) {
+            case BQ24196_REG_INPUT_SRC_CTRL:
+                reg_val = bq24196_read_input_src_ctrl_reg();
+                break;
+            case BQ24196_REG_CHARGE_TERM:
+                reg_val = bq24196_read_charge_term_reg();
+                break;
             case BQ24196_REG_STATUS:
                 reg_val = bq24196_read_status_reg();
+                break;
+            case BQ24196_REG_FAULT:
+                reg_val = bq24196_read_fault_reg();
                 break;
             default: {
                 char err_msg[40];
@@ -176,9 +181,17 @@ static BaseType_t cli_command_bq(char *write_buffer, size_t write_buffer_size, c
         char msg[40];
         sprintf(msg, "Successfully read  0x%02X from addr 0x%02X", reg_val, reg);
         strcpy(write_buffer, msg);
+    } else if (action_len == 4 && strncmp(action, "dwdg", action_len) == 0) {
+        bq24196_disable_watchdog();
+        strcpy(write_buffer, "OK");
+    } else if (action_len == 4 && strncmp(action, "dchg", action_len) == 0) {
+        bq24196_disable_charging();
+        strcpy(write_buffer, "OK");
+    } else if (action_len == 4 && strncmp(action, "wisc", action_len) == 0) {
+        bq24196_write_input_src_ctrl_reg();
+        strcpy(write_buffer, "OK");
     } else {
         strcpy(write_buffer, "Command did not match any available 'bq' subcommands");
-        return pdFALSE;
     }
 
     return pdFALSE;
@@ -204,7 +217,7 @@ void cli_command_register_all() {
         .pcHelpString                = "bq: Perform actions on the BQ24196 IC",
         .pxCommandInterpreter        = cli_command_bq,
         .cExpectedNumberOfParameters = -1,
-	};
+    };
 
     static const CLI_Command_Definition_t gpio_cmd = {
         .pcCommand    = "gpio",
