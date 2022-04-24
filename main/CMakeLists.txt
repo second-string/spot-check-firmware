@@ -17,5 +17,6 @@ idf_component_register(
                                  "cli_commands.c"
                                  "i2c.c"
                                  "bq24196.c"
+                                 "cd54hc4094.c"
                     INCLUDE_DIRS "include"
                     EMBED_TXTFILES ${project_dir}/server_certs/ca_cert.pem)
