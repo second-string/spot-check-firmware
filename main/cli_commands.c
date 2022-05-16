@@ -8,6 +8,7 @@
 #include "esp_system.h"
 
 #include "bq24196.h"
+#include "cd54hc4094.h"
 #include "cli_commands.h"
 #include "log.h"
 
@@ -156,12 +157,17 @@ static BaseType_t cli_command_bq(char *write_buffer, size_t write_buffer_size, c
             return pdFALSE;
         }
 
-        bq24196_reg_t reg     = strtoul(reg_str, NULL, 16);
+        uint8_t temp_reg = strtoul(reg_str, NULL, 16);
+        if (temp_reg >= BQ24196_REG_COUNT) {
+            char err_msg[40];
+            sprintf(err_msg, "0x%02X is not a valid BQ24196 register", temp_reg);
+            strcpy(write_buffer, err_msg);
+            return pdFALSE;
+        }
+
+        bq24196_reg_t reg     = temp_reg;
         uint8_t       reg_val = 0xFF;
         switch (reg) {
-            case BQ24196_REG_INPUT_SRC_CTRL:
-                reg_val = bq24196_read_input_src_ctrl_reg();
-                break;
             case BQ24196_REG_CHARGE_TERM:
                 reg_val = bq24196_read_charge_term_reg();
                 break;
@@ -172,10 +178,7 @@ static BaseType_t cli_command_bq(char *write_buffer, size_t write_buffer_size, c
                 reg_val = bq24196_read_fault_reg();
                 break;
             default: {
-                char err_msg[40];
-                sprintf(err_msg, "0x%02X is not a valid BQ24196 regsister", reg);
-                strcpy(write_buffer, err_msg);
-                return pdFALSE;
+                reg_val = bq24196_read_reg(reg);
             }
         }
         char msg[40];
@@ -187,11 +190,33 @@ static BaseType_t cli_command_bq(char *write_buffer, size_t write_buffer_size, c
     } else if (action_len == 4 && strncmp(action, "dchg", action_len) == 0) {
         bq24196_disable_charging();
         strcpy(write_buffer, "OK");
-    } else if (action_len == 4 && strncmp(action, "wisc", action_len) == 0) {
-        bq24196_write_input_src_ctrl_reg();
-        strcpy(write_buffer, "OK");
     } else {
         strcpy(write_buffer, "Command did not match any available 'bq' subcommands");
+    }
+
+    return pdFALSE;
+}
+
+static BaseType_t cli_command_shiftreg(char *write_buffer, size_t write_buffer_size, const char *cmd_str) {
+    BaseType_t  action_len;
+    const char *action = FreeRTOS_CLIGetParameter(cmd_str, 1, &action_len);
+    if (action == NULL) {
+        strcpy(write_buffer, "Error: usage is 'shiftreg <action> <arg>'");
+        return pdFALSE;
+    }
+
+    if (action_len == 6 && strncmp(action, "output", action_len) == 0) {
+        const char *output_val_str = FreeRTOS_CLIGetParameter(cmd_str, 2, &action_len);
+        if (output_val_str == NULL) {
+            strcpy(write_buffer, "Error: usage is 'shiftreg output <output_byte_val>'");
+            return pdFALSE;
+        }
+
+        uint8_t output_val = strtoul(output_val_str, NULL, 16);
+        cd54hc4094_set_output(output_val);
+        char retstr[40];
+        sprintf(retstr, "Shift register pins set to 0x%02X", output_val);
+        strcpy(write_buffer, retstr);
     }
 
     return pdFALSE;
@@ -226,8 +251,17 @@ void cli_command_register_all() {
         .cExpectedNumberOfParameters = 2,
     };
 
+    static const CLI_Command_Definition_t shiftreg_cmd = {
+        .pcCommand = "shiftreg",
+        .pcHelpString =
+            "shiftreg:\n\toutput: Set the output pins of the shift register to each bit in the value (in hex)",
+        .pxCommandInterpreter        = cli_command_shiftreg,
+        .cExpectedNumberOfParameters = 2,
+    };
+
     FreeRTOS_CLIRegisterCommand(&info_cmd);
     FreeRTOS_CLIRegisterCommand(&reset_cmd);
     FreeRTOS_CLIRegisterCommand(&bq_cmd);
     FreeRTOS_CLIRegisterCommand(&gpio_cmd);
+    FreeRTOS_CLIRegisterCommand(&shiftreg_cmd);
 }

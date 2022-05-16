@@ -14,6 +14,7 @@
 #include "driver/gpio.h"
 
 #include "bq24196.h"
+#include "cd54hc4094.h"
 #include "cli_commands.h"
 #include "cli_task.h"
 #include "conditions_task.h"
@@ -35,6 +36,9 @@
 #define TAG "sc-main"
 
 #define CLI_UART UART_NUM_0
+#define SHIFTREG_CLK_PIN GPIO_NUM_32
+#define SHIFTREG_DATA_PIN GPIO_NUM_33
+#define SHIFTREG_STROBE_PIN GPIO_NUM_12
 
 static uart_handle_t cli_uart_handle;
 static i2c_handle_t  bq24196_i2c_handle;
@@ -182,6 +186,7 @@ static void app_init() {
         timer_init("button_hold", button_hold_timer_expired_callback, BUTTON_HOLD_TIMER_PERIOD_MS * 1000);
     gpio_init_local(button_isr_handler);
     bq24196_init(&bq24196_i2c_handle);
+    cd54hc4094_init(SHIFTREG_CLK_PIN, SHIFTREG_DATA_PIN, SHIFTREG_STROBE_PIN);
 
     ESP_ERROR_CHECK(esp_event_loop_create_default());
     mdns_local_init();
@@ -195,13 +200,15 @@ static void app_init() {
 
 static void app_start() {
     i2c_start(&bq24196_i2c_handle);
+    bq24196_start();
 
+    vTaskDelay(pdMS_TO_TICKS(3000));
     wifi_start_provisioning(false);
 
     TaskHandle_t update_conditions_task_handle;
     xTaskCreate(&update_conditions_task,
                 "update-conditions",
-                SPOT_CHECK_MINIMAL_STACK_SIZE_BYTES,
+                SPOT_CHECK_MINIMAL_STACK_SIZE_BYTES * 3,
                 NULL,
                 tskIDLE_PRIORITY,
                 &update_conditions_task_handle);
@@ -233,6 +240,7 @@ void app_main(void) {
         // TODO :: move debounce logic to gpio file and register callback
         button_state_t current_button_state = gpio_debounce(debounce_handle, button_hold_handle);
         if (current_button_state == BUTTON_STATE_SINGLE_PRESS) {
+            log_printf(TAG, LOG_LEVEL_DEBUG, "Button pressed");
             ESP_ERROR_CHECK(gpio_set_level(LED_PIN, !gpio_get_level(LED_PIN)));
 
             // Space for base url + endpoint. Query param space handled when building full url in perform_request

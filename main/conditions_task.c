@@ -1,7 +1,7 @@
 #include <string.h>
 
-#include "log.h"
 #include "freertos/FreeRTOS.h"
+#include "log.h"
 
 #include "conditions_task.h"
 #include "gpio_local.h"
@@ -54,6 +54,13 @@ static void refresh_conditions(conditions_t *new_conditions) {
         cJSON *wind_speed_object  = cJSON_GetObjectItem(data_value, "wind_speed");
         cJSON *wind_dir_object    = cJSON_GetObjectItem(data_value, "wind_dir");
         cJSON *tide_height_object = cJSON_GetObjectItem(data_value, "tide_height");
+
+        log_printf(TAG, LOG_LEVEL_DEBUG, "Server response: %s", server_response);
+        parse_success = false;
+        if (server_response != NULL) {
+            free(server_response);
+        }
+        return;
 
         char *wind_dir_str    = cJSON_GetStringValue(wind_dir_object);
         char *tide_height_str = cJSON_GetStringValue(tide_height_object);
@@ -117,7 +124,7 @@ void display_conditions(conditions_t *conditions) {
             conditions->wind_dir,
             conditions->tide_height);
     log_printf(TAG, LOG_LEVEL_INFO, "Showing: '%s'", conditions_str);
-    led_text_show_text(conditions_str, strlen(conditions_str));
+    // led_text_show_text(conditions_str, strlen(conditions_str));
 }
 
 void display_last_retrieved_conditions() {
@@ -138,8 +145,10 @@ void update_conditions_task(void *args) {
 
         fetch_new_conditions = false;
 
-        log_printf(TAG, LOG_LEVEL_INFO,
-                 "Picked up fetch_new_conditions flag set in conditions task main loop, running refresh then display");
+        log_printf(
+            TAG,
+            LOG_LEVEL_INFO,
+            "Picked up fetch_new_conditions flag set in conditions task main loop, running refresh then display");
         conditions_t new_conditions;
         refresh_conditions(&new_conditions);
         display_conditions(&new_conditions);

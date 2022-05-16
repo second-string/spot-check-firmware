@@ -17,6 +17,19 @@ void bq24196_init(i2c_handle_t *handle) {
     i2c_handle = handle;
 }
 
+void bq24196_start() {
+    bq24196_disable_watchdog();
+
+    // Set min DPM voltage to 4.36V (default) and max DPM current to 1A
+    bq24196_write_reg(BQ24196_REG_INPUT_SRC_CTRL, 0x34);
+
+    // Set min system voltage to 3.3V
+    bq24196_write_reg(BQ24196_REG_POWER_ON_CONFIG, 0x17);
+
+    // Set max charge voltage to 4.144V
+    bq24196_write_reg(BQ24196_REG_CHARGE_VOLTAGE_CTRL, 0xA2);
+}
+
 /*
  * Flow for writing a byte to a reg is:
  * - write start bit
@@ -51,7 +64,7 @@ static void bq24196_write_reg(uint8_t reg, uint8_t byte) {
  * - write nack
  * - write stop bit
  */
-static uint8_t bq24196_read_reg(bq24196_reg_t reg) {
+uint8_t bq24196_read_reg(bq24196_reg_t reg) {
     assert(i2c_handle);
 
     i2c_cmd_handle_t cmd_handle = i2c_cmd_link_create();
@@ -78,14 +91,6 @@ static uint8_t bq24196_read_reg(bq24196_reg_t reg) {
     i2c_cmd_link_delete(cmd_handle);
 
     return reg_val;
-}
-
-uint8_t bq24196_read_input_src_ctrl_reg() {
-    return bq24196_read_reg(BQ24196_REG_INPUT_SRC_CTRL);
-}
-
-void bq24196_write_input_src_ctrl_reg() {
-    bq24196_write_reg(BQ24196_REG_INPUT_SRC_CTRL, 0x34);
 }
 
 uint8_t bq24196_read_charge_term_reg() {
