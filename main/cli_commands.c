@@ -178,7 +178,7 @@ static BaseType_t cli_command_bq(char *write_buffer, size_t write_buffer_size, c
                 reg_val = bq24196_read_fault_reg();
                 break;
             default: {
-                reg_val = bq24196_read_reg(reg);
+                bq24196_read_reg(reg, &reg_val);
             }
         }
         char msg[40];

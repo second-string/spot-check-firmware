@@ -19,11 +19,11 @@ typedef enum {
     BQ24196_REG_COUNT,
 } bq24196_reg_t;
 
-void    bq24196_init(i2c_handle_t *i2c_handle);
-void    bq24196_start();
-uint8_t bq24196_read_reg(bq24196_reg_t reg);
-uint8_t bq24196_read_charge_term_reg();
-uint8_t bq24196_read_status_reg();
-uint8_t bq24196_read_fault_reg();
-void    bq24196_disable_charging();
-void    bq24196_disable_watchdog();
+void      bq24196_init(i2c_handle_t *i2c_handle);
+void      bq24196_start();
+esp_err_t bq24196_read_reg(bq24196_reg_t reg, uint8_t *value);
+uint8_t   bq24196_read_charge_term_reg();
+uint8_t   bq24196_read_status_reg();
+uint8_t   bq24196_read_fault_reg();
+esp_err_t bq24196_disable_charging();
+esp_err_t bq24196_disable_watchdog();

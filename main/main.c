@@ -18,6 +18,7 @@
 #include "cli_commands.h"
 #include "cli_task.h"
 #include "conditions_task.h"
+#include "epd_driver.h"
 #include "fonts.h"
 #include "gpio_local.h"
 #include "http_client.h"
@@ -202,7 +203,6 @@ static void app_start() {
     i2c_start(&bq24196_i2c_handle);
     bq24196_start();
 
-    vTaskDelay(pdMS_TO_TICKS(3000));
     wifi_start_provisioning(false);
 
     TaskHandle_t update_conditions_task_handle;
