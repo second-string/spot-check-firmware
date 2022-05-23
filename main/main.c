@@ -19,7 +19,7 @@
 #include "cli_task.h"
 #include "conditions_task.h"
 #include "epd_driver.h"
-#include "fonts.h"
+#include "epd_highlevel.h"
 #include "gpio_local.h"
 #include "http_client.h"
 #include "http_server.h"
@@ -31,6 +31,7 @@
 #include "timer.h"
 #include "uart.h"
 #include "wifi.h"
+// #include "firasans_20.h"
 
 #include "log.h"
 
@@ -41,8 +42,11 @@
 #define SHIFTREG_DATA_PIN GPIO_NUM_33
 #define SHIFTREG_STROBE_PIN GPIO_NUM_12
 
-static uart_handle_t cli_uart_handle;
-static i2c_handle_t  bq24196_i2c_handle;
+#define FONT FiraSans_20
+
+static uart_handle_t       cli_uart_handle;
+static i2c_handle_t        bq24196_i2c_handle;
+// static EpdiyHighlevelState hl;
 
 static volatile int sta_connect_attempts = 0;
 
@@ -188,6 +192,8 @@ static void app_init() {
     gpio_init_local(button_isr_handler);
     bq24196_init(&bq24196_i2c_handle);
     cd54hc4094_init(SHIFTREG_CLK_PIN, SHIFTREG_DATA_PIN, SHIFTREG_STROBE_PIN);
+    // epd_init(EPD_LUT_1K);
+    // hl = epd_hl_init(EPD_BUILTIN_WAVEFORM);
 
     ESP_ERROR_CHECK(esp_event_loop_create_default());
     mdns_local_init();
@@ -213,10 +219,7 @@ static void app_start() {
                 tskIDLE_PRIORITY,
                 &update_conditions_task_handle);
 
-    // minimal * 3 is the smallest we can go w/o SO - are we (or the ota sdk) allocing space for the binary chunks on
-    // the stack????
-    // Actually empty CLI task SOs at single minimal so maybe not. Sheesh big tasks. conditions task seems fine on one
-    // minimal?
+    // minimal * 3 is the smallest we can go w/o SO
     TaskHandle_t ota_task_handle;
     xTaskCreate(&check_ota_update_task,
                 "check-ota-update",

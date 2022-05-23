@@ -7,7 +7,6 @@
 #include "gpio_local.h"
 #include "http_client.h"
 #include "json.h"
-#include "led_text.h"
 #include "nvs.h"
 #include "timer.h"
 #include "wifi.h"
@@ -28,7 +27,7 @@ static void conditions_timer_expired_callback(void *timer_args) {
     if ((seconds_elapsed / 60) >= CONDITIONS_UPDATE_INTERVAL_MINUTES || new_location_set) {
         if (new_location_set) {
             // If we have currently scrolling text, clear the LEDs for us to push a new conditions string
-            led_text_stop_scroll();
+            // led_text_stop_scroll();
         }
 
         new_location_set     = false;
