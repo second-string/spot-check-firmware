@@ -18,8 +18,7 @@
 #include "cli_commands.h"
 #include "cli_task.h"
 #include "conditions_task.h"
-#include "epd_driver.h"
-#include "epd_highlevel.h"
+#include "display.h"
 #include "gpio.h"
 #include "http_client.h"
 #include "http_server.h"
@@ -42,11 +41,8 @@
 #define SHIFTREG_DATA_PIN GPIO_NUM_33
 #define SHIFTREG_STROBE_PIN GPIO_NUM_12
 
-#define FONT FiraSans_20
-
 static uart_handle_t cli_uart_handle;
 static i2c_handle_t  bq24196_i2c_handle;
-// static EpdiyHighlevelState hl;
 
 static volatile int sta_connect_attempts = 0;
 
@@ -174,8 +170,7 @@ static void app_init() {
     gpio_init();
     bq24196_init(&bq24196_i2c_handle);
     cd54hc4094_init(SHIFTREG_CLK_PIN, SHIFTREG_DATA_PIN, SHIFTREG_STROBE_PIN);
-    // epd_init(EPD_LUT_1K);
-    // hl = epd_hl_init(EPD_BUILTIN_WAVEFORM);
+    display_init();
 
     ESP_ERROR_CHECK(esp_event_loop_create_default());
     mdns_local_init();
@@ -190,6 +185,7 @@ static void app_init() {
 static void app_start() {
     i2c_start(&bq24196_i2c_handle);
     bq24196_start();
+    display_start();
 
     wifi_start_provisioning(false);
 
@@ -216,6 +212,8 @@ static void app_start() {
 void app_main(void) {
     app_init();
     app_start();
+
+    display_render_splash_screen();
 
     while (1) {
         // ESP_ERROR_CHECK(esp_task_wdt_reset());
