@@ -211,6 +211,17 @@ static void app_start() {
 
 void app_main(void) {
     app_init();
+
+    size_t info_buffer_size = 200 * sizeof(char);
+    char  *info_buffer      = (char *)malloc(info_buffer_size);
+    log_printf(TAG, LOG_LEVEL_INFO, "");
+    log_printf(TAG, LOG_LEVEL_INFO, "");
+    while (cli_command_info(info_buffer, info_buffer_size, NULL) == pdTRUE) {
+        log_printf(TAG, LOG_LEVEL_INFO, info_buffer);
+    }
+    log_printf(TAG, LOG_LEVEL_INFO, "");
+    log_printf(TAG, LOG_LEVEL_INFO, "");
+
     app_start();
 
     display_render_splash_screen(4);

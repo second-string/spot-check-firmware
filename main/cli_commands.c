@@ -32,7 +32,7 @@ static const char *banner[] = {
     NULL,
 };
 
-static BaseType_t cli_command_info(char *write_buffer, size_t write_buffer_size, const char *cmd_str) {
+BaseType_t cli_command_info(char *write_buffer, size_t write_buffer_size, const char *cmd_str) {
     static uint8_t      banner_line = 0;
     static info_state_t state       = INFO_STATE_BANNER;
 
