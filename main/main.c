@@ -213,7 +213,7 @@ void app_main(void) {
     app_init();
     app_start();
 
-    display_render_splash_screen();
+    display_render_splash_screen(4);
 
     while (1) {
         // ESP_ERROR_CHECK(esp_task_wdt_reset());

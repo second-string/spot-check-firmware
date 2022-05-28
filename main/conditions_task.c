@@ -136,6 +136,7 @@ void update_conditions_task(void *args) {
     timer_info_handle conditions_handle =
         timer_init("conditions",
                    conditions_timer_expired_callback,
+                   NULL,
                    CONDITIONS_UPDATE_INTERVAL_MINUTES * SECONDS_PER_MIN * MS_PER_SECOND);
     timer_reset(conditions_handle, true);
 

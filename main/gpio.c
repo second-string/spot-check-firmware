@@ -82,7 +82,7 @@ void gpio_init() {
 #error Cannot intialize button GPIO, no dev board HW rev set in menuconfig!
 #endif
 
-    debounce_handle = timer_init("debounce", button_timer_expired_callback, BUTTON_TIMER_PERIOD_MS);
+    debounce_handle = timer_init("debounce", button_timer_expired_callback, NULL, BUTTON_TIMER_PERIOD_MS);
 
     gpio_config(&input_config);
     ESP_ERROR_CHECK(gpio_install_isr_service(0));
