@@ -4,7 +4,7 @@
 #include "log.h"
 
 #include "conditions_task.h"
-#include "gpio_local.h"
+#include "gpio.h"
 #include "http_client.h"
 #include "json.h"
 #include "nvs.h"
@@ -12,6 +12,8 @@
 #include "wifi.h"
 
 #define TAG "sc-conditions-task"
+
+#define CONDITIONS_UPDATE_INTERVAL_MINUTES (20)
 
 /*
  * Initialize this to pass our check is (since we normally divide this num by 60)
@@ -132,7 +134,9 @@ void display_last_retrieved_conditions() {
 
 void update_conditions_task(void *args) {
     timer_info_handle conditions_handle =
-        timer_init("conditions", conditions_timer_expired_callback, ONE_SECOND_TIMER_MS * 1000);
+        timer_init("conditions",
+                   conditions_timer_expired_callback,
+                   CONDITIONS_UPDATE_INTERVAL_MINUTES * SECONDS_PER_MIN * MS_PER_SECOND);
     timer_reset(conditions_handle, true);
 
     while (1) {

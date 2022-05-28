@@ -20,7 +20,7 @@
 #include "conditions_task.h"
 #include "epd_driver.h"
 #include "epd_highlevel.h"
-#include "gpio_local.h"
+#include "gpio.h"
 #include "http_client.h"
 #include "http_server.h"
 #include "i2c.h"
@@ -44,26 +44,11 @@
 
 #define FONT FiraSans_20
 
-static uart_handle_t       cli_uart_handle;
-static i2c_handle_t        bq24196_i2c_handle;
+static uart_handle_t cli_uart_handle;
+static i2c_handle_t  bq24196_i2c_handle;
 // static EpdiyHighlevelState hl;
 
 static volatile int sta_connect_attempts = 0;
-
-static timer_info_handle button_hold_handle;
-static timer_info_handle debounce_handle;
-
-void button_timer_expired_callback(void *timer_args) {
-    button_timer_expired = true;
-}
-
-void button_hold_timer_expired_callback(void *timer_args) {
-    button_hold_timer_expired = true;
-}
-
-void button_isr_handler(void *arg) {
-    button_pressed = !(bool)gpio_get_level(GPIO_BUTTON_PIN);
-}
 
 void default_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data) {
     // STA mode events (connecting to internet-based station)
@@ -186,10 +171,7 @@ static void app_init() {
     // https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-guides/wifi.html#wi-fi-configuration-phase
     nvs_init();
     i2c_init(BQ24196_I2C_PORT, BQ24196_I2C_SDA_PIN, BQ24196_I2C_SCL_PIN, &bq24196_i2c_handle);
-    debounce_handle = timer_init("debounce", button_timer_expired_callback, BUTTON_TIMER_PERIOD_MS * 1000);
-    button_hold_handle =
-        timer_init("button_hold", button_hold_timer_expired_callback, BUTTON_HOLD_TIMER_PERIOD_MS * 1000);
-    gpio_init_local(button_isr_handler);
+    gpio_init();
     bq24196_init(&bq24196_i2c_handle);
     cd54hc4094_init(SHIFTREG_CLK_PIN, SHIFTREG_DATA_PIN, SHIFTREG_STROBE_PIN);
     // epd_init(EPD_LUT_1K);
@@ -240,9 +222,7 @@ void app_main(void) {
 
         vTaskDelay(100 / portTICK_PERIOD_MS);
 
-        // TODO :: move debounce logic to gpio file and register callback
-        button_state_t current_button_state = gpio_debounce(debounce_handle, button_hold_handle);
-        if (current_button_state == BUTTON_STATE_SINGLE_PRESS) {
+        if (false) {
             log_printf(TAG, LOG_LEVEL_DEBUG, "Button pressed");
             ESP_ERROR_CHECK(gpio_set_level(LED_PIN, !gpio_get_level(LED_PIN)));
 
@@ -283,17 +263,6 @@ void app_main(void) {
             // Caller responsible for freeing buffer if non-null on return
             if (server_response != NULL) {
                 free(server_response);
-            }
-        } else if (current_button_state == BUTTON_STATE_HOLD) {
-            // Currently erase full NVM when gpio button is held - can be scoped in the future just to stored wifi
-            // provisioning data. Throw away return value, internal function will print out error if occurs. Reboot
-            // after to get back into provisoning state
-            log_printf(TAG, LOG_LEVEL_INFO, "GPIO button held, erasing NVM then rebooting");
-            esp_err_t err = nvs_full_erase();
-            (void)err;
-            esp_restart();
-            while (1) {
-                ;
             }
         }
     }

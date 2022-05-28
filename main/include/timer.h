@@ -6,21 +6,10 @@
 
 #include "constants.h"
 
-#define RELOAD_ON_EXPIRATION true
-
-#define BUTTON_TIMER_PERIOD_MS (20)
-#define BUTTON_HOLD_TIMER_PERIOD_MS (5000)
-#define CONDITIONS_UPDATE_INTERVAL_MINUTES (20)
-#define ONE_SECOND_TIMER_MS (1000)
-
 typedef struct timer_info_t *timer_info_handle;
 
-// Used for debouncing
-extern volatile bool button_timer_expired;
-extern volatile bool button_hold_timer_expired;
-
 // Does NOT start timer, must use reset_timer to start count
-timer_info_handle timer_init(char *timer_name, void *timer_expired_callback, unsigned int timeout_microseconds);
+timer_info_handle timer_init(char *timer_name, void *timer_expired_callback, unsigned int timeout_milliseconds);
 
 // Reset timer and begin counting up to period again.
 // Clears interrupt flag as well
