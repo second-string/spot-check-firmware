@@ -26,7 +26,9 @@
 /* Config Reggister Control */
 #define CFG_DATA GPIO_NUM_33
 #define CFG_CLK GPIO_NUM_32
-#define CFG_STR GPIO_NUM_0
+
+// This GPIO altered for custom board
+#define CFG_STR GPIO_NUM_12
 #endif
 #if defined(CONFIG_EPD_BOARD_REVISION_V6)
 #define CFG_SCL GPIO_NUM_33
