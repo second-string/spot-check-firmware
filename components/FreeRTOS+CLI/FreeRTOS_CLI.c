@@ -181,9 +181,11 @@ BaseType_t FreeRTOS_CLIProcessCommand(const char *const pcCommandInput, char *pc
         }
     } else {
         /* pxCommand was NULL, the command was not found. */
-        strncpy(pcWriteBuffer,
-                "Command not recognised.  Enter 'help' to view a list of available commands.\r\n\r\n",
-                xWriteBufferLen);
+        char buf[200] = {0};
+        sprintf(buf,
+                "Command %s not recognised.  Enter 'help' to view a list of available commands.\r\n\r\n",
+                pcCommandInput);
+        strcpy(pcWriteBuffer, buf);
         xReturn = pdFALSE;
     }
 

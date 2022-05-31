@@ -38,11 +38,18 @@ static uint8_t      *queue_data_buffer;
 static char         *command_processing_out;
 
 static void cli_process_char(char c) {
-    command_buffer[command_char_idx++] = c;
-
     // TODO :: handle backspace
-    // Echo
-    uart_write_bytes(handle->port, &c, 1);
+    if (c == 0x08) {
+        command_buffer[--command_char_idx] = 0x00;
+        // Echo out a backspace to move the cursor back, a space to cover up the old char, then another backspace to
+        // remove the space. Don't put any of it in our buffer because we dgaf about those shenanigans to make it look
+        // good to the user.
+        uart_write_bytes(handle->port, "\x08\x20\x08", 3);
+    } else {
+        // Add to buffer and echo back
+        command_buffer[command_char_idx++] = c;
+        uart_write_bytes(handle->port, &c, 1);
+    }
 
     if (c == '\n' || c == '\r') {
         // Overwrite newline with null term FreeRTOS+CLI to be able to process it
