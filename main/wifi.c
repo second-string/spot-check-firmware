@@ -23,7 +23,7 @@
 
 #define WIFI_EVENT_GROUP_NETWORK_CONNECTED_BIT (1 << 0)
 
-bool wifi_is_provisioning_inited = false;
+static bool wifi_is_provisioning_inited = false;
 
 static esp_event_handler_instance_t provisioning_manager_event_handler;
 static EventGroupHandle_t           wifi_event_group;

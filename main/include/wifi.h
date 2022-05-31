@@ -12,8 +12,6 @@ typedef struct {
     size_t password_len;
 } connect_to_network_task_args;
 
-extern bool wifi_is_provisioning_inited;
-
 /* Base init that needs to be done on boot no matter what mode we're headed for */
 void wifi_init();
 
