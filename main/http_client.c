@@ -3,6 +3,7 @@
 
 #include "constants.h"
 #include "http_client.h"
+#include "wifi.h"
 
 // Must included below constants.h where we overwite the define of LOG_LOCAL_LEVEL
 #include "log.h"
@@ -13,7 +14,6 @@
 #define MAX_READ_BUFFER_SIZE 4096
 
 extern const uint8_t server_cert_pem_start[] asm("_binary_ca_cert_pem_start");
-extern bool          connected_to_network;
 
 /* Technically unnecessary, should be stubbed out for non-debug build */
 esp_err_t http_event_handler(esp_http_client_event_t *event) {
@@ -86,7 +86,7 @@ request http_client_build_request(char              *endpoint,
  * performed using whatever was last set.
  */
 int http_client_perform_request(request *request_obj, char **read_buffer) {
-    if (!connected_to_network) {
+    if (!wifi_is_network_connected()) {
         log_printf(TAG, LOG_LEVEL_INFO, "Attempted to make GET request, not connected to internet yet so bailing");
         return 0;
     }
@@ -200,7 +200,7 @@ int http_client_perform_post(request *request_obj,
                              size_t   post_data_size,
                              char    *response_data,
                              size_t  *response_data_size) {
-    if (!connected_to_network) {
+    if (!wifi_is_network_connected()) {
         log_printf(TAG, LOG_LEVEL_INFO, "Attempted to make POST request, not connected to internet yet so bailing");
         return 0;
     }

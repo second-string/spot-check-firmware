@@ -12,11 +12,16 @@ typedef struct {
     size_t password_len;
 } connect_to_network_task_args;
 
-extern bool          wifi_is_provisioning_inited;
-extern volatile bool connected_to_network;
+extern bool wifi_is_provisioning_inited;
 
 /* Base init that needs to be done on boot no matter what mode we're headed for */
-void wifi_init(void *event_handler);
+void wifi_init();
+
+/* Uses an event group internally to yield until the wifi task sets the connected bit */
+void wifi_block_until_connected();
+
+/* Used by tasks to check if connected yet in order to perform logic without having to block on event group */
+bool wifi_is_network_connected();
 
 /*
  * Inits config and event handler for provisioning. Supports being called

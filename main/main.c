@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <string.h>
-#include <wifi_provisioning/manager.h>
-#include <wifi_provisioning/scheme_softap.h>
+// #include <wifi_provisioning/manager.h>
+// #include <wifi_provisioning/scheme_softap.h>
 
 #include "esp_system.h"
 #include "esp_task_wdt.h"
@@ -44,110 +44,6 @@
 static uart_handle_t cli_uart_handle;
 static i2c_handle_t  bq24196_i2c_handle;
 
-static volatile int sta_connect_attempts = 0;
-
-void default_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data) {
-    // STA mode events (connecting to internet-based station)
-    if (event_base == WIFI_EVENT) {
-        switch (event_id) {
-            case WIFI_EVENT_STA_START:
-                esp_wifi_connect();
-                break;
-            case WIFI_EVENT_STA_CONNECTED:
-                log_printf(TAG, LOG_LEVEL_INFO, "Got STA_CONN event");
-                break;
-            case WIFI_EVENT_STA_DISCONNECTED: {
-                if (sta_connect_attempts < PROVISIONED_NETWORK_CONNECTION_MAXIMUM_RETRY) {
-                    log_printf(TAG, LOG_LEVEL_INFO, "Got STA_DISCON, retrying to connect to the AP");
-                    esp_wifi_connect();
-                    sta_connect_attempts++;
-                } else {
-                    log_printf(TAG,
-                               LOG_LEVEL_INFO,
-                               "Got STA_DISCON and max retries, setting FAIL bit and kicking provision process");
-                    wifi_init_provisioning();
-                    wifi_start_provisioning(true);
-                }
-                break;
-            }
-            default:
-                log_printf(TAG, LOG_LEVEL_INFO, "Got unknown WIFI event id: %d", event_id);
-        }
-    }
-
-    // IP events, needed for actual connection to provisioned network once in STA mode
-    if (event_base == IP_EVENT) {
-        switch (event_id) {
-            case IP_EVENT_STA_GOT_IP: {
-                ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
-                log_printf(TAG, LOG_LEVEL_INFO, "Setting CONNECTED bit, got ip:" IPSTR, IP2STR(&event->ip_info.ip));
-                sta_connect_attempts = 0;
-                // mdns_advertise_tcp_service();
-
-                connected_to_network = true;
-
-                // We only start our http server upon IP assignment if this is a normal startup
-                // in STA mode where we already have creds. If we're in this state after connecting
-                // through a provisioning, we might not have enough sockets (I think) and the http server
-                // start will fail sometimes. In the PROV_END case below, we force a reboot once we're done
-                // provisioning, which always frees up the ability to successfully start the http_server
-                if (!wifi_is_provisioning_inited) {
-                    http_server_start();
-                }
-                break;
-            }
-            default:
-                log_printf(TAG, LOG_LEVEL_INFO, "Got unknown IP event id: %d", event_id);
-        }
-    }
-
-    // Provisioning manager events
-    if (event_base == WIFI_PROV_EVENT) {
-        switch (event_id) {
-            case WIFI_PROV_INIT:
-                log_printf(TAG, LOG_LEVEL_INFO, "Provisioning inited event emitted");
-                break;
-            case WIFI_PROV_START:
-                log_printf(TAG, LOG_LEVEL_INFO, "Provisioning started event emitted");
-                break;
-            case WIFI_PROV_CRED_RECV: {
-                wifi_sta_config_t *wifi_sta_cfg = (wifi_sta_config_t *)event_data;
-                size_t             ssid_len     = strnlen((char *)wifi_sta_cfg->ssid, sizeof(wifi_sta_cfg->ssid));
-                log_printf(TAG,
-                           LOG_LEVEL_INFO,
-                           "Received provisioning creds event - SSID: %s (length %d), PW: %s",
-                           wifi_sta_cfg->ssid,
-                           ssid_len,
-                           wifi_sta_cfg->password);
-                break;
-            }
-            case WIFI_PROV_CRED_FAIL: {
-                wifi_prov_sta_fail_reason_t *reason = (wifi_prov_sta_fail_reason_t *)event_data;
-                log_printf(TAG,
-                           LOG_LEVEL_ERROR,
-                           "Provisioning failed: %s",
-                           (*reason == WIFI_PROV_STA_AUTH_ERROR) ? "AP PW incorrect" : "AP not found");
-                break;
-            }
-            case WIFI_PROV_CRED_SUCCESS:
-                log_printf(TAG, LOG_LEVEL_INFO, "Provisioning successful event emitted");
-                break;
-            case WIFI_PROV_END: {
-                log_printf(TAG, LOG_LEVEL_INFO, "Provisioning complete event emitted, de-initing prov mgr");
-                wifi_deinit_provisioning();
-                esp_restart();
-                break;
-            }
-            case WIFI_PROV_DEINIT:
-                log_printf(TAG, LOG_LEVEL_INFO, "Provisioning deinited event emitted");
-                break;
-            default:
-                log_printf(TAG, LOG_LEVEL_INFO, "Received unsupported provisioning event: %d", event_id);
-                break;
-        }
-    }
-}
-
 static void app_init() {
     // ESP_ERROR_CHECK(esp_task_wdt_init());
 
@@ -174,7 +70,7 @@ static void app_init() {
 
     ESP_ERROR_CHECK(esp_event_loop_create_default());
     mdns_local_init();
-    wifi_init(default_event_handler);
+    wifi_init();
     wifi_init_provisioning();
     http_client_init();
 

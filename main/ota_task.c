@@ -131,11 +131,9 @@ void check_ota_update_task(void *args) {
     vTaskDelete(NULL);
 #endif
 
-    while (!connected_to_network) {
-        log_printf(TAG,
-                   LOG_LEVEL_INFO,
-                   "Not connected to wifi yet, OTA task will sleep and periodically check connection");
-        vTaskDelay(10000 / portTICK_PERIOD_MS);
+    if (!wifi_is_network_connected()) {
+        log_printf(TAG, LOG_LEVEL_INFO, "Not connected to wifi yet, OTA task will block until connection recieved");
+        wifi_block_until_connected();
     }
 
     // Start our OTA process with the default binary URL first

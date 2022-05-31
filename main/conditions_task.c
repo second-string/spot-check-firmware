@@ -140,10 +140,13 @@ void update_conditions_task(void *args) {
                    CONDITIONS_UPDATE_INTERVAL_MINUTES * SECONDS_PER_MIN * MS_PER_SECOND);
     timer_reset(conditions_handle, true);
 
+    // Wait forever until connected
+    wifi_block_until_connected();
+
     while (1) {
         vTaskDelay(5000 / portTICK_PERIOD_MS);
 
-        if (!connected_to_network || !fetch_new_conditions) {
+        if (!fetch_new_conditions) {
             continue;
         }
 
