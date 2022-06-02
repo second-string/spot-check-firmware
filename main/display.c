@@ -10,6 +10,8 @@
 #define TAG "sc-display"
 
 #define FONT FiraSans_20
+#define ED060SC4_WIDTH_PX 800
+#define ED060SC4_HEIGHT_PX 600
 
 static EpdiyHighlevelState hl;
 static uint32_t            display_height;
@@ -76,4 +78,42 @@ void display_render_text(char *text) {
 
     log_printf(TAG, LOG_LEVEL_DEBUG, "Rendering text on display: '%s'", text);
     display_render();
+}
+
+/*
+ * Display a decoded JPEG on the e-ink display. Takes a pointer to data buffer (flash or ram), height and width of image
+ * in px, bytes per pixel, and starting x,y on screen. Bytes per pix will be 1 if rendering black and white, otherwise
+ * will be 3 or 4 for RGB and RBGA data.
+ */
+void display_render_image(uint8_t *image_buffer,
+                          size_t   width_px,
+                          size_t   height_px,
+                          uint8_t  bytes_per_px,
+                          uint32_t screen_x,
+                          uint32_t screen_y) {
+    display_full_clear();
+    uint8_t *fb = epd_hl_get_framebuffer(&hl);
+
+    const uint32_t row_width = width_px * bytes_per_px;
+    const uint32_t height    = height_px;
+    for (uint32_t i = 0; i < height - 1; i++) {
+        for (uint32_t j = 0, x_px = 0; j < row_width - 1; j += bytes_per_px) {
+            // For now assume any non-0xFF is black
+            if (j > 0) {
+                x_px = j / bytes_per_px;
+            }
+
+            epd_draw_pixel(screen_x + x_px, screen_y + i, image_buffer[i * row_width + j] == 0xFF ? 0xFF : 0x00, fb);
+        }
+    }
+
+    display_render();
+}
+
+/*
+ * Assumes array holds enough data for full screen, cannot check bounds and will crash if not. See display_render_image
+ * for internals.
+ */
+void display_render_image_fullscreen(uint8_t *image_buffer, uint8_t bytes_per_px) {
+    display_render_image(image_buffer, ED060SC4_WIDTH_PX, ED060SC4_HEIGHT_PX, bytes_per_px, 0, 0);
 }

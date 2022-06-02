@@ -19,5 +19,6 @@ idf_component_register(
                                  "bq24196.c"
                                  "cd54hc4094.c"
                                  "display.c"
+                                 "raw_image.c"
                     INCLUDE_DIRS "include"
                     EMBED_TXTFILES ${project_dir}/server_certs/ca_cert.pem)

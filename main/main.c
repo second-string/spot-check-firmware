@@ -1,7 +1,5 @@
 #include <stdio.h>
 #include <string.h>
-// #include <wifi_provisioning/manager.h>
-// #include <wifi_provisioning/scheme_softap.h>
 
 #include "esp_system.h"
 #include "esp_task_wdt.h"
@@ -27,10 +25,10 @@
 #include "mdns_local.h"
 #include "nvs.h"
 #include "ota_task.h"
+#include "raw_image.h"
 #include "timer.h"
 #include "uart.h"
 #include "wifi.h"
-// #include "firasans_20.h"
 
 #include "log.h"
 
@@ -122,7 +120,7 @@ void app_main(void) {
     app_start();
 
     display_render_splash_screen();
-    vTaskDelay(pdMS_TO_TICKS(4000));
+    vTaskDelay(pdMS_TO_TICKS(1000));
     if (!wifi_is_provisioned()) {
         display_render_text(
             "Download the Spot Check app and follow\nthe configuration steps to connect\n your device to a wifi "
@@ -130,6 +128,7 @@ void app_main(void) {
     } else {
         display_render_text("Loading forecast...");
     }
+    vTaskDelay(pdMS_TO_TICKS(1000));
 
     while (1) {
         // TODO :: wdg with tasks
