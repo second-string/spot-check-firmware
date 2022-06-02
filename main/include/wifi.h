@@ -37,4 +37,7 @@ void wifi_start_provisioning(bool force_reprovision);
 /* Deinits provisioning manager, unregisters from event handler, and sets internal flag */
 void wifi_deinit_provisioning();
 
+/* Check if we're provisioned */
+bool wifi_is_provisioned();
+
 #endif

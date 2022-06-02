@@ -117,18 +117,32 @@ void app_main(void) {
     }
     log_printf(TAG, LOG_LEVEL_INFO, "");
     log_printf(TAG, LOG_LEVEL_INFO, "");
+    free(info_buffer);
 
     app_start();
 
-    display_render_splash_screen(4);
+    display_render_splash_screen();
+    vTaskDelay(pdMS_TO_TICKS(4000));
+    if (!wifi_is_provisioned()) {
+        display_render_text(
+            "Download the Spot Check app and follow\nthe configuration steps to connect\n your device to a wifi "
+            "network");
+    } else {
+        display_render_text("Loading forecast...");
+    }
 
     while (1) {
+        // TODO :: wdg with tasks
         // ESP_ERROR_CHECK(esp_task_wdt_reset());
 
-        vTaskDelay(100 / portTICK_PERIOD_MS);
+        // yielding 100 seconds every loop for now. I think we'll be able to take this loop out and delete the default
+        // task
+        vTaskDelay(pdMS_TO_TICKS(100000));
 
-        if (false) {
-            log_printf(TAG, LOG_LEVEL_DEBUG, "Button pressed");
+        /*
+        TODO :: this whole logic block should be either a simple timer with a callback to run the fetch of new forecast
+        info or in a task. We don't need to wait for user trigger to scroll now, so we can handle the update in the
+        background if (false) { log_printf(TAG, LOG_LEVEL_DEBUG, "Button pressed");
             ESP_ERROR_CHECK(gpio_set_level(LED_PIN, !gpio_get_level(LED_PIN)));
 
             // Space for base url + endpoint. Query param space handled when building full url in perform_request
@@ -170,5 +184,6 @@ void app_main(void) {
                 free(server_response);
             }
         }
+        */
     }
 }

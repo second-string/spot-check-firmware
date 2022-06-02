@@ -249,3 +249,12 @@ bool wifi_is_network_connected() {
     return WIFI_EVENT_GROUP_NETWORK_CONNECTED_BIT &
            xEventGroupWaitBits(wifi_event_group, WIFI_EVENT_GROUP_NETWORK_CONNECTED_BIT, pdFALSE, pdTRUE, 0);
 }
+
+/*
+ * Just uses the esp-idf api function to check the NVS creds, so it doesn't need provisioning to be running
+ */
+bool wifi_is_provisioned() {
+    bool already_provisioned = false;
+    ESP_ERROR_CHECK(wifi_prov_mgr_is_provisioned(&already_provisioned));
+    return already_provisioned;
+}

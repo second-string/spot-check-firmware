@@ -12,7 +12,6 @@
 #define FONT FiraSans_20
 
 static EpdiyHighlevelState hl;
-static timer_info_handle   callback_timer;
 static uint32_t            display_height;
 static uint32_t            display_width;
 
@@ -29,7 +28,6 @@ static void display_render() {
 void display_init() {
     epd_init(EPD_LUT_1K);
     hl             = epd_hl_init(EPD_BUILTIN_WAVEFORM);
-    callback_timer = timer_init("display callback", display_render_text, "Loading...", 3 * MS_PER_SECOND);
     display_width  = epd_rotated_display_width();
     display_height = epd_rotated_display_height();
     log_printf(TAG, LOG_LEVEL_INFO, "Display dimensions,  width: %dpx height: %dpx", display_width, display_height);
@@ -49,7 +47,7 @@ void display_full_clear() {
     log_printf(TAG, LOG_LEVEL_DEBUG, "Cleared full display");
 }
 
-void display_render_splash_screen(uint8_t display_time_secs) {
+void display_render_splash_screen() {
     configASSERT(hl.front_fb && hl.back_fb);
 
     uint8_t *fb = epd_hl_get_framebuffer(&hl);
@@ -64,15 +62,11 @@ void display_render_splash_screen(uint8_t display_time_secs) {
     cursor_y = epd_rotated_display_height() - 50;
     epd_write_default(&FONT, "Second String Studios", &cursor_x, &cursor_y, fb);
 
+    log_printf(TAG, LOG_LEVEL_DEBUG, "Rendering splash screen on display");
     display_render();
-
-    timer_change_period(callback_timer, display_time_secs * MS_PER_SECOND);
-    timer_reset(callback_timer, false);
 }
 
-void display_render_text(void *callback_arg) {
-    char *text = callback_arg;
-
+void display_render_text(char *text) {
     display_full_clear();
 
     uint8_t *fb       = epd_hl_get_framebuffer(&hl);
@@ -80,5 +74,6 @@ void display_render_text(void *callback_arg) {
     int      cursor_y = display_height / 2 - 20;
     epd_write_default(&FONT, text, &cursor_x, &cursor_y, fb);
 
+    log_printf(TAG, LOG_LEVEL_DEBUG, "Rendering text on display: '%s'", text);
     display_render();
 }
