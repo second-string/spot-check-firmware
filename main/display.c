@@ -103,7 +103,8 @@ void display_render_image(uint8_t *image_buffer,
                 x_px = j / bytes_per_px;
             }
 
-            epd_draw_pixel(screen_x + x_px, screen_y + i, image_buffer[i * row_width + j] == 0xFF ? 0xFF : 0x00, fb);
+            // Draw pixel directly from data (assumes that it's 8-bit depth grayscale)
+            epd_draw_pixel(screen_x + x_px, screen_y + i, image_buffer[i * row_width + j], fb);
         }
     }
 
