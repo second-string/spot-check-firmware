@@ -231,11 +231,17 @@ static BaseType_t cli_command_api(char *write_buffer, size_t write_buffer_size, 
         return pdFALSE;
     }
 
-    char    url[60];
-    char    res[100];
-    request req = http_client_build_request((char *)endpoint, NULL, url, NULL, 0);
-    http_client_perform_request(&req, (char **)&res);
+    char                     url[60];
+    char                    *res           = NULL;
+    size_t                   bytes_alloced = 0;
+    request                  req           = http_client_build_request((char *)endpoint, NULL, url, NULL, 0);
+    esp_http_client_handle_t client;
+    http_client_perform_request(&req, &client);
+    ESP_ERROR_CHECK(http_client_read_response(&client, &res, &bytes_alloced));
     strcpy(write_buffer, cmd_str);
+    if (res && bytes_alloced > 0) {
+        free(res);
+    }
     return pdFALSE;
 }
 

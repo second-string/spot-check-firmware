@@ -100,10 +100,11 @@ static bool check_forced_update(esp_app_desc_t *current_image_info, char *versio
     strcpy(url + base_len, version_info_path);
     request request_obj = {.num_params = 0, .params = NULL, .url = url};
 
-    char   response_data[100];
-    size_t response_data_size;
-    ESP_ERROR_CHECK(
-        http_client_perform_post(&request_obj, post_data, strlen(post_data), response_data, &response_data_size));
+    char                    *response_data;
+    size_t                   response_data_size;
+    esp_http_client_handle_t client;
+    ESP_ERROR_CHECK(http_client_perform_post(&request_obj, post_data, strlen(post_data), &client));
+    http_client_read_response(&client, &response_data, &response_data_size);
 
     log_printf(TAG, LOG_LEVEL_INFO, "%s", response_data);
     bool   force_update      = false;
@@ -117,7 +118,8 @@ static bool check_forced_update(esp_app_desc_t *current_image_info, char *versio
         force_update = true;
     }
 
-    // Clean up json mem
+    // Clean up request and json mem
+    free(response_data);
     cJSON_free(response_json);
 
     return force_update;

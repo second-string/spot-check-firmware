@@ -85,15 +85,18 @@ request http_client_build_request(char              *endpoint,
 }
 
 /*
- * request obj is optional, but highly recommended to ensure the
- * right url/params are set up. If not supplied, request will be
- * performed using whatever was last set.
+ * NOTE: only performs the HTTP request. Does not read out response data, does not clean up client (unless there was a
+ * failure). Caller responsible for calling http_client_read_response after this function to read data into buffer and
+ * close client, OR manually reading data and closing in the case of maniupulating large responses as they're chunked
+ * in.
  */
-int http_client_perform_request(request *request_obj, char **read_buffer) {
-    // if (!wifi_is_network_connected()) {
-    //     log_printf(TAG, LOG_LEVEL_INFO, "Attempted to make GET request, not connected to internet yet so bailing");
-    //     return 0;
-    // }
+bool http_client_perform_request(request *request_obj, esp_http_client_handle_t *client) {
+    configASSERT(client);
+
+    if (!wifi_is_network_connected()) {
+        log_printf(TAG, LOG_LEVEL_INFO, "Attempted to make GET request, not connected to internet yet so bailing");
+        return 0;
+    }
 
     log_printf(TAG, LOG_LEVEL_INFO, "Initing http client for request...");
 
@@ -106,7 +109,7 @@ int http_client_perform_request(request *request_obj, char **read_buffer) {
         .transport_type = HTTP_TRANSPORT_OVER_SSL,
     };
 
-    esp_http_client_handle_t client = esp_http_client_init(&http_config);
+    *client = esp_http_client_init(&http_config);
     if (!client) {
         log_printf(TAG, LOG_LEVEL_INFO, "Error initing http client, returning without sending request");
         return 0;
@@ -125,85 +128,37 @@ int http_client_perform_request(request *request_obj, char **read_buffer) {
             strcat(req_url, "&");
         }
 
-        ESP_ERROR_CHECK(esp_http_client_set_url(client, req_url));
+        ESP_ERROR_CHECK(esp_http_client_set_url(*client, req_url));
         log_printf(TAG, LOG_LEVEL_INFO, "Setting url to %s", req_url);
     }
 
-    ESP_ERROR_CHECK(esp_http_client_set_method(client, HTTP_METHOD_GET));
-    ESP_ERROR_CHECK(esp_http_client_set_header(client, "Content-type", "text/html"));
+    ESP_ERROR_CHECK(esp_http_client_set_method(*client, HTTP_METHOD_GET));
+    ESP_ERROR_CHECK(esp_http_client_set_header(*client, "Content-type", "text/html"));
 
-    esp_err_t error = esp_http_client_perform(client);
+    esp_err_t error = esp_http_client_perform(*client);
     if (error != ESP_OK) {
         const char *err_text = esp_err_to_name(error);
         log_printf(TAG, LOG_LEVEL_INFO, "Error performing test GET, error: %s", err_text);
 
         // clean up and return no space allocated
-        error = esp_http_client_cleanup(client);
+        error = esp_http_client_cleanup(*client);
         if (error != ESP_OK) {
             log_printf(TAG, LOG_LEVEL_INFO, "Error cleaning up  http client connection");
         }
 
-        return 0;
+        return false;
     }
 
-    int content_length = esp_http_client_get_content_length(client);
-    int status         = esp_http_client_get_status_code(client);
-    if (status >= 200 && status <= 299) {
-        if (content_length < 0) {
-            log_printf(TAG, LOG_LEVEL_INFO, "Got success status (%d) but no content in response, bailing", status);
-            // clean up and return no space allocated
-            error = esp_http_client_cleanup(client);
-            if (error != ESP_OK) {
-                log_printf(TAG, LOG_LEVEL_INFO, "Error cleaning up  http client connection");
-            }
-
-            return 0;
-        }
-
-        log_printf(TAG, LOG_LEVEL_INFO, "GET success! Status=%d, Content-length=%d", status, content_length);
-    } else {
-        log_printf(TAG,
-                   LOG_LEVEL_INFO,
-                   "GET failed. Setting content_length to zero to skip to cleanup at end of function. Status=%d, "
-                   "Content-length=%d",
-                   status,
-                   content_length);
-        content_length = 0;
-    }
-
-    int alloced_space_used = 0;
-    if (content_length < MAX_READ_BUFFER_SIZE) {
-        // Did a lot of work here to try to read into buffer in chunks since default response buffer
-        // inside client is inited to ~512 bytes but something's borked in the SDK. This is technically
-        // double-allocating buffers since there's one internally and another here, but hopefully the quick malloc/free
-        // shouldn't cause any issues
-        *read_buffer                    = malloc(content_length + 1);
-        int length_received             = esp_http_client_read(client, *read_buffer, content_length);
-        (*read_buffer)[length_received] = '\0';
-        alloced_space_used              = length_received + 1;
-    } else {
-        log_printf(TAG,
-                   LOG_LEVEL_INFO,
-                   "Not enough room in read buffer: buffer=%d, content=%d",
-                   MAX_READ_BUFFER_SIZE,
-                   content_length);
-    }
-
-    error = esp_http_client_cleanup(client);
-    if (error != ESP_OK) {
-        log_printf(TAG, LOG_LEVEL_INFO, "Error cleaning up  http client connection");
-    }
-    log_printf(TAG, LOG_LEVEL_INFO, "Cleaned up http client after request");
-
-    return alloced_space_used;
+    return true;
 }
 
-// 0 for success, error code if not
-int http_client_perform_post(request *request_obj,
-                             char    *post_data,
-                             size_t   post_data_size,
-                             char    *response_data,
-                             size_t  *response_data_size) {
+// TODO :: refactor this to be split to re-use http_client_read_response like perform_request. Requires read_response to
+// be refactored to return response_data_size through pointer arg and not directly returned 0 for success, error code if
+// not
+int http_client_perform_post(request                  *request_obj,
+                             char                     *post_data,
+                             size_t                    post_data_size,
+                             esp_http_client_handle_t *client) {
     if (!wifi_is_network_connected()) {
         log_printf(TAG, LOG_LEVEL_INFO, "Attempted to make POST request, not connected to internet yet so bailing");
         return 0;
@@ -220,7 +175,7 @@ int http_client_perform_post(request *request_obj,
         .transport_type = HTTP_TRANSPORT_OVER_SSL,
     };
 
-    esp_http_client_handle_t client = esp_http_client_init(&http_config);
+    client = esp_http_client_init(&http_config);
     if (!client) {
         log_printf(TAG, LOG_LEVEL_INFO, "Error initing http client, returning without sending request");
         return 0;
@@ -228,31 +183,45 @@ int http_client_perform_post(request *request_obj,
 
     int retval = 0;
 
-    ESP_ERROR_CHECK(esp_http_client_set_url(client, request_obj->url));
-    ESP_ERROR_CHECK(esp_http_client_set_method(client, HTTP_METHOD_POST));
-    ESP_ERROR_CHECK(esp_http_client_set_header(client, "Content-type", "application/json"));
-    ESP_ERROR_CHECK(esp_http_client_set_post_field(client, post_data, post_data_size));
+    ESP_ERROR_CHECK(esp_http_client_set_url(*client, request_obj->url));
+    ESP_ERROR_CHECK(esp_http_client_set_method(*client, HTTP_METHOD_POST));
+    ESP_ERROR_CHECK(esp_http_client_set_header(*client, "Content-type", "application/json"));
+    ESP_ERROR_CHECK(esp_http_client_set_post_field(*client, post_data, post_data_size));
 
     log_printf(TAG, LOG_LEVEL_INFO, "Performing POST to %s with data size %u", request_obj->url, post_data_size);
-    esp_err_t err = esp_http_client_perform(client);
+    esp_err_t err = esp_http_client_perform(*client);
     if (err != ESP_OK) {
         log_printf(TAG, LOG_LEVEL_ERROR, "Error performing POST, error: %s", esp_err_to_name(err));
         retval = -1;
     } else {
-        retval = esp_http_client_get_status_code(client);
+        uint16_t status = esp_http_client_get_status_code(*client);
+        retval          = status <= 200 || status > 299;
     }
 
-    int content_length = esp_http_client_get_content_length(client);
-    int status         = esp_http_client_get_status_code(client);
+    return retval;
+}
+
+/*
+ * Read response data into caller-supplied buffer from open request in caller-supplied client. Request must have been
+ * sent through client using http_client_perform_request.
+ * Returns error code, return bytes malloced through response_data_size which caller is responsible for freeing.
+ */
+int http_client_read_response(esp_http_client_handle_t *client, char **response_data, size_t *response_data_size) {
+    configASSERT(client);
+
+    int retval         = 0;
+    int content_length = esp_http_client_get_content_length(*client);
+    int status         = esp_http_client_get_status_code(*client);
     if (status >= 200 && status <= 299) {
         if (content_length < 0) {
             log_printf(TAG, LOG_LEVEL_INFO, "Got success status (%d) but no content in response, bailing", status);
-            esp_err_t error = esp_http_client_cleanup(client);
+            esp_err_t error = esp_http_client_cleanup(*client);
             if (error != ESP_OK) {
                 log_printf(TAG, LOG_LEVEL_INFO, "Error cleaning up  http client connection");
             }
 
-            return retval;
+            retval = -1;
+            ;
         }
 
         log_printf(TAG, LOG_LEVEL_INFO, "POST success! Status=%d, Content-length=%d", status, content_length);
@@ -264,11 +233,13 @@ int http_client_perform_post(request *request_obj,
             status,
             content_length);
         content_length = 0;
+        retval         = -1;
     }
 
     int alloced_space_used = 0;
     if (content_length < MAX_READ_BUFFER_SIZE) {
-        int length_received            = esp_http_client_read(client, response_data, content_length);
+        *response_data                 = malloc(content_length + 1);
+        int length_received            = esp_http_client_read(*client, *response_data, content_length);
         response_data[length_received] = '\0';
         alloced_space_used             = length_received + 1;
     } else {
@@ -277,16 +248,18 @@ int http_client_perform_post(request *request_obj,
                    "Not enough room in read buffer: buffer=%d, content=%d",
                    MAX_READ_BUFFER_SIZE,
                    content_length);
+        retval = -1;
     }
 
     *response_data_size = alloced_space_used;
 
-    esp_err_t error = esp_http_client_cleanup(client);
-    if (error != ESP_OK) {
+    esp_err_t err = esp_http_client_cleanup(*client);
+    if (err != ESP_OK) {
         log_printf(TAG, LOG_LEVEL_INFO, "Error cleaning up  http client connection");
+        retval = err;
     }
     log_printf(TAG, LOG_LEVEL_INFO, "Cleaned up http client after request");
 
     // Return 0 if successful, the error code or -1 if anything else
-    return retval >= 200 && retval <= 200 ? 0 : retval;
+    return retval;
 }

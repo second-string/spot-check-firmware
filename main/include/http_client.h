@@ -28,11 +28,11 @@ request   http_client_build_request(char              *endpoint,
                                     char              *url_buf,
                                     query_param       *params,
                                     uint8_t            num_params);
-int       http_client_perform_request(request *request_obj, char **read_buffer);
-int       http_client_perform_post(request *request_obj,
-                                   char    *post_data,
-                                   size_t   post_data_size,
-                                   char    *response_data,
-                                   size_t  *response_data_size);
+bool      http_client_perform_request(request *request_obj, esp_http_client_handle_t *client);
+int       http_client_perform_post(request                  *request_obj,
+                                   char                     *post_data,
+                                   size_t                    post_data_size,
+                                   esp_http_client_handle_t *client);
+int       http_client_read_response(esp_http_client_handle_t *client, char **response_data, size_t *response_data_size);
 
 #endif
