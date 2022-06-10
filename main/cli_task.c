@@ -133,7 +133,7 @@ void cli_task_start() {
 
     rval = xTaskCreate(cli_process_command,
                        "CLI cmd process",
-                       SPOT_CHECK_MINIMAL_STACK_SIZE_BYTES * 2,
+                       SPOT_CHECK_MINIMAL_STACK_SIZE_BYTES * 3,
                        queue_handle,
                        CLI_CMD_PROCESS_TASK_PRIORITY,
                        NULL);

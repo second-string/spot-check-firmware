@@ -61,23 +61,27 @@ request http_client_build_request(char              *endpoint,
                                   char              *url_buf,
                                   query_param       *params,
                                   uint8_t            num_params) {
-    query_param temp_params[num_params];
-    if (strcmp(endpoint, "conditions") == 0) {
-        temp_params[0] = (query_param){.key = "lat", .value = config->spot_lat};
-        temp_params[1] = (query_param){.key = "lon", .value = config->spot_lon};
-        temp_params[2] = (query_param){.key = "spot_id", .value = config->spot_uid};
-    } else {
-        temp_params[0] = (query_param){.key = "days", .value = config->number_of_days};
-        temp_params[1] = (query_param){.key = "spot_id", .value = config->spot_uid};
+    request req = {0};
+    if (params && num_params > 0) {
+        query_param temp_params[num_params];
+        if (strcmp(endpoint, "conditions") == 0) {
+            temp_params[0] = (query_param){.key = "lat", .value = config->spot_lat};
+            temp_params[1] = (query_param){.key = "lon", .value = config->spot_lon};
+            temp_params[2] = (query_param){.key = "spot_id", .value = config->spot_uid};
+        } else if (strcmp(endpoint, "tides") == 0 || strcmp(endpoint, "swell") == 0) {
+            temp_params[0] = (query_param){.key = "days", .value = config->number_of_days};
+            temp_params[1] = (query_param){.key = "spot_id", .value = config->spot_uid};
+        }
+        memcpy(params, temp_params, sizeof(temp_params));
+        req.num_params = sizeof(temp_params) / sizeof(query_param);
+        req.params     = params;
     }
-
-    memcpy(params, temp_params, sizeof(temp_params));
 
     strcpy(url_buf, URL_BASE);
     strcat(url_buf, endpoint);
-    request tide_request = {.url = url_buf, .params = params, .num_params = sizeof(temp_params) / sizeof(query_param)};
+    req.url = url_buf;
 
-    return tide_request;
+    return req;
 }
 
 /*
@@ -86,10 +90,10 @@ request http_client_build_request(char              *endpoint,
  * performed using whatever was last set.
  */
 int http_client_perform_request(request *request_obj, char **read_buffer) {
-    if (!wifi_is_network_connected()) {
-        log_printf(TAG, LOG_LEVEL_INFO, "Attempted to make GET request, not connected to internet yet so bailing");
-        return 0;
-    }
+    // if (!wifi_is_network_connected()) {
+    //     log_printf(TAG, LOG_LEVEL_INFO, "Attempted to make GET request, not connected to internet yet so bailing");
+    //     return 0;
+    // }
 
     log_printf(TAG, LOG_LEVEL_INFO, "Initing http client for request...");
 
@@ -171,8 +175,8 @@ int http_client_perform_request(request *request_obj, char **read_buffer) {
     if (content_length < MAX_READ_BUFFER_SIZE) {
         // Did a lot of work here to try to read into buffer in chunks since default response buffer
         // inside client is inited to ~512 bytes but something's borked in the SDK. This is technically
-        // double-allocating buffers of MAX_READ_BUFFER_SIZE since there's one internally and another
-        // here, but hopefully the quick malloc/free shouldn't cause any issues
+        // double-allocating buffers since there's one internally and another here, but hopefully the quick malloc/free
+        // shouldn't cause any issues
         *read_buffer                    = malloc(content_length + 1);
         int length_received             = esp_http_client_read(client, *read_buffer, content_length);
         (*read_buffer)[length_received] = '\0';

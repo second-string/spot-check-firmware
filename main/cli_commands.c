@@ -10,6 +10,7 @@
 #include "bq24196.h"
 #include "cd54hc4094.h"
 #include "cli_commands.h"
+#include "http_client.h"
 #include "log.h"
 
 #define TAG "sc-cli-cmd"
@@ -222,6 +223,22 @@ static BaseType_t cli_command_shiftreg(char *write_buffer, size_t write_buffer_s
     return pdFALSE;
 }
 
+static BaseType_t cli_command_api(char *write_buffer, size_t write_buffer_size, const char *cmd_str) {
+    BaseType_t  endpoint_len;
+    const char *endpoint = FreeRTOS_CLIGetParameter(cmd_str, 1, &endpoint_len);
+    if (endpoint == NULL) {
+        strcpy(write_buffer, "Error: usage is 'api <endpoint>'");
+        return pdFALSE;
+    }
+
+    char    url[60];
+    char    res[100];
+    request req = http_client_build_request((char *)endpoint, NULL, url, NULL, 0);
+    http_client_perform_request(&req, (char **)&res);
+    strcpy(write_buffer, cmd_str);
+    return pdFALSE;
+}
+
 void cli_command_register_all() {
     static const CLI_Command_Definition_t info_cmd = {
         .pcCommand                   = "info",
@@ -259,9 +276,17 @@ void cli_command_register_all() {
         .cExpectedNumberOfParameters = 2,
     };
 
+    static const CLI_Command_Definition_t api_cmd = {
+        .pcCommand            = "api",
+        .pcHelpString         = "api:\n\t<endpoint>: send request to API endpoint with base URL set in menuconfig",
+        .pxCommandInterpreter = cli_command_api,
+        .cExpectedNumberOfParameters = 1,
+    };
+
     FreeRTOS_CLIRegisterCommand(&info_cmd);
     FreeRTOS_CLIRegisterCommand(&reset_cmd);
     FreeRTOS_CLIRegisterCommand(&bq_cmd);
     FreeRTOS_CLIRegisterCommand(&gpio_cmd);
     FreeRTOS_CLIRegisterCommand(&shiftreg_cmd);
+    FreeRTOS_CLIRegisterCommand(&api_cmd);
 }
