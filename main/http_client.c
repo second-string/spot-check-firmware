@@ -107,6 +107,7 @@ bool http_client_perform_request(request *request_obj, esp_http_client_handle_t 
         .buffer_size    = MAX_READ_BUFFER_SIZE,
         .cert_pem       = (char *)&server_cert_pem_start,
         .transport_type = HTTP_TRANSPORT_OVER_SSL,
+        .is_async       = false,
     };
 
     *client = esp_http_client_init(&http_config);
@@ -135,14 +136,14 @@ bool http_client_perform_request(request *request_obj, esp_http_client_handle_t 
     ESP_ERROR_CHECK(esp_http_client_set_method(*client, HTTP_METHOD_GET));
     ESP_ERROR_CHECK(esp_http_client_set_header(*client, "Content-type", "text/html"));
 
-    esp_err_t error = esp_http_client_perform(*client);
-    if (error != ESP_OK) {
-        const char *err_text = esp_err_to_name(error);
-        log_printf(TAG, LOG_LEVEL_INFO, "Error performing test GET, error: %s", err_text);
+    esp_err_t err = esp_http_client_open(*client, 0);
+    // Opens and sends the request since we have no data
+    if (err != ESP_OK) {
+        log_printf(TAG, LOG_LEVEL_ERROR, "Error opening http client, error: %s", esp_err_to_name(err));
 
         // clean up and return no space allocated
-        error = esp_http_client_cleanup(*client);
-        if (error != ESP_OK) {
+        err = esp_http_client_cleanup(*client);
+        if (err != ESP_OK) {
             log_printf(TAG, LOG_LEVEL_INFO, "Error cleaning up  http client connection");
         }
 
@@ -152,9 +153,9 @@ bool http_client_perform_request(request *request_obj, esp_http_client_handle_t 
     return true;
 }
 
-// TODO :: refactor this to be split to re-use http_client_read_response like perform_request. Requires read_response to
-// be refactored to return response_data_size through pointer arg and not directly returned 0 for success, error code if
-// not
+// TODO :: refactor the perform functions to be one func with arg for post or get. Almost identical now, just have to
+// resolve the small differences in implementation of the URL build w/ query params and setting client values. Will need
+// to include a call to esp_http_client_write for the post case
 int http_client_perform_post(request                  *request_obj,
                              char                     *post_data,
                              size_t                    post_data_size,
@@ -175,7 +176,7 @@ int http_client_perform_post(request                  *request_obj,
         .transport_type = HTTP_TRANSPORT_OVER_SSL,
     };
 
-    client = esp_http_client_init(&http_config);
+    *client = esp_http_client_init(&http_config);
     if (!client) {
         log_printf(TAG, LOG_LEVEL_INFO, "Error initing http client, returning without sending request");
         return 0;
@@ -209,9 +210,20 @@ int http_client_perform_post(request                  *request_obj,
 int http_client_read_response(esp_http_client_handle_t *client, char **response_data, size_t *response_data_size) {
     configASSERT(client);
 
-    int retval         = 0;
-    int content_length = esp_http_client_get_content_length(*client);
-    int status         = esp_http_client_get_status_code(*client);
+    int retval = 0;
+
+    // Kicks off and blocks until all headers downloaded. Can get remainder of headers (like status_code) from their
+    // hepler functions, content_length is returned directly
+    int content_length = esp_http_client_fetch_headers(*client);
+    if (content_length < 0) {
+        log_printf(TAG, LOG_LEVEL_ERROR, "Error fetching headers: %s", esp_err_to_name(content_length));
+    } else if (content_length == 0) {
+        log_printf(TAG, LOG_LEVEL_ERROR, "Content length of zero after fetching headers, bailing");
+        *response_data_size = 0;
+        return 0;
+    }
+
+    int status = esp_http_client_get_status_code(*client);
     if (status >= 200 && status <= 299) {
         if (content_length < 0) {
             log_printf(TAG, LOG_LEVEL_INFO, "Got success status (%d) but no content in response, bailing", status);
@@ -221,27 +233,36 @@ int http_client_read_response(esp_http_client_handle_t *client, char **response_
             }
 
             retval = -1;
-            ;
         }
 
-        log_printf(TAG, LOG_LEVEL_INFO, "POST success! Status=%d, Content-length=%d", status, content_length);
+        log_printf(TAG, LOG_LEVEL_INFO, "Request success! Status=%d, Content-length=%d", status, content_length);
     } else {
-        log_printf(
-            TAG,
-            LOG_LEVEL_INFO,
-            "POST failed. Setting content_length to zero to skip to cleanup and return.  Status=%d, Content-length=%d",
-            status,
-            content_length);
+        log_printf(TAG,
+                   LOG_LEVEL_INFO,
+                   "Request failed. Setting content_length to zero to skip to cleanup and return.  Status=%d, "
+                   "Content-length=%d",
+                   status,
+                   content_length);
         content_length = 0;
         retval         = -1;
     }
 
-    int alloced_space_used = 0;
+    size_t alloced_space_used = 0;
     if (content_length < MAX_READ_BUFFER_SIZE) {
-        *response_data                 = malloc(content_length + 1);
-        int length_received            = esp_http_client_read(*client, *response_data, content_length);
-        response_data[length_received] = '\0';
-        alloced_space_used             = length_received + 1;
+        *response_data      = malloc(content_length + 1);
+        int length_received = esp_http_client_read(*client, *response_data, content_length);
+        if (length_received < 0) {
+            // Don't bother making the caller free anything since we have nothing to give them. Free here and return 0
+            // alloced
+            alloced_space_used = 0;
+            free(*response_data);
+            log_printf(TAG, LOG_LEVEL_ERROR, "Error reading response after successful http client request");
+            return 0;
+        } else {
+            (*response_data)[length_received] = '\0';
+            alloced_space_used                = length_received + 1;
+            log_printf(TAG, LOG_LEVEL_DEBUG, "Rcvd %zu bytes of response data: %s", alloced_space_used, *response_data);
+        }
     } else {
         log_printf(TAG,
                    LOG_LEVEL_INFO,

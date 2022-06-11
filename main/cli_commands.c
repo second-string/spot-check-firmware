@@ -236,11 +236,15 @@ static BaseType_t cli_command_api(char *write_buffer, size_t write_buffer_size, 
     size_t                   bytes_alloced = 0;
     request                  req           = http_client_build_request((char *)endpoint, NULL, url, NULL, 0);
     esp_http_client_handle_t client;
-    http_client_perform_request(&req, &client);
-    ESP_ERROR_CHECK(http_client_read_response(&client, &res, &bytes_alloced));
-    strcpy(write_buffer, cmd_str);
-    if (res && bytes_alloced > 0) {
-        free(res);
+    bool                     success = http_client_perform_request(&req, &client);
+    if (!success) {
+        log_printf(TAG, LOG_LEVEL_ERROR, "Error making request, aborting");
+    } else {
+        ESP_ERROR_CHECK(http_client_read_response(&client, &res, &bytes_alloced));
+        if (res && bytes_alloced > 0) {
+            strcpy(write_buffer, res);
+            free(res);
+        }
     }
     return pdFALSE;
 }
