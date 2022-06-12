@@ -22,6 +22,12 @@ typedef enum {
     INFO_STATE_COMPILE_DATE,
 } info_state_t;
 
+typedef enum {
+    PARTITION_STATE_START,
+    PARTITION_STATE_LISTING,
+    PARTITION_STATE_END,
+} partition_state_t;
+
 static const char *banner[] = {
     "   _____             _      _____ _               _",
     "  / ____|           | |    / ____| |             | |",
@@ -251,21 +257,28 @@ static BaseType_t cli_command_api(char *write_buffer, size_t write_buffer_size, 
 }
 
 static BaseType_t partition_command_api(char *write_buffer, size_t write_buffer_size, const char *cmd_str) {
-    BaseType_t  cmd_len;
-    const char *cmd = FreeRTOS_CLIGetParameter(cmd_str, 1, &cmd_len);
-    if (cmd == NULL) {
-        strcpy(write_buffer, "Error: usage is '<cmd> <label>'");
+    BaseType_t               retval = pdFALSE;
+    static partition_state_t state  = PARTITION_STATE_START;
+    BaseType_t               action_len;
+    const char              *action = FreeRTOS_CLIGetParameter(cmd_str, 1, &action_len);
+    if (action == NULL) {
+        strcpy(write_buffer, "Error: usage is '<action> [<label>]'");
         return pdFALSE;
     }
 
     BaseType_t  part_label_len;
     const char *part_label = FreeRTOS_CLIGetParameter(cmd_str, 2, &part_label_len);
-    if (part_label == NULL) {
-        strcpy(write_buffer, "Error: usage is '<cmd> <label>'");
-        return pdFALSE;
-    }
+    // char        temp[100];
+    // sprintf(temp, "action: %s - label: %s, label_len: %zu", action, part_label, part_label_len);
+    // strcpy(write_buffer, temp);
+    // return pdFALSE;
 
-    if (cmd_len == 4 && strcmp(cmd, "read") == 0) {
+    if (action_len == 4 && strncmp(action, "read", action_len) == 0) {
+        if (part_label == NULL) {
+            strcpy(write_buffer, "Error: usage is 'read <label>'");
+            return pdFALSE;
+        }
+
         const esp_partition_t *part =
             esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_ANY, part_label);
         if (part == NULL) {
@@ -279,7 +292,15 @@ static BaseType_t partition_command_api(char *write_buffer, size_t write_buffer_
         for (int i = 0; i < sizeof(temp); i++) {
             log_printf(TAG, LOG_LEVEL_INFO, "%02X", temp[i]);
         }
-    } else if (cmd_len == 5 && strcmp(cmd, "erase") == 0) {
+
+        // Empty out the buffer since we'll print the output of the last command if we don't
+        strcpy(write_buffer, "");
+    } else if (action_len == 5 && strncmp(action, "erase", action_len) == 0) {
+        if (part_label == NULL) {
+            strcpy(write_buffer, "Error: usage is 'erase <label>'");
+            return pdFALSE;
+        }
+
         const esp_partition_t *part =
             esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_ANY, part_label);
         if (part == NULL) {
@@ -296,11 +317,52 @@ static BaseType_t partition_command_api(char *write_buffer, size_t write_buffer_
             sprintf(msg, "Erasing of '%s' partition not allowed!", part->label);
             strcpy(write_buffer, msg);
         }
+    } else if (action_len == 4 && strncmp(action, "list", action_len) == 0) {
+        static esp_partition_iterator_t iter = NULL;
+        static const esp_partition_t   *part = NULL;
+        switch (state) {
+            case PARTITION_STATE_START:
+                iter = esp_partition_find(ESP_PARTITION_TYPE_ANY, ESP_PARTITION_SUBTYPE_ANY, NULL);
+
+                char part_header[100];
+                sprintf(part_header, "%10s, %5s, %5s, %5s", "label", "type", "subtype", "size");
+                strcpy(write_buffer, part_header);
+
+                state  = PARTITION_STATE_LISTING;
+                retval = pdTRUE;
+                break;
+            case PARTITION_STATE_LISTING:
+                if (iter == NULL) {
+                    state = PARTITION_STATE_END;
+                } else {
+                    part = esp_partition_get(iter);
+
+                    // With the null check on the below esp_partition_check, it shouldn't be possible to get a null part
+                    // here but check anyway
+                    if (part == NULL) {
+                        state = PARTITION_STATE_END;
+                    } else {
+                        char part_str[100];
+                        sprintf(part_str, "%10s, %5d, %5d, 0x%5X", part->label, part->type, part->subtype, part->size);
+                        strcpy(write_buffer, part_str);
+
+                        iter   = esp_partition_next(iter);
+                        retval = pdTRUE;
+                    }
+                }
+                break;
+            case PARTITION_STATE_END:
+                esp_partition_iterator_release(iter);
+                iter  = NULL;
+                part  = NULL;
+                state = PARTITION_STATE_START;
+                break;
+        }
     } else {
         strcpy(write_buffer, "Unknown partition command");
     }
 
-    return pdFALSE;
+    return retval;
 }
 
 void cli_command_register_all() {
@@ -350,9 +412,10 @@ void cli_command_register_all() {
     static const CLI_Command_Definition_t partition_cmd = {
         .pcCommand = "partition",
         .pcHelpString =
-            "partition:\n\tread <label>: read the first 16 bytes of a partition\n\terase <label>: erase a partition",
+            "partition:\n\tread <label>: read the first 16 bytes of a partition\n\terase <label>: erase a "
+            "partition\n\tlist: list the current device partition table",
         .pxCommandInterpreter        = partition_command_api,
-        .cExpectedNumberOfParameters = 2,
+        .cExpectedNumberOfParameters = -1,
     };
 
     FreeRTOS_CLIRegisterCommand(&info_cmd);
