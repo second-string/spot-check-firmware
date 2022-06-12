@@ -5,6 +5,7 @@
 
 #include "driver/gpio.h"
 #include "esp_ota_ops.h"
+#include "esp_partition.h"
 #include "esp_system.h"
 
 #include "bq24196.h"
@@ -249,6 +250,59 @@ static BaseType_t cli_command_api(char *write_buffer, size_t write_buffer_size, 
     return pdFALSE;
 }
 
+static BaseType_t partition_command_api(char *write_buffer, size_t write_buffer_size, const char *cmd_str) {
+    BaseType_t  cmd_len;
+    const char *cmd = FreeRTOS_CLIGetParameter(cmd_str, 1, &cmd_len);
+    if (cmd == NULL) {
+        strcpy(write_buffer, "Error: usage is '<cmd> <label>'");
+        return pdFALSE;
+    }
+
+    BaseType_t  part_label_len;
+    const char *part_label = FreeRTOS_CLIGetParameter(cmd_str, 2, &part_label_len);
+    if (part_label == NULL) {
+        strcpy(write_buffer, "Error: usage is '<cmd> <label>'");
+        return pdFALSE;
+    }
+
+    if (cmd_len == 4 && strcmp(cmd, "read") == 0) {
+        const esp_partition_t *part =
+            esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_ANY, part_label);
+        if (part == NULL) {
+            strcpy(write_buffer, "No partition by that name found");
+        }
+
+        uint8_t temp[16];
+        ESP_ERROR_CHECK(esp_partition_read(part, 0x00, temp, 16));
+
+        log_printf(TAG, LOG_LEVEL_INFO, "First 16 bytes of the %s partition:", part_label);
+        for (int i = 0; i < sizeof(temp); i++) {
+            log_printf(TAG, LOG_LEVEL_INFO, "%02X", temp[i]);
+        }
+    } else if (cmd_len == 5 && strcmp(cmd, "erase") == 0) {
+        const esp_partition_t *part =
+            esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_ANY, part_label);
+        if (part == NULL) {
+            strcpy(write_buffer, "No partition by that name found");
+        }
+
+        char msg[60];
+        if ((part_label_len == 3 && strcmp(part_label, "nvs") == 0) ||
+            (part_label_len == 10 && strcmp(part_label, "screen_img") == 0)) {
+            esp_partition_erase_range(part, 0x0, part->size);
+            sprintf(msg, "Successfully erased '%s' partition", part->label);
+            strcpy(write_buffer, msg);
+        } else {
+            sprintf(msg, "Erasing of '%s' partition not allowed!", part->label);
+            strcpy(write_buffer, msg);
+        }
+    } else {
+        strcpy(write_buffer, "Unknown partition command");
+    }
+
+    return pdFALSE;
+}
+
 void cli_command_register_all() {
     static const CLI_Command_Definition_t info_cmd = {
         .pcCommand                   = "info",
@@ -293,10 +347,19 @@ void cli_command_register_all() {
         .cExpectedNumberOfParameters = 1,
     };
 
+    static const CLI_Command_Definition_t partition_cmd = {
+        .pcCommand = "partition",
+        .pcHelpString =
+            "partition:\n\tread <label>: read the first 16 bytes of a partition\n\terase <label>: erase a partition",
+        .pxCommandInterpreter        = partition_command_api,
+        .cExpectedNumberOfParameters = 2,
+    };
+
     FreeRTOS_CLIRegisterCommand(&info_cmd);
     FreeRTOS_CLIRegisterCommand(&reset_cmd);
     FreeRTOS_CLIRegisterCommand(&bq_cmd);
     FreeRTOS_CLIRegisterCommand(&gpio_cmd);
     FreeRTOS_CLIRegisterCommand(&shiftreg_cmd);
     FreeRTOS_CLIRegisterCommand(&api_cmd);
+    FreeRTOS_CLIRegisterCommand(&partition_cmd);
 }
