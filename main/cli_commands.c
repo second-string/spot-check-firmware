@@ -6,11 +6,13 @@
 #include "driver/gpio.h"
 #include "esp_ota_ops.h"
 #include "esp_partition.h"
+#include "esp_spi_flash.h"
 #include "esp_system.h"
 
 #include "bq24196.h"
 #include "cd54hc4094.h"
 #include "cli_commands.h"
+#include "display.h"
 #include "http_client.h"
 #include "log.h"
 
@@ -365,6 +367,58 @@ static BaseType_t partition_command_api(char *write_buffer, size_t write_buffer_
     return retval;
 }
 
+static BaseType_t display_command_api(char *write_buffer, size_t write_buffer_size, const char *cmd_str) {
+    BaseType_t  action_len;
+    const char *action = FreeRTOS_CLIGetParameter(cmd_str, 1, &action_len);
+    if (action == NULL) {
+        strcpy(write_buffer, "Error: usage is '<action> [<x> <y>]'");
+        return pdFALSE;
+    }
+
+    if (action_len == 5 && strncmp(action, "flash", action_len) == 0) {
+        BaseType_t  x_coord_len;
+        BaseType_t  y_coord_len;
+        const char *x_coord_str = FreeRTOS_CLIGetParameter(cmd_str, 2, &x_coord_len);
+        const char *y_coord_str = FreeRTOS_CLIGetParameter(cmd_str, 3, &y_coord_len);
+
+        uint32_t x_coord = 0;
+        uint32_t y_coord = 0;
+        if (x_coord_str) {
+            x_coord = strtoul(x_coord_str, NULL, 10);
+        }
+        if (y_coord_str) {
+            y_coord = strtoul(y_coord_str, NULL, 10);
+        }
+
+        char msg[80];
+        sprintf(msg, "Rendering image from flash at (%u, %u)", x_coord, y_coord);
+        strcpy(write_buffer, msg);
+
+        spi_flash_mmap_handle_t spi_flash_handle;
+        const uint8_t          *mapped_flash = malloc(5000);
+        if (mapped_flash == NULL) {
+            strcpy(write_buffer, "Big malloc for mapped memory failed");
+            return pdFALSE;
+        }
+
+        const esp_partition_t *screen_img_partition =
+            esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_ANY, "screen_img");
+        esp_partition_mmap(screen_img_partition,
+                           0x0,
+                           5000,
+                           SPI_FLASH_MMAP_DATA,
+                           (const void **)&mapped_flash,
+                           &spi_flash_handle);
+        display_render_image((uint8_t *)mapped_flash, 100, 50, 1, x_coord, y_coord);
+
+        spi_flash_unmap(spi_flash_handle);
+    } else {
+        strcpy(write_buffer, "Unknown display command");
+    }
+
+    return pdFALSE;
+}
+
 void cli_command_register_all() {
     static const CLI_Command_Definition_t info_cmd = {
         .pcCommand                   = "info",
@@ -418,6 +472,13 @@ void cli_command_register_all() {
         .cExpectedNumberOfParameters = -1,
     };
 
+    static const CLI_Command_Definition_t display_cmd = {
+        .pcCommand    = "display",
+        .pcHelpString = "display:\n\tflash <x> <y>: render the image currently in flash as the specified coordinates",
+        .pxCommandInterpreter        = display_command_api,
+        .cExpectedNumberOfParameters = -1,
+    };
+
     FreeRTOS_CLIRegisterCommand(&info_cmd);
     FreeRTOS_CLIRegisterCommand(&reset_cmd);
     FreeRTOS_CLIRegisterCommand(&bq_cmd);
@@ -425,4 +486,5 @@ void cli_command_register_all() {
     FreeRTOS_CLIRegisterCommand(&shiftreg_cmd);
     FreeRTOS_CLIRegisterCommand(&api_cmd);
     FreeRTOS_CLIRegisterCommand(&partition_cmd);
+    FreeRTOS_CLIRegisterCommand(&display_cmd);
 }

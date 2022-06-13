@@ -2,6 +2,7 @@
 #include "freertos/FreeRTOS.h"
 
 #include "constants.h"
+#include "esp_partition.h"
 #include "http_client.h"
 #include "wifi.h"
 
@@ -11,7 +12,9 @@
 #define TAG "sc-http-client"
 
 #define MAX_QUERY_PARAM_LENGTH 15
-#define MAX_READ_BUFFER_SIZE 4096
+#define MAX_READ_BUFFER_SIZE 1024
+
+#define SCREEN_IMG_PARTITION_LABEL "screen_img"
 
 extern const uint8_t server_cert_pem_start[] asm("_binary_ca_cert_pem_start");
 
@@ -107,7 +110,6 @@ bool http_client_perform_request(request *request_obj, esp_http_client_handle_t 
         .buffer_size    = MAX_READ_BUFFER_SIZE,
         .cert_pem       = (char *)&server_cert_pem_start,
         .transport_type = HTTP_TRANSPORT_OVER_SSL,
-        .is_async       = false,
     };
 
     *client = esp_http_client_init(&http_config);
@@ -266,10 +268,45 @@ int http_client_read_response(esp_http_client_handle_t *client, char **response_
     } else {
         log_printf(TAG,
                    LOG_LEVEL_INFO,
-                   "Not enough room in read buffer: buffer=%d, content=%d",
+                   "Content-length of %d too big for max local buffer of %d bytes. Assuming this is an image, chunking "
+                   "response and saving to flash partition",
                    MAX_READ_BUFFER_SIZE,
                    content_length);
-        retval = -1;
+
+        const esp_partition_t *screen_img_partition =
+            esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_ANY, SCREEN_IMG_PARTITION_LABEL);
+        // TODO :: if we store a header with img info, use that info to only erase the image data not the whole
+        // partition for time's sake
+        esp_partition_erase_range(screen_img_partition, 0x0, screen_img_partition->size);
+
+        uint32_t moving_screen_img_addr = 0x0;
+        int      length_received        = 0;
+        *response_data                  = malloc(MAX_READ_BUFFER_SIZE);
+        do {
+            // Pull in chunk and immediately write to flash
+            length_received = esp_http_client_read(*client, *response_data, MAX_READ_BUFFER_SIZE);
+            esp_partition_write(screen_img_partition, moving_screen_img_addr, *response_data, length_received);
+            log_printf(TAG,
+                       LOG_LEVEL_DEBUG,
+                       "Wrote %d bytes to screen image partition at offset %d",
+                       length_received,
+                       moving_screen_img_addr);
+            moving_screen_img_addr += length_received;
+        } while (length_received > 0);
+
+        alloced_space_used = MAX_READ_BUFFER_SIZE;
+        if (length_received < 0) {
+            // TODO :: Figure out what to do in error case
+
+            // Don't bother making the caller free anything since we have nothing to give them. Free here and return 0
+            // alloced
+            // alloced_space_used = 0;
+            // free(*response_data);
+            log_printf(TAG, LOG_LEVEL_ERROR, "Error reading response after successful http client request");
+            // return 0;
+        } else {
+            log_printf(TAG, LOG_LEVEL_DEBUG, "Rcvd %zu bytes of response data, saving to flash", alloced_space_used);
+        }
     }
 
     *response_data_size = alloced_space_used;
