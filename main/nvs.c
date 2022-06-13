@@ -73,7 +73,12 @@ bool nvs_set_uint32(char *key, uint32_t val) {
     if (err == ESP_OK) {
         retval = true;
     } else {
-        log_printf(TAG, LOG_LEVEL_ERROR, "Error setting uint32 value '%u' for key '%s' in NVS", val, key);
+        log_printf(TAG,
+                   LOG_LEVEL_ERROR,
+                   "Error (%s) setting uint32 value '%u' for key '%s' in NVS",
+                   esp_err_to_name(err),
+                   val,
+                   key);
     }
 
     return retval;

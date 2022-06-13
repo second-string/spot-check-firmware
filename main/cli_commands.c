@@ -12,6 +12,7 @@
 #include "bq24196.h"
 #include "cd54hc4094.h"
 #include "cli_commands.h"
+#include "constants.h"
 #include "display.h"
 #include "http_client.h"
 #include "log.h"
@@ -392,27 +393,43 @@ static BaseType_t display_command_api(char *write_buffer, size_t write_buffer_si
         }
 
         spi_flash_mmap_handle_t spi_flash_handle;
-        const uint8_t          *mapped_flash = malloc(5000);
-        if (mapped_flash == NULL) {
-            strcpy(write_buffer, "Big malloc for mapped memory failed");
+        uint32_t                screen_img_len    = 0;
+        uint32_t                screen_img_width  = 0;
+        uint32_t                screen_img_height = 0;
+        bool                    success           = nvs_get_uint32(SCREEN_IMG_SIZE_NVS_KEY, &screen_img_len);
+        if (!success) {
+            strcpy(write_buffer, "No screen img size value stored in NVS, cannot render screen out of flash");
+            return pdFALSE;
+        }
+        success = nvs_get_uint32(SCREEN_IMG_WIDTH_PX_NVS_KEY, &screen_img_width);
+        if (!success) {
+            strcpy(write_buffer, "No screen img width value stored in NVS, cannot render screen out of flash");
+            return pdFALSE;
+        }
+        success = nvs_get_uint32(SCREEN_IMG_HEIGHT_PX_NVS_KEY, &screen_img_height);
+        if (!success) {
+            strcpy(write_buffer, "No screen img height value stored in NVS, cannot render screen out of flash");
             return pdFALSE;
         }
 
         const esp_partition_t *screen_img_partition =
             esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_ANY, "screen_img");
+
+        // TODO :: make sure screen_img_len length is less that buffer size (or at least a reasonable number to malloc)
+        // mmap handles the large malloc internally, and the call the munmap below frees it
+        const uint8_t *mapped_flash = NULL;
         esp_partition_mmap(screen_img_partition,
                            0x0,
-                           5000,
+                           screen_img_len,
                            SPI_FLASH_MMAP_DATA,
                            (const void **)&mapped_flash,
                            &spi_flash_handle);
-        display_render_image((uint8_t *)mapped_flash, 100, 50, 1, x_coord, y_coord);
+        display_render_image((uint8_t *)mapped_flash, screen_img_width, screen_img_height, 1, x_coord, y_coord);
 
         spi_flash_munmap(spi_flash_handle);
-        free((void *)mapped_flash);
 
         char msg[80];
-        sprintf(msg, "Rendering image from flash at (%u, %u)", x_coord, y_coord);
+        sprintf(msg, "Rendered image from flash at (%u, %u)", x_coord, y_coord);
         strcpy(write_buffer, msg);
     } else {
         strcpy(write_buffer, "Unknown display command");

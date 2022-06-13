@@ -14,8 +14,6 @@
 #define MAX_QUERY_PARAM_LENGTH 15
 #define MAX_READ_BUFFER_SIZE 1024
 
-#define SCREEN_IMG_PARTITION_LABEL "screen_img"
-
 extern const uint8_t server_cert_pem_start[] asm("_binary_ca_cert_pem_start");
 
 /* Technically unnecessary, should be stubbed out for non-debug build */
