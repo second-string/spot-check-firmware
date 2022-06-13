@@ -41,6 +41,44 @@ void nvs_init() {
     log_printf(TAG, LOG_LEVEL_INFO, "NVS successfully inited and opened");
 }
 
+bool nvs_get_uint32(char *key, uint32_t *val) {
+    bool retval = false;
+    configASSERT(handle);
+
+    esp_err_t err = nvs_get_u32(handle, key, val);
+    switch (err) {
+        case ESP_OK:
+            retval = true;
+            break;
+        case ESP_ERR_NVS_NOT_FOUND:
+            log_printf(TAG, LOG_LEVEL_INFO, "The NVS value for key '%s' is not initialized yet", key);
+            *val = 0;
+            break;
+        default:
+            log_printf(TAG,
+                       LOG_LEVEL_ERROR,
+                       "Error (%s) reading value for key '%s' from NVS\n",
+                       esp_err_to_name(err),
+                       key);
+    }
+
+    return retval;
+}
+
+bool nvs_set_uint32(char *key, uint32_t val) {
+    bool retval = false;
+    configASSERT(handle);
+
+    esp_err_t err = nvs_set_u32(handle, key, val);
+    if (err == ESP_OK) {
+        retval = true;
+    } else {
+        log_printf(TAG, LOG_LEVEL_ERROR, "Error setting uint32 value '%u' for key '%s' in NVS", val, key);
+    }
+
+    return retval;
+}
+
 void nvs_save_config(spot_check_config *config) {
     if (handle == 0) {
         log_printf(TAG, LOG_LEVEL_ERROR, "Attempting to save to NVS before calling nvs_init(), not saving values");
@@ -92,7 +130,7 @@ spot_check_config *nvs_get_config() {
     if (handle == 0) {
         log_printf(TAG,
                    LOG_LEVEL_ERROR,
-                   "Attempting to retrive from NVS before calling nvs_init(), returning null ptr");
+                   "Attempting to retrieve from NVS before calling nvs_init(), returning null ptr");
         return NULL;
     }
 

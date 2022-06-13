@@ -19,6 +19,8 @@ typedef struct {
 extern bool new_location_set;
 
 void               nvs_init();
+bool               nvs_get_uint32(char *key, uint32_t *val);
+bool               nvs_set_uint32(char *key, uint32_t val);
 void               nvs_save_config(spot_check_config *config);
 esp_err_t          nvs_full_erase();
 spot_check_config *nvs_get_config();
