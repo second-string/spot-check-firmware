@@ -242,10 +242,34 @@ static BaseType_t cli_command_api(char *write_buffer, size_t write_buffer_size, 
         return pdFALSE;
     }
 
-    char                     url[60];
-    char                    *res           = NULL;
-    size_t                   bytes_alloced = 0;
-    request                  req           = http_client_build_request((char *)endpoint, NULL, url, NULL, 0);
+    // Make sure to update list of endpoints in http_client_build_request if changing this list
+    const char *const endpoints_with_query_params[2] = {
+        "conditions",
+        "screen_update",
+    };
+
+    // If entered endpoint is in list to include config query params, include that data in call to
+    // http_client_build_request
+    bool include_params = false;
+    for (uint8_t i = 0; i < sizeof(endpoints_with_query_params) / sizeof(char *); i++) {
+        if (strlen(endpoints_with_query_params[i]) == endpoint_len &&
+            strncmp(endpoints_with_query_params[i], endpoint, endpoint_len) == 0) {
+            include_params = true;
+            break;
+        }
+    }
+
+    char               url[80];
+    char              *res           = NULL;
+    size_t             bytes_alloced = 0;
+    spot_check_config *config        = NULL;
+    query_param        params[3];
+    uint8_t            num_params = 0;
+    if (include_params) {
+        config     = nvs_get_config();
+        num_params = 3;
+    }
+    request                  req = http_client_build_request((char *)endpoint, config, url, params, num_params);
     esp_http_client_handle_t client;
     bool                     success = http_client_perform_request(&req, &client);
     if (!success) {
@@ -260,7 +284,7 @@ static BaseType_t cli_command_api(char *write_buffer, size_t write_buffer_size, 
     return pdFALSE;
 }
 
-static BaseType_t partition_command_api(char *write_buffer, size_t write_buffer_size, const char *cmd_str) {
+static BaseType_t cli_command_partition(char *write_buffer, size_t write_buffer_size, const char *cmd_str) {
     BaseType_t               retval = pdFALSE;
     static partition_state_t state  = PARTITION_STATE_START;
     BaseType_t               action_len;
@@ -369,7 +393,7 @@ static BaseType_t partition_command_api(char *write_buffer, size_t write_buffer_
     return retval;
 }
 
-static BaseType_t display_command_api(char *write_buffer, size_t write_buffer_size, const char *cmd_str) {
+static BaseType_t cli_command_display(char *write_buffer, size_t write_buffer_size, const char *cmd_str) {
     BaseType_t  action_len;
     const char *action = FreeRTOS_CLIGetParameter(cmd_str, 1, &action_len);
     if (action == NULL) {
@@ -438,7 +462,7 @@ static BaseType_t display_command_api(char *write_buffer, size_t write_buffer_si
     return pdFALSE;
 }
 
-static BaseType_t nvs_command_api(char *write_buffer, size_t write_buffer_size, const char *cmd_str) {
+static BaseType_t cli_command_nvs(char *write_buffer, size_t write_buffer_size, const char *cmd_str) {
     BaseType_t  action_len;
     const char *action = FreeRTOS_CLIGetParameter(cmd_str, 1, &action_len);
     if (action == NULL) {
@@ -538,14 +562,14 @@ void cli_command_register_all() {
         .pcHelpString =
             "partition:\n\tread <label>: read the first 16 bytes of a partition\n\terase <label>: erase a "
             "partition\n\tlist: list the current device partition table",
-        .pxCommandInterpreter        = partition_command_api,
+        .pxCommandInterpreter        = cli_command_partition,
         .cExpectedNumberOfParameters = -1,
     };
 
     static const CLI_Command_Definition_t display_cmd = {
         .pcCommand    = "display",
         .pcHelpString = "display:\n\tflash <x> <y>: render the image currently in flash as the specified coordinates",
-        .pxCommandInterpreter        = display_command_api,
+        .pxCommandInterpreter        = cli_command_display,
         .cExpectedNumberOfParameters = -1,
     };
 
@@ -555,7 +579,7 @@ void cli_command_register_all() {
             "nvs:\n\tget <key>: get the uint32 value stored for the key\n\tset <key> <number>: set a uint32 value in "
             "NVS for a "
             "given key",
-        .pxCommandInterpreter        = nvs_command_api,
+        .pxCommandInterpreter        = cli_command_nvs,
         .cExpectedNumberOfParameters = -1,
     };
 
