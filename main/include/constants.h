@@ -3,6 +3,9 @@
 
 // #define LOG_LOCAL_LEVEL ESP_LOG_VERBOSE
 
+#define MIN(x, y) (((x) < (y)) ? (x) : (y))
+#define MAX(x, y) (((x) > (y)) ? (x) : (y))
+
 // esp freertos port configMINIMAL_STACK_SIZE is 768 base plus optionals compiled in
 // (esp-idf/components/freertos/esp_additions/include/freertos/FreeRTOSConfg.h).
 // Define our own minimum here (esp freertos port takes stack size in BYTES not WORDS like vanilla, so stupid)

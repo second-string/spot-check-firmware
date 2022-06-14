@@ -46,12 +46,12 @@ static void refresh_conditions(conditions_t *new_conditions) {
     request            request = http_client_build_request("conditions", config, url_buf, params, 3);
 
     char                    *server_response    = NULL;
-    size_t                   alloced_space_used = 0;
+    size_t                   response_data_size = 0;
     esp_http_client_handle_t client;
     http_client_perform_request(&request, &client);
-    ESP_ERROR_CHECK(http_client_read_response(&client, &server_response, &alloced_space_used));
+    ESP_ERROR_CHECK(http_client_read_response(&client, &server_response, &response_data_size));
     bool parse_success = false;
-    if (alloced_space_used != 0) {
+    if (response_data_size != 0) {
         cJSON *json               = parse_json(server_response);
         cJSON *data_value         = cJSON_GetObjectItem(json, "data");
         cJSON *temperature_object = cJSON_GetObjectItem(data_value, "temp");

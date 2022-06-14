@@ -235,12 +235,9 @@ static BaseType_t cli_command_shiftreg(char *write_buffer, size_t write_buffer_s
 }
 
 static BaseType_t cli_command_api(char *write_buffer, size_t write_buffer_size, const char *cmd_str) {
+    // Don't null check this to support making requests to url base
     BaseType_t  endpoint_len;
     const char *endpoint = FreeRTOS_CLIGetParameter(cmd_str, 1, &endpoint_len);
-    if (endpoint == NULL) {
-        strcpy(write_buffer, "Error: usage is 'api <endpoint>'");
-        return pdFALSE;
-    }
 
     // Make sure to update list of endpoints in http_client_build_request if changing this list
     const char *const endpoints_with_query_params[2] = {
@@ -277,7 +274,8 @@ static BaseType_t cli_command_api(char *write_buffer, size_t write_buffer_size, 
     } else {
         ESP_ERROR_CHECK(http_client_read_response(&client, &res, &bytes_alloced));
         if (res && bytes_alloced > 0) {
-            strcpy(write_buffer, res);
+            // strncpy up to write_buffer_size since we might have received a ton of binary data for screen images
+            strncpy(write_buffer, res, MIN(strlen(res), write_buffer_size));
             free(res);
         }
     }
@@ -296,10 +294,6 @@ static BaseType_t cli_command_partition(char *write_buffer, size_t write_buffer_
 
     BaseType_t  part_label_len;
     const char *part_label = FreeRTOS_CLIGetParameter(cmd_str, 2, &part_label_len);
-    // char        temp[100];
-    // sprintf(temp, "action: %s - label: %s, label_len: %zu", action, part_label, part_label_len);
-    // strcpy(write_buffer, temp);
-    // return pdFALSE;
 
     if (action_len == 4 && strncmp(action, "read", action_len) == 0) {
         if (part_label == NULL) {
@@ -554,7 +548,7 @@ void cli_command_register_all() {
         .pcCommand            = "api",
         .pcHelpString         = "api:\n\t<endpoint>: send request to API endpoint with base URL set in menuconfig",
         .pxCommandInterpreter = cli_command_api,
-        .cExpectedNumberOfParameters = 1,
+        .cExpectedNumberOfParameters = -1,
     };
 
     static const CLI_Command_Definition_t partition_cmd = {
