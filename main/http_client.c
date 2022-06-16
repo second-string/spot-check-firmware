@@ -290,6 +290,10 @@ int http_client_read_response(esp_http_client_handle_t *client, char **response_
             nvs_get_uint32(SCREEN_IMG_SIZE_NVS_KEY, &screen_img_size);
             if (screen_img_size) {
                 esp_partition_erase_range(screen_img_partition, 0x0, screen_img_size);
+                nvs_set_uint32(SCREEN_IMG_SIZE_NVS_KEY, 0);
+                nvs_set_uint32(SCREEN_IMG_WIDTH_PX_NVS_KEY, 0);
+                nvs_set_uint32(SCREEN_IMG_HEIGHT_PX_NVS_KEY, 0);
+                log_printf(TAG, LOG_LEVEL_DEBUG, "Erased %u bytes from screen img partition");
             } else {
                 log_printf(TAG,
                            LOG_LEVEL_DEBUG,
@@ -304,6 +308,16 @@ int http_client_read_response(esp_http_client_handle_t *client, char **response_
                 // Pull in chunk and immediately write to flash
                 length_received = esp_http_client_read(*client, *response_data, MAX_READ_BUFFER_SIZE);
                 if (length_received > 0) {
+                    if (moving_screen_img_addr + length_received > screen_img_partition->size) {
+                        log_printf(TAG,
+                                   LOG_LEVEL_ERROR,
+                                   "Attempting to write 0x%02X bytes to partition at offset 0x%02X which would "
+                                   "overflow the boundary of 0x%02X bytes, aborting",
+                                   length_received,
+                                   moving_screen_img_addr,
+                                   screen_img_partition->size);
+                        break;
+                    }
                     esp_partition_write(screen_img_partition, moving_screen_img_addr, *response_data, length_received);
                     log_printf(TAG,
                                LOG_LEVEL_DEBUG,
@@ -316,14 +330,14 @@ int http_client_read_response(esp_http_client_handle_t *client, char **response_
 
             bytes_received = MAX_READ_BUFFER_SIZE;
             if (length_received < 0) {
-                // TODO :: Figure out what to do in error case
+                // NVS has already been marked as invalid at time of flash erase, so just return error
                 log_printf(TAG, LOG_LEVEL_ERROR, "Error reading response after successful http client request");
                 retval = -1;
             } else {
                 // Save metadata as last action to make sure all steps have succeeded and there's a valid image in flash
                 nvs_set_uint32(SCREEN_IMG_SIZE_NVS_KEY, moving_screen_img_addr);
-                nvs_set_uint32(SCREEN_IMG_WIDTH_PX_NVS_KEY, 100);
-                nvs_set_uint32(SCREEN_IMG_HEIGHT_PX_NVS_KEY, 50);
+                nvs_set_uint32(SCREEN_IMG_WIDTH_PX_NVS_KEY, 700);
+                nvs_set_uint32(SCREEN_IMG_HEIGHT_PX_NVS_KEY, 200);
                 log_printf(TAG,
                            LOG_LEVEL_DEBUG,
                            "Rcvd %zu bytes total of response data and saved to flash",
