@@ -7,9 +7,9 @@
 #include "esp_http_client.h"
 #include "nvs.h"
 
-// Needs trailing slash! Actually maybe not...
+// Needs trailing slash!
 // #define URL_BASE "https://spotcheck.brianteam.dev/"
-#define URL_BASE "http://common-room.s3.us-east-2.amazonaws.com/smol_render.raw"
+#define URL_BASE "http://common-room.s3.us-east-2.amazonaws.com/"
 
 typedef struct {
     char *key;

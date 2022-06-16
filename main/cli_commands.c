@@ -240,9 +240,10 @@ static BaseType_t cli_command_api(char *write_buffer, size_t write_buffer_size, 
     const char *endpoint = FreeRTOS_CLIGetParameter(cmd_str, 1, &endpoint_len);
 
     // Make sure to update list of endpoints in http_client_build_request if changing this list
-    const char *const endpoints_with_query_params[2] = {
+    const char *const endpoints_with_query_params[3] = {
         "conditions",
         "screen_update",
+        "tide_chart",
     };
 
     // If entered endpoint is in list to include config query params, include that data in call to
@@ -411,10 +412,10 @@ static BaseType_t cli_command_display(char *write_buffer, size_t write_buffer_si
         }
 
         spi_flash_mmap_handle_t spi_flash_handle;
-        uint32_t                screen_img_len    = 0;
+        uint32_t                screen_img_size   = 0;
         uint32_t                screen_img_width  = 0;
         uint32_t                screen_img_height = 0;
-        bool                    success           = nvs_get_uint32(SCREEN_IMG_SIZE_NVS_KEY, &screen_img_len);
+        bool                    success           = nvs_get_uint32(SCREEN_IMG_SIZE_NVS_KEY, &screen_img_size);
         if (!success) {
             strcpy(write_buffer, "No screen img size value stored in NVS, cannot render screen out of flash");
             return pdFALSE;
@@ -438,7 +439,7 @@ static BaseType_t cli_command_display(char *write_buffer, size_t write_buffer_si
         const uint8_t *mapped_flash = NULL;
         esp_partition_mmap(screen_img_partition,
                            0x0,
-                           screen_img_len,
+                           screen_img_size,
                            SPI_FLASH_MMAP_DATA,
                            (const void **)&mapped_flash,
                            &spi_flash_handle);
@@ -447,7 +448,13 @@ static BaseType_t cli_command_display(char *write_buffer, size_t write_buffer_si
         spi_flash_munmap(spi_flash_handle);
 
         char msg[80];
-        sprintf(msg, "Rendered image from flash at (%u, %u)", x_coord, y_coord);
+        sprintf(msg,
+                "Rendered image from flash at (%u, %u) sized %u bytes (W: %u, H: %u)",
+                x_coord,
+                y_coord,
+                screen_img_size,
+                screen_img_width,
+                screen_img_height);
         strcpy(write_buffer, msg);
     } else {
         strcpy(write_buffer, "Unknown display command");

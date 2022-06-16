@@ -19,7 +19,7 @@ static uint32_t            display_width;
 
 static void display_render() {
     epd_poweron();
-    enum EpdDrawError err = epd_hl_update_screen(&hl, MODE_GC16, 25);
+    enum EpdDrawError err = epd_hl_update_screen(&hl, MODE_GL16, 25);
     (void)err;
     // TODO :: error check
     // TODO :: do we need this delay?
@@ -92,22 +92,16 @@ void display_render_image(uint8_t *image_buffer,
                           uint32_t screen_x,
                           uint32_t screen_y) {
     display_full_clear();
-    uint8_t *fb = epd_hl_get_framebuffer(&hl);
+    uint8_t *fb   = epd_hl_get_framebuffer(&hl);
+    EpdRect  rect = {
+         .x      = screen_x,
+         .y      = screen_y,
+         .width  = width_px,
+         .height = height_px,
+    };
 
-    const uint32_t row_width = width_px * bytes_per_px;
-    const uint32_t height    = height_px;
-    for (uint32_t i = 0; i < height - 1; i++) {
-        for (uint32_t j = 0, x_px = 0; j < row_width - 1; j += bytes_per_px) {
-            // For now assume any non-0xFF is black
-            if (j > 0) {
-                x_px = j / bytes_per_px;
-            }
-
-            // Draw pixel directly from data (assumes that it's 8-bit depth grayscale)
-            epd_draw_pixel(screen_x + x_px, screen_y + i, image_buffer[i * row_width + j], fb);
-        }
-    }
-
+    // Data MUST be 2 pixels per byte, aka 1 pixel per 4-bit nibble.
+    epd_copy_to_framebuffer(rect, image_buffer, fb);
     display_render();
 }
 
