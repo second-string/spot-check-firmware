@@ -5,6 +5,7 @@
 
 #include "esp_err.h"
 #include "esp_http_client.h"
+#include "esp_partition.h"
 #include "nvs.h"
 
 // Needs trailing slash!
@@ -35,6 +36,11 @@ int       http_client_perform_post(request                  *request_obj,
                                    char                     *post_data,
                                    size_t                    post_data_size,
                                    esp_http_client_handle_t *client);
-int       http_client_read_response(esp_http_client_handle_t *client, char **response_data, size_t *response_data_size);
+esp_err_t http_client_read_response_to_buffer(esp_http_client_handle_t *client,
+                                              char                    **response_data,
+                                              size_t                   *response_data_size);
+int       http_client_read_response_to_flash(esp_http_client_handle_t *client,
+                                             esp_partition_t          *partition,
+                                             uint32_t                  offset_into_partition);
 
 #endif

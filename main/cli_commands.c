@@ -239,11 +239,19 @@ static BaseType_t cli_command_api(char *write_buffer, size_t write_buffer_size, 
     BaseType_t  endpoint_len;
     const char *endpoint = FreeRTOS_CLIGetParameter(cmd_str, 1, &endpoint_len);
 
-    // Make sure to update list of endpoints in http_client_build_request if changing this list
-    const char *const endpoints_with_query_params[3] = {
+    const char *const endpoints_with_query_params[] = {
         "conditions",
         "screen_update",
-        "tide_chart",
+        "tides_chart",
+        // NOTE: Make sure to update list of endpoints in http_client_build_request if changing this list
+    };
+
+    const char *const endpoints_read_to_flash[] = {
+        "screen_update",
+        "tides_chart",
+        "swell_chart",
+        "test_tide_chart.raw",
+        // NOTE: Make sure to update list of endpoints in http_client_build_request if changing this list
     };
 
     // If entered endpoint is in list to include config query params, include that data in call to
@@ -253,6 +261,18 @@ static BaseType_t cli_command_api(char *write_buffer, size_t write_buffer_size, 
         if (strlen(endpoints_with_query_params[i]) == endpoint_len &&
             strncmp(endpoints_with_query_params[i], endpoint, endpoint_len) == 0) {
             include_params = true;
+            log_printf(TAG, LOG_LEVEL_DEBUG, "Including normal query params in this CLI API request");
+            break;
+        }
+    }
+
+    // If entered endpoint is in list to read to flash, save response to partition instead of buffer
+    bool save_to_flash = false;
+    for (uint8_t i = 0; i < sizeof(endpoints_read_to_flash) / sizeof(char *); i++) {
+        if (strlen(endpoints_read_to_flash[i]) == endpoint_len &&
+            strncmp(endpoints_read_to_flash[i], endpoint, endpoint_len) == 0) {
+            save_to_flash = true;
+            log_printf(TAG, LOG_LEVEL_DEBUG, "Saving response from this CLI API request to flash partition");
             break;
         }
     }
@@ -267,17 +287,40 @@ static BaseType_t cli_command_api(char *write_buffer, size_t write_buffer_size, 
         config     = nvs_get_config();
         num_params = 3;
     }
-    request                  req = http_client_build_request((char *)endpoint, config, url, params, num_params);
+
+    request req = http_client_build_request((char *)endpoint, config, url, params, num_params);
+    memset(write_buffer, 0x0, write_buffer_size);
+
     esp_http_client_handle_t client;
     bool                     success = http_client_perform_request(&req, &client);
     if (!success) {
         log_printf(TAG, LOG_LEVEL_ERROR, "Error making request, aborting");
     } else {
-        ESP_ERROR_CHECK(http_client_read_response(&client, &res, &bytes_alloced));
-        if (res && bytes_alloced > 0) {
-            // strncpy up to write_buffer_size since we might have received a ton of binary data for screen images
-            strncpy(write_buffer, res, MIN(strlen(res), write_buffer_size));
-            free(res);
+        if (save_to_flash) {
+            const esp_partition_t *part = esp_partition_find_first(ESP_PARTITION_TYPE_DATA,
+                                                                   ESP_PARTITION_SUBTYPE_ANY,
+                                                                   SCREEN_IMG_PARTITION_LABEL);
+            if (part == NULL) {
+                char msg[60];
+                sprintf(msg, "No %s partition found", SCREEN_IMG_PARTITION_LABEL);
+                strcpy(write_buffer, msg);
+                return pdFALSE;
+            }
+
+            int bytes_saved = http_client_read_response_to_flash(&client, (esp_partition_t *)part, 0);
+            if (bytes_saved > 0) {
+                char msg[80];
+                sprintf(msg, "Saved %u bytes to screen_img flash partition at 0x%X offset", bytes_saved, 0);
+                strcpy(write_buffer, msg);
+                free(res);
+            }
+        } else {
+            esp_err_t http_err = http_client_read_response_to_buffer(&client, &res, &bytes_alloced);
+            if (http_err == ESP_OK && res && bytes_alloced > 0) {
+                // strncpy up to write_buffer_size since response might be big (shouldn't be since only text though)
+                strncpy(write_buffer, res, MIN(strlen(res), write_buffer_size));
+                free(res);
+            }
         }
     }
     return pdFALSE;
@@ -360,8 +403,8 @@ static BaseType_t cli_command_partition(char *write_buffer, size_t write_buffer_
                 } else {
                     part = esp_partition_get(iter);
 
-                    // With the null check on the below esp_partition_check, it shouldn't be possible to get a null part
-                    // here but check anyway
+                    // With the null check on the below esp_partition_check, it shouldn't be possible to get a null
+                    // part here but check anyway
                     if (part == NULL) {
                         state = PARTITION_STATE_END;
                     } else {
@@ -434,8 +477,8 @@ static BaseType_t cli_command_display(char *write_buffer, size_t write_buffer_si
         const esp_partition_t *screen_img_partition =
             esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_ANY, "screen_img");
 
-        // TODO :: make sure screen_img_len length is less that buffer size (or at least a reasonable number to malloc)
-        // mmap handles the large malloc internally, and the call the munmap below frees it
+        // TODO :: make sure screen_img_len length is less that buffer size (or at least a reasonable number to
+        // malloc) mmap handles the large malloc internally, and the call the munmap below frees it
         const uint8_t *mapped_flash = NULL;
         esp_partition_mmap(screen_img_partition,
                            0x0,
@@ -577,7 +620,8 @@ void cli_command_register_all() {
     static const CLI_Command_Definition_t nvs_cmd = {
         .pcCommand = "nvs",
         .pcHelpString =
-            "nvs:\n\tget <key>: get the uint32 value stored for the key\n\tset <key> <number>: set a uint32 value in "
+            "nvs:\n\tget <key>: get the uint32 value stored for the key\n\tset <key> <number>: set a uint32 value "
+            "in "
             "NVS for a "
             "given key",
         .pxCommandInterpreter        = cli_command_nvs,

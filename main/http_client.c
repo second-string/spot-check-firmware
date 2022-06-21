@@ -2,7 +2,6 @@
 #include "freertos/FreeRTOS.h"
 
 #include "constants.h"
-#include "esp_partition.h"
 #include "http_client.h"
 #include "wifi.h"
 
@@ -65,7 +64,8 @@ request http_client_build_request(char              *endpoint,
     request req = {0};
     if (params && num_params > 0) {
         query_param temp_params[num_params];
-        if (strcmp(endpoint, "conditions") == 0 || strcmp(endpoint, "screen_update") == 0) {
+        if (strcmp(endpoint, "conditions") == 0 || strcmp(endpoint, "screen_update") == 0 ||
+            strcmp(endpoint, "swell_chart") == 0 || strcmp(endpoint, "tides_chart") == 0) {
             temp_params[0] = (query_param){.key = "lat", .value = config->spot_lat};
             temp_params[1] = (query_param){.key = "lon", .value = config->spot_lon};
             temp_params[2] = (query_param){.key = "spot_id", .value = config->spot_uid};
@@ -124,6 +124,7 @@ bool http_client_perform_request(request *request_obj, esp_http_client_handle_t 
         strcpy(req_url, request_obj->url);
 
         if (request_obj->num_params > 0) {
+            log_printf(TAG, LOG_LEVEL_DEBUG, "Adding %d query params to URL", request_obj->num_params);
             strcat(req_url, "?");
             for (int i = 0; i < request_obj->num_params; i++) {
                 query_param param = request_obj->params[i];
@@ -208,153 +209,199 @@ int http_client_perform_post(request                  *request_obj,
 }
 
 /*
- * Read response data into caller-supplied buffer from open request in caller-supplied client. Request must have been
- * sent through client using http_client_perform_request.
- * Returns error code, return bytes malloced through response_data_size which caller is responsible for freeing.
+ * Check headers and status code to make sure request was successful. Should only be used internally by http request
+ * functions before they read out data in different manners.
+ * Returns success, content length returned through last arg.
  */
-int http_client_read_response(esp_http_client_handle_t *client, char **response_data, size_t *response_data_size) {
+static bool http_client_check_response(esp_http_client_handle_t *client, int *content_length) {
     configASSERT(client);
+    configASSERT(content_length);
 
-    int retval = 0;
+    bool success = false;
 
     // Kicks off and blocks until all headers downloaded. Can get remainder of headers (like status_code) from their
     // helper functions, content_length is returned directly
-    int content_length = esp_http_client_fetch_headers(*client);
+    *content_length = esp_http_client_fetch_headers(*client);
+
+    // Check status to make sure we have actual good data to read out
+    int status = esp_http_client_get_status_code(*client);
+    if (status >= 200 && status <= 299) {
+        if (*content_length < 0) {
+            log_printf(TAG,
+                       LOG_LEVEL_INFO,
+                       "Status code successful (%d), but error fetching headers with negative content-length, bailing",
+                       status);
+        } else if (content_length == 0) {
+            log_printf(TAG,
+                       LOG_LEVEL_ERROR,
+                       "Status code successful (%d), but content length of zero after fetching headers, bailing");
+        } else {
+            success = true;
+            log_printf(TAG, LOG_LEVEL_INFO, "Request success! Status=%d, Content-length=%d", status, *content_length);
+        }
+    } else {
+        log_printf(TAG,
+                   LOG_LEVEL_INFO,
+                   "Request failed: status=%d, "
+                   "Content-length=%d",
+                   status,
+                   content_length);
+    }
+
+    return success;
+}
+
+/*
+ * Read response from http requeste into caller-supplied buffer. Caller responsible for freeing malloced buffer saved in
+ * response_data pointer if return value > 0. Request must have been sent through client using
+ * http_client_perform_request.
+ * Returns -1 for error, otherwise number of bytes malloced.
+ */
+esp_err_t http_client_read_response_to_buffer(esp_http_client_handle_t *client,
+                                              char                    **response_data,
+                                              size_t                   *response_data_size) {
+    configASSERT(client);
+    configASSERT(response_data);
+    configASSERT(response_data_size);
+    esp_err_t err = ESP_FAIL;
 
     size_t bytes_received = 0;
     do {
-        // Check status to make sure we have actual good data to read out
-        int status = esp_http_client_get_status_code(*client);
-        if (status >= 200 && status <= 299) {
-            log_printf(TAG, LOG_LEVEL_INFO, "Request success! Status=%d, Content-length=%d", status, content_length);
-
-            if (content_length < 0) {
-                log_printf(TAG, LOG_LEVEL_INFO, "Error fetching headers with negative content-length, bailing");
-                bytes_received = 0;
-                retval         = -1;
-                break;
-            } else if (content_length == 0) {
-                log_printf(TAG, LOG_LEVEL_ERROR, "Content length of zero after fetching headers, bailing");
-                bytes_received = 0;
-                retval         = -1;
-                break;
-            }
-
-        } else {
-            log_printf(TAG,
-                       LOG_LEVEL_INFO,
-                       "Request failed: status=%d, "
-                       "Content-length=%d",
-                       status,
-                       content_length);
-            bytes_received = 0;
-            retval         = -1;
+        int  content_length = 0;
+        bool success        = http_client_check_response(client, &content_length);
+        if (!success || content_length == 0) {
             break;
         }
 
-        // If content-length is less than the max buffer size, we assume it's a regular API response (json, protobuf,
-        // whatever), and read it all in one go. If it's more, we assume we're receiving a screen image that we'll need
-        // to save to flash, since that's the only endpoint that currently returns anywhere near more data than the max
-        // buffer size.
         if (content_length < MAX_READ_BUFFER_SIZE) {
-            *response_data      = malloc(content_length + 1);
+            *response_data = malloc(content_length + 1);
+            if (!response_data) {
+                log_printf(TAG, LOG_LEVEL_ERROR, "Malloc of %u bytes failed for http response!", content_length + 1);
+                break;
+            }
+
             int length_received = esp_http_client_read(*client, *response_data, content_length);
             if (length_received < 0) {
                 // Don't bother making the caller free anything since we have nothing to give them. Free here and return
-                // 0 alloced
-                bytes_received = 0;
+                // -1 for error
                 free(*response_data);
                 log_printf(TAG, LOG_LEVEL_ERROR, "Error reading response after successful http client request");
                 break;
             } else {
                 (*response_data)[length_received] = '\0';
                 bytes_received                    = length_received + 1;
+                err                               = ESP_OK;
                 log_printf(TAG, LOG_LEVEL_DEBUG, "Rcvd %zu bytes of response data: %s", bytes_received, *response_data);
             }
         } else {
             log_printf(
                 TAG,
-                LOG_LEVEL_INFO,
-                "Content-length of %d too big for max local buffer of %d bytes. Assuming this is an image, chunking "
-                "response and saving to flash partition",
-                MAX_READ_BUFFER_SIZE,
-                content_length);
-
-            const esp_partition_t *screen_img_partition = esp_partition_find_first(ESP_PARTITION_TYPE_DATA,
-                                                                                   ESP_PARTITION_SUBTYPE_ANY,
-                                                                                   SCREEN_IMG_PARTITION_LABEL);
-
-            // Erase only the size of the image currently stored (internal spi flash functions will erase to page
-            // boundary automatically)
-            uint32_t screen_img_size = 0;
-            nvs_get_uint32(SCREEN_IMG_SIZE_NVS_KEY, &screen_img_size);
-            if (screen_img_size) {
-                esp_partition_erase_range(screen_img_partition, 0x0, screen_img_size);
-                nvs_set_uint32(SCREEN_IMG_SIZE_NVS_KEY, 0);
-                nvs_set_uint32(SCREEN_IMG_WIDTH_PX_NVS_KEY, 0);
-                nvs_set_uint32(SCREEN_IMG_HEIGHT_PX_NVS_KEY, 0);
-                log_printf(TAG, LOG_LEVEL_DEBUG, "Erased %u bytes from screen img partition");
-            } else {
-                log_printf(TAG,
-                           LOG_LEVEL_DEBUG,
-                           "%s NVS key had zero value, not erasing any of screen img partition",
-                           SCREEN_IMG_SIZE_NVS_KEY);
-            }
-
-            uint32_t moving_screen_img_addr = 0x0;
-            int      length_received        = 0;
-            *response_data                  = malloc(MAX_READ_BUFFER_SIZE);
-            do {
-                // Pull in chunk and immediately write to flash
-                length_received = esp_http_client_read(*client, *response_data, MAX_READ_BUFFER_SIZE);
-                if (length_received > 0) {
-                    if (moving_screen_img_addr + length_received > screen_img_partition->size) {
-                        log_printf(TAG,
-                                   LOG_LEVEL_ERROR,
-                                   "Attempting to write 0x%02X bytes to partition at offset 0x%02X which would "
-                                   "overflow the boundary of 0x%02X bytes, aborting",
-                                   length_received,
-                                   moving_screen_img_addr,
-                                   screen_img_partition->size);
-                        break;
-                    }
-                    esp_partition_write(screen_img_partition, moving_screen_img_addr, *response_data, length_received);
-                    log_printf(TAG,
-                               LOG_LEVEL_DEBUG,
-                               "Wrote %d bytes to screen image partition at offset %d",
-                               length_received,
-                               moving_screen_img_addr);
-                    moving_screen_img_addr += length_received;
-                }
-            } while (length_received > 0);
-
-            bytes_received = MAX_READ_BUFFER_SIZE;
-            if (length_received < 0) {
-                // NVS has already been marked as invalid at time of flash erase, so just return error
-                log_printf(TAG, LOG_LEVEL_ERROR, "Error reading response after successful http client request");
-                retval = -1;
-            } else {
-                // Save metadata as last action to make sure all steps have succeeded and there's a valid image in flash
-                nvs_set_uint32(SCREEN_IMG_SIZE_NVS_KEY, moving_screen_img_addr);
-                nvs_set_uint32(SCREEN_IMG_WIDTH_PX_NVS_KEY, 700);
-                nvs_set_uint32(SCREEN_IMG_HEIGHT_PX_NVS_KEY, 200);
-                log_printf(TAG,
-                           LOG_LEVEL_DEBUG,
-                           "Rcvd %zu bytes total of response data and saved to flash",
-                           bytes_received);
-            }
+                LOG_LEVEL_ERROR,
+                "Content length received in response (%d) larger than max read buffer size of %u, aborting request",
+                content_length,
+                MAX_READ_BUFFER_SIZE);
+            break;
         }
     } while (0);
 
     *response_data_size = bytes_received;
+    return err;
+}
 
-    esp_err_t err = esp_http_client_cleanup(*client);
-    if (err != ESP_OK) {
-        log_printf(TAG, LOG_LEVEL_INFO, "Error cleaning up  http client connection");
-        retval = err;
+/*
+ * Read response from http request in chunks into flash partition. Request must have been sent through client using
+ * http_client_perform_request.
+ * Returns -1 for error, otherwise number of bytes saved to flash.
+ */
+int http_client_read_response_to_flash(esp_http_client_handle_t *client,
+                                       esp_partition_t          *partition,
+                                       uint32_t                  offset_into_partition) {
+    configASSERT(client);
+    configASSERT(partition);
+
+    int  content_length = 0;
+    bool success        = http_client_check_response(client, &content_length);
+    if (!success) {
+        return -1;
+    } else if (content_length == 0) {
+        return 0;
     }
-    log_printf(TAG, LOG_LEVEL_INFO, "Cleaned up http client after request");
 
-    // Return 0 if successful, the error code or -1 if anything else
-    return retval;
+    size_t bytes_received = 0;
+    log_printf(TAG,
+               LOG_LEVEL_INFO,
+               "Reading %u payload bytes into flash in chunks of size %u",
+               content_length,
+               MAX_READ_BUFFER_SIZE);
+
+    const esp_partition_t *screen_img_partition =
+        esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_ANY, SCREEN_IMG_PARTITION_LABEL);
+
+    // Erase only the size of the image currently stored (internal spi flash functions will erase to page
+    // boundary automatically)
+    uint32_t screen_img_size = 0;
+    nvs_get_uint32(SCREEN_IMG_SIZE_NVS_KEY, &screen_img_size);
+    if (screen_img_size) {
+        esp_partition_erase_range(screen_img_partition, 0x0, screen_img_size);
+        nvs_set_uint32(SCREEN_IMG_SIZE_NVS_KEY, 0);
+        nvs_set_uint32(SCREEN_IMG_WIDTH_PX_NVS_KEY, 0);
+        nvs_set_uint32(SCREEN_IMG_HEIGHT_PX_NVS_KEY, 0);
+        log_printf(TAG, LOG_LEVEL_DEBUG, "Erased %u bytes from screen img partition");
+    } else {
+        log_printf(TAG,
+                   LOG_LEVEL_DEBUG,
+                   "%s NVS key had zero value, not erasing any of screen img partition",
+                   SCREEN_IMG_SIZE_NVS_KEY);
+    }
+
+    uint32_t moving_screen_img_addr = offset_into_partition;
+    int      length_received        = 0;
+    uint8_t *response_data          = malloc(MAX_READ_BUFFER_SIZE);
+    if (!response_data) {
+        log_printf(TAG, LOG_LEVEL_ERROR, "Malloc of %u bytes failed for http response!", content_length + 1);
+        return -1;
+    }
+    do {
+        // Pull in chunk and immediately write to flash
+        length_received = esp_http_client_read(*client, (char *)response_data, MAX_READ_BUFFER_SIZE);
+        if (length_received > 0) {
+            if (moving_screen_img_addr + length_received > screen_img_partition->size) {
+                log_printf(TAG,
+                           LOG_LEVEL_ERROR,
+                           "Attempting to write 0x%02X bytes to partition at offset 0x%02X which would "
+                           "overflow the boundary of 0x%02X bytes, aborting",
+                           length_received,
+                           moving_screen_img_addr,
+                           screen_img_partition->size);
+                break;
+            }
+            esp_partition_write(screen_img_partition, moving_screen_img_addr, response_data, length_received);
+            log_printf(TAG,
+                       LOG_LEVEL_DEBUG,
+                       "Wrote %d bytes to screen image partition at offset %d",
+                       length_received,
+                       moving_screen_img_addr);
+            moving_screen_img_addr += length_received;
+            bytes_received += length_received;
+        }
+    } while (length_received > 0);
+
+    if (response_data) {
+        free(response_data);
+    }
+
+    if (length_received < 0) {
+        // NVS has already been marked as invalid at time of flash erase, so just return error
+        log_printf(TAG, LOG_LEVEL_ERROR, "Error reading response after successful http client request");
+        return -1;
+    } else {
+        // Save metadata as last action to make sure all steps have succeeded and there's a valid image in
+        // flash
+        nvs_set_uint32(SCREEN_IMG_SIZE_NVS_KEY, moving_screen_img_addr);
+        nvs_set_uint32(SCREEN_IMG_WIDTH_PX_NVS_KEY, 700);
+        nvs_set_uint32(SCREEN_IMG_HEIGHT_PX_NVS_KEY, 200);
+        log_printf(TAG, LOG_LEVEL_DEBUG, "Rcvd %zu bytes total of response data and saved to flash", bytes_received);
+    }
+
+    return bytes_received;
 }
