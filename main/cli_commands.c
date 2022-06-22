@@ -251,6 +251,7 @@ static BaseType_t cli_command_api(char *write_buffer, size_t write_buffer_size, 
         "tides_chart",
         "swell_chart",
         "test_tide_chart.raw",
+        "test_swell_chart.raw",
         // NOTE: Make sure to update list of endpoints in http_client_build_request if changing this list
     };
 
@@ -307,12 +308,74 @@ static BaseType_t cli_command_api(char *write_buffer, size_t write_buffer_size, 
                 return pdFALSE;
             }
 
-            int bytes_saved = http_client_read_response_to_flash(&client, (esp_partition_t *)part, 0);
+            // TODO :: this little block w/ enum is unnecessary, could just do endpoint comparision and handle erase
+            // logic within these statements. Done this way to make it portable to pull out into its own function later
+            screen_img_t screen_img = SCREEN_IMG_COUNT;
+            if (strcmp(endpoint, "test_tide_chart.raw") == 0) {
+                screen_img = SCREEN_IMG_TIDE_CHART;
+            } else if (strcmp(endpoint, "test_swell_chart.raw") == 0) {
+                screen_img = SCREEN_IMG_SWELL_CHART;
+            } else {
+                char msg[80];
+                sprintf(msg, "Found no matching screen_img_t enum value for endpoint '%s'", endpoint);
+                strcpy(write_buffer, msg);
+                return pdFALSE;
+            }
+
+            char    *screen_img_size_key   = NULL;
+            char    *screen_img_width_key  = NULL;
+            char    *screen_img_height_key = NULL;
+            uint32_t screen_img_offset     = 0;
+            switch (screen_img) {
+                case SCREEN_IMG_TIDE_CHART:
+                    screen_img_size_key   = SCREEN_IMG_TIDE_CHART_SIZE_NVS_KEY;
+                    screen_img_width_key  = SCREEN_IMG_TIDE_CHART_WIDTH_PX_NVS_KEY;
+                    screen_img_height_key = SCREEN_IMG_TIDE_CHART_HEIGHT_PX_NVS_KEY;
+                    screen_img_offset     = SCREEN_IMG_TIDE_CHART_OFFSET;
+                    break;
+                case SCREEN_IMG_SWELL_CHART:
+                    screen_img_size_key   = SCREEN_IMG_SWELL_CHART_SIZE_NVS_KEY;
+                    screen_img_width_key  = SCREEN_IMG_SWELL_CHART_WIDTH_PX_NVS_KEY;
+                    screen_img_height_key = SCREEN_IMG_SWELL_CHART_HEIGHT_PX_NVS_KEY;
+                    screen_img_offset     = SCREEN_IMG_SWELL_CHART_OFFSET;
+                    break;
+                default:
+                    configASSERT(0);
+            }
+
+            uint32_t screen_img_size   = 0;
+            uint32_t screen_img_width  = 0;
+            uint32_t screen_img_height = 0;
+            nvs_get_uint32(screen_img_size_key, &screen_img_size);
+            nvs_get_uint32(screen_img_width_key, &screen_img_width);
+            nvs_get_uint32(screen_img_height_key, &screen_img_height);
+
+            // Erase only the size of the image currently stored (internal spi flash functions will erase to page
+            // boundary automatically)
+            if (screen_img_size) {
+                esp_partition_erase_range(part, screen_img_offset, screen_img_size);
+                nvs_set_uint32(screen_img_size_key, 0);
+                nvs_set_uint32(screen_img_width_key, 0);
+                nvs_set_uint32(screen_img_height_key, 0);
+                log_printf(TAG, LOG_LEVEL_DEBUG, "Erased %u bytes from %u screen_img_t", screen_img_size, screen_img);
+            } else {
+                log_printf(TAG,
+                           LOG_LEVEL_DEBUG,
+                           "%s NVS key had zero value, not erasing any of screen img partition",
+                           screen_img_size_key);
+            }
+
+            int bytes_saved = http_client_read_response_to_flash(&client, (esp_partition_t *)part, screen_img_offset);
             if (bytes_saved > 0) {
+                // Save metadata as last action to make sure all steps have succeeded and there's a valid image in
+                // flash
+                nvs_set_uint32(screen_img_size_key, bytes_saved);
+                nvs_set_uint32(screen_img_width_key, 700);
+                nvs_set_uint32(screen_img_height_key, 200);
+
                 char msg[80];
                 sprintf(msg, "Saved %u bytes to screen_img flash partition at 0x%X offset", bytes_saved, 0);
                 strcpy(write_buffer, msg);
-                free(res);
             }
         } else {
             esp_err_t http_err = http_client_read_response_to_buffer(&client, &res, &bytes_alloced);
@@ -323,6 +386,7 @@ static BaseType_t cli_command_api(char *write_buffer, size_t write_buffer_size, 
             }
         }
     }
+
     return pdFALSE;
 }
 
@@ -435,11 +499,53 @@ static BaseType_t cli_command_display(char *write_buffer, size_t write_buffer_si
     BaseType_t  action_len;
     const char *action = FreeRTOS_CLIGetParameter(cmd_str, 1, &action_len);
     if (action == NULL) {
-        strcpy(write_buffer, "Error: usage is '<action> [<x> <y>]'");
+        strcpy(write_buffer, "Error: usage is '<action> [<screen>] [<x> <y>]'");
         return pdFALSE;
     }
 
     if (action_len == 5 && strncmp(action, "flash", action_len) == 0) {
+        BaseType_t  screen_len;
+        const char *screen = FreeRTOS_CLIGetParameter(cmd_str, 2, &screen_len);
+        if (screen == NULL) {
+            strcpy(write_buffer, "Error: usage is '<action> <screen> [<x> <y>]'");
+            return pdFALSE;
+        }
+
+        // TODO :: this little block w/ enum is unnecessary, could just do endpoint comparision and handle erase
+        // logic within these statements. Done this way to make it portable to pull out into its own function later
+        screen_img_t screen_img = SCREEN_IMG_COUNT;
+        if (screen_len == 4 && strncmp(screen, "tide", screen_len) == 0) {
+            screen_img = SCREEN_IMG_TIDE_CHART;
+        } else if (screen_len == 5 && strncmp(screen, "swell", screen_len) == 0) {
+            screen_img = SCREEN_IMG_SWELL_CHART;
+        } else {
+            char msg[80];
+            sprintf(msg, "Found no matching screen_img_t enum value for screen '%s'", screen);
+            strcpy(write_buffer, msg);
+            return pdFALSE;
+        }
+
+        char    *screen_img_size_key   = NULL;
+        char    *screen_img_width_key  = NULL;
+        char    *screen_img_height_key = NULL;
+        uint32_t screen_img_offset     = 0;
+        switch (screen_img) {
+            case SCREEN_IMG_TIDE_CHART:
+                screen_img_size_key   = SCREEN_IMG_TIDE_CHART_SIZE_NVS_KEY;
+                screen_img_width_key  = SCREEN_IMG_TIDE_CHART_WIDTH_PX_NVS_KEY;
+                screen_img_height_key = SCREEN_IMG_TIDE_CHART_HEIGHT_PX_NVS_KEY;
+                screen_img_offset     = SCREEN_IMG_TIDE_CHART_OFFSET;
+                break;
+            case SCREEN_IMG_SWELL_CHART:
+                screen_img_size_key   = SCREEN_IMG_SWELL_CHART_SIZE_NVS_KEY;
+                screen_img_width_key  = SCREEN_IMG_SWELL_CHART_WIDTH_PX_NVS_KEY;
+                screen_img_height_key = SCREEN_IMG_SWELL_CHART_HEIGHT_PX_NVS_KEY;
+                screen_img_offset     = SCREEN_IMG_SWELL_CHART_OFFSET;
+                break;
+            default:
+                configASSERT(0);
+        }
+
         BaseType_t  x_coord_len;
         BaseType_t  y_coord_len;
         const char *x_coord_str = FreeRTOS_CLIGetParameter(cmd_str, 2, &x_coord_len);
@@ -454,21 +560,23 @@ static BaseType_t cli_command_display(char *write_buffer, size_t write_buffer_si
             y_coord = strtoul(y_coord_str, NULL, 10);
         }
 
+        // TODO :: all of this logic should be abstracted out into a display function that takes a screen_img_t and
+        // handle the internal logic itself. Currently always defaulting to tide to simplify things for right now
         spi_flash_mmap_handle_t spi_flash_handle;
         uint32_t                screen_img_size   = 0;
         uint32_t                screen_img_width  = 0;
         uint32_t                screen_img_height = 0;
-        bool                    success           = nvs_get_uint32(SCREEN_IMG_SIZE_NVS_KEY, &screen_img_size);
+        bool                    success           = nvs_get_uint32(screen_img_size_key, &screen_img_size);
         if (!success) {
             strcpy(write_buffer, "No screen img size value stored in NVS, cannot render screen out of flash");
             return pdFALSE;
         }
-        success = nvs_get_uint32(SCREEN_IMG_WIDTH_PX_NVS_KEY, &screen_img_width);
+        success = nvs_get_uint32(screen_img_width_key, &screen_img_width);
         if (!success) {
             strcpy(write_buffer, "No screen img width value stored in NVS, cannot render screen out of flash");
             return pdFALSE;
         }
-        success = nvs_get_uint32(SCREEN_IMG_HEIGHT_PX_NVS_KEY, &screen_img_height);
+        success = nvs_get_uint32(screen_img_height_key, &screen_img_height);
         if (!success) {
             strcpy(write_buffer, "No screen img height value stored in NVS, cannot render screen out of flash");
             return pdFALSE;
@@ -481,13 +589,12 @@ static BaseType_t cli_command_display(char *write_buffer, size_t write_buffer_si
         // malloc) mmap handles the large malloc internally, and the call the munmap below frees it
         const uint8_t *mapped_flash = NULL;
         esp_partition_mmap(screen_img_partition,
-                           0x0,
+                           screen_img_offset,
                            screen_img_size,
                            SPI_FLASH_MMAP_DATA,
                            (const void **)&mapped_flash,
                            &spi_flash_handle);
         display_render_image((uint8_t *)mapped_flash, screen_img_width, screen_img_height, 1, x_coord, y_coord);
-
         spi_flash_munmap(spi_flash_handle);
 
         char msg[80];

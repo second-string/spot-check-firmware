@@ -245,7 +245,7 @@ static bool http_client_check_response(esp_http_client_handle_t *client, int *co
                    "Request failed: status=%d, "
                    "Content-length=%d",
                    status,
-                   content_length);
+                   *content_length);
     }
 
     return success;
@@ -310,7 +310,7 @@ esp_err_t http_client_read_response_to_buffer(esp_http_client_handle_t *client,
 
 /*
  * Read response from http request in chunks into flash partition. Request must have been sent through client using
- * http_client_perform_request.
+ * http_client_perform_request. Caller must erase desired location in flash first.
  * Returns -1 for error, otherwise number of bytes saved to flash.
  */
 int http_client_read_response_to_flash(esp_http_client_handle_t *client,
@@ -334,26 +334,6 @@ int http_client_read_response_to_flash(esp_http_client_handle_t *client,
                content_length,
                MAX_READ_BUFFER_SIZE);
 
-    const esp_partition_t *screen_img_partition =
-        esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_ANY, SCREEN_IMG_PARTITION_LABEL);
-
-    // Erase only the size of the image currently stored (internal spi flash functions will erase to page
-    // boundary automatically)
-    uint32_t screen_img_size = 0;
-    nvs_get_uint32(SCREEN_IMG_SIZE_NVS_KEY, &screen_img_size);
-    if (screen_img_size) {
-        esp_partition_erase_range(screen_img_partition, 0x0, screen_img_size);
-        nvs_set_uint32(SCREEN_IMG_SIZE_NVS_KEY, 0);
-        nvs_set_uint32(SCREEN_IMG_WIDTH_PX_NVS_KEY, 0);
-        nvs_set_uint32(SCREEN_IMG_HEIGHT_PX_NVS_KEY, 0);
-        log_printf(TAG, LOG_LEVEL_DEBUG, "Erased %u bytes from screen img partition");
-    } else {
-        log_printf(TAG,
-                   LOG_LEVEL_DEBUG,
-                   "%s NVS key had zero value, not erasing any of screen img partition",
-                   SCREEN_IMG_SIZE_NVS_KEY);
-    }
-
     uint32_t moving_screen_img_addr = offset_into_partition;
     int      length_received        = 0;
     uint8_t *response_data          = malloc(MAX_READ_BUFFER_SIZE);
@@ -365,17 +345,17 @@ int http_client_read_response_to_flash(esp_http_client_handle_t *client,
         // Pull in chunk and immediately write to flash
         length_received = esp_http_client_read(*client, (char *)response_data, MAX_READ_BUFFER_SIZE);
         if (length_received > 0) {
-            if (moving_screen_img_addr + length_received > screen_img_partition->size) {
+            if (moving_screen_img_addr + length_received > partition->size) {
                 log_printf(TAG,
                            LOG_LEVEL_ERROR,
                            "Attempting to write 0x%02X bytes to partition at offset 0x%02X which would "
                            "overflow the boundary of 0x%02X bytes, aborting",
                            length_received,
                            moving_screen_img_addr,
-                           screen_img_partition->size);
+                           partition->size);
                 break;
             }
-            esp_partition_write(screen_img_partition, moving_screen_img_addr, response_data, length_received);
+            esp_partition_write(partition, moving_screen_img_addr, response_data, length_received);
             log_printf(TAG,
                        LOG_LEVEL_DEBUG,
                        "Wrote %d bytes to screen image partition at offset %d",
@@ -395,11 +375,6 @@ int http_client_read_response_to_flash(esp_http_client_handle_t *client,
         log_printf(TAG, LOG_LEVEL_ERROR, "Error reading response after successful http client request");
         return -1;
     } else {
-        // Save metadata as last action to make sure all steps have succeeded and there's a valid image in
-        // flash
-        nvs_set_uint32(SCREEN_IMG_SIZE_NVS_KEY, moving_screen_img_addr);
-        nvs_set_uint32(SCREEN_IMG_WIDTH_PX_NVS_KEY, 700);
-        nvs_set_uint32(SCREEN_IMG_HEIGHT_PX_NVS_KEY, 200);
         log_printf(TAG, LOG_LEVEL_DEBUG, "Rcvd %zu bytes total of response data and saved to flash", bytes_received);
     }
 
