@@ -91,7 +91,6 @@ void display_render_image(uint8_t *image_buffer,
                           uint8_t  bytes_per_px,
                           uint32_t screen_x,
                           uint32_t screen_y) {
-    display_full_clear();
     uint8_t *fb   = epd_hl_get_framebuffer(&hl);
     EpdRect  rect = {
          .x      = screen_x,

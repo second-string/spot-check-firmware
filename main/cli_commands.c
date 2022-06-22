@@ -503,7 +503,10 @@ static BaseType_t cli_command_display(char *write_buffer, size_t write_buffer_si
         return pdFALSE;
     }
 
-    if (action_len == 5 && strncmp(action, "flash", action_len) == 0) {
+    if (action_len == 5 && strncmp(action, "clear", action_len) == 0) {
+        display_full_clear();
+        memset(write_buffer, 0x0, write_buffer_size);
+    } else if (action_len == 5 && strncmp(action, "flash", action_len) == 0) {
         BaseType_t  screen_len;
         const char *screen = FreeRTOS_CLIGetParameter(cmd_str, 2, &screen_len);
         if (screen == NULL) {
@@ -548,16 +551,22 @@ static BaseType_t cli_command_display(char *write_buffer, size_t write_buffer_si
 
         BaseType_t  x_coord_len;
         BaseType_t  y_coord_len;
-        const char *x_coord_str = FreeRTOS_CLIGetParameter(cmd_str, 2, &x_coord_len);
-        const char *y_coord_str = FreeRTOS_CLIGetParameter(cmd_str, 3, &y_coord_len);
+        const char *x_coord_str = FreeRTOS_CLIGetParameter(cmd_str, 3, &x_coord_len);
+        const char *y_coord_str = FreeRTOS_CLIGetParameter(cmd_str, 4, &y_coord_len);
 
         uint32_t x_coord = 0;
         uint32_t y_coord = 0;
         if (x_coord_str) {
-            x_coord = strtoul(x_coord_str, NULL, 10);
+            char termed_str[4];
+            strncpy(termed_str, x_coord_str, x_coord_len);
+            termed_str[x_coord_len] = '\0';
+            x_coord                 = strtoul(termed_str, NULL, 10);
         }
         if (y_coord_str) {
-            y_coord = strtoul(y_coord_str, NULL, 10);
+            char termed_str[4];
+            strncpy(termed_str, y_coord_str, y_coord_len);
+            termed_str[y_coord_len] = '\0';
+            y_coord                 = strtoul(termed_str, NULL, 10);
         }
 
         // TODO :: all of this logic should be abstracted out into a display function that takes a screen_img_t and
