@@ -1,5 +1,7 @@
 #pragma once
 
+#include "constants.h"
+
 void display_init();
 void display_start();
 void display_full_clear();

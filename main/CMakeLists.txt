@@ -20,5 +20,7 @@ idf_component_register(
                                  "cd54hc4094.c"
                                  "display.c"
                                  "raw_image.c"
+                                 "flash_partition.c"
+                                 "screen_img_handler.c"
                     INCLUDE_DIRS "include"
                     EMBED_TXTFILES ${project_dir}/server_certs/ca_cert.pem)

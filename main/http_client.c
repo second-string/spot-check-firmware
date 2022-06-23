@@ -65,6 +65,7 @@ request http_client_build_request(char              *endpoint,
     if (params && num_params > 0) {
         query_param temp_params[num_params];
         if (strcmp(endpoint, "conditions") == 0 || strcmp(endpoint, "screen_update") == 0 ||
+            strcmp(endpoint, "test_swell_chart.raw") == 0 || strcmp(endpoint, "test_tide_chart.raw") == 0 ||
             strcmp(endpoint, "swell_chart") == 0 || strcmp(endpoint, "tides_chart") == 0) {
             temp_params[0] = (query_param){.key = "lat", .value = config->spot_lat};
             temp_params[1] = (query_param){.key = "lon", .value = config->spot_lon};
@@ -83,6 +84,11 @@ request http_client_build_request(char              *endpoint,
         strcat(url_buf, endpoint);
     }
     req.url = url_buf;
+    log_printf(TAG, LOG_LEVEL_DEBUG, "Built request URL: %s", url_buf);
+    log_printf(TAG, LOG_LEVEL_DEBUG, "Built %u request query params:", req.num_params);
+    for (uint8_t i = 0; i < num_params; i++) {
+        log_printf(TAG, LOG_LEVEL_DEBUG, "Param %u - %s: %s", i, req.params[i].key, req.params[i].value);
+    }
 
     return req;
 }

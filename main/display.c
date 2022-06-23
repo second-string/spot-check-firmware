@@ -4,6 +4,7 @@
 #include "epd_driver.h"
 #include "epd_highlevel.h"
 #include "firasans_20.h"
+#include "flash_partition.h"
 #include "log.h"
 #include "timer.h"
 
