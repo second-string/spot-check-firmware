@@ -12,11 +12,25 @@
 
 #define TAG "sc-screenimg"
 
+typedef struct {
+    screen_img_t screen_img;
+    uint32_t     x_coord;
+    uint32_t     y_coord;
+    char        *screen_img_size_key;
+    char        *screen_img_width_key;
+    char        *screen_img_height_key;
+    uint32_t     screen_img_offset;
+    uint32_t     screen_img_size;
+    uint32_t     screen_img_width;
+    uint32_t     screen_img_height;
+    char        *endpoint;
+} screen_img_metadata_t;
+
 static void screen_img_handler_get_metadata(screen_img_t screen_img, screen_img_metadata_t *metadata) {
     switch (screen_img) {
         case SCREEN_IMG_TIDE_CHART:
             metadata->x_coord               = 50;
-            metadata->y_coord               = 0;
+            metadata->y_coord               = 200;
             metadata->screen_img_size_key   = SCREEN_IMG_TIDE_CHART_SIZE_NVS_KEY;
             metadata->screen_img_width_key  = SCREEN_IMG_TIDE_CHART_WIDTH_PX_NVS_KEY;
             metadata->screen_img_height_key = SCREEN_IMG_TIDE_CHART_HEIGHT_PX_NVS_KEY;
@@ -25,7 +39,7 @@ static void screen_img_handler_get_metadata(screen_img_t screen_img, screen_img_
             break;
         case SCREEN_IMG_SWELL_CHART:
             metadata->x_coord               = 50;
-            metadata->y_coord               = 300;
+            metadata->y_coord               = 400;
             metadata->screen_img_size_key   = SCREEN_IMG_SWELL_CHART_SIZE_NVS_KEY;
             metadata->screen_img_width_key  = SCREEN_IMG_SWELL_CHART_WIDTH_PX_NVS_KEY;
             metadata->screen_img_height_key = SCREEN_IMG_SWELL_CHART_HEIGHT_PX_NVS_KEY;

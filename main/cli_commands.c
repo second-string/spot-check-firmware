@@ -11,6 +11,7 @@
 #include "bq24196.h"
 #include "cd54hc4094.h"
 #include "cli_commands.h"
+#include "conditions_task.h"
 #include "constants.h"
 #include "display.h"
 #include "flash_partition.h"
@@ -532,6 +533,34 @@ static BaseType_t cli_command_nvs(char *write_buffer, size_t write_buffer_size, 
     return pdFALSE;
 }
 
+static BaseType_t cli_command_conditions(char *write_buffer, size_t write_buffer_size, const char *cmd_str) {
+    BaseType_t  type_len;
+    const char *type = FreeRTOS_CLIGetParameter(cmd_str, 1, &type_len);
+    if (type == NULL) {
+        strcpy(write_buffer, "Error: usage is 'conditions <type>' where type is 'conditions|tide|swell|both'");
+        return pdFALSE;
+    }
+
+    memset(write_buffer, 0x0, write_buffer_size);
+    if (type_len == 10 && strncmp(type, "conditions", type_len) == 0) {
+        conditions_trigger_conditions_update();
+        strcpy(write_buffer, "Triggered conditions update");
+    } else if (type_len == 4 && strncmp(type, "tide", type_len) == 0) {
+        conditions_trigger_tide_chart_update();
+        strcpy(write_buffer, "Triggered tide chart update");
+    } else if (type_len == 5 && strncmp(type, "swell", type_len) == 0) {
+        conditions_trigger_swell_chart_update();
+        strcpy(write_buffer, "Triggered swell chart update");
+    } else if (type_len == 4 && strncmp(type, "both", type_len) == 0) {
+        conditions_trigger_both_charts_update();
+        strcpy(write_buffer, "Triggered both charts update");
+    } else {
+        strcpy(write_buffer, "Invalid conditions update type, must be 'conditions|tide|swell|both'");
+    }
+
+    return pdFALSE;
+}
+
 void cli_command_register_all() {
     static const CLI_Command_Definition_t info_cmd = {
         .pcCommand                   = "info",
@@ -603,6 +632,15 @@ void cli_command_register_all() {
         .cExpectedNumberOfParameters = -1,
     };
 
+    static const CLI_Command_Definition_t conditions_cmd = {
+        .pcCommand = "conditions",
+        .pcHelpString =
+            "conditions <[conditions|tide|swell]: Trigger an update of one of the conditions types as if it were "
+            "triggered by normal timer expiration",
+        .pxCommandInterpreter        = cli_command_conditions,
+        .cExpectedNumberOfParameters = 1,
+    };
+
     FreeRTOS_CLIRegisterCommand(&info_cmd);
     FreeRTOS_CLIRegisterCommand(&reset_cmd);
     FreeRTOS_CLIRegisterCommand(&bq_cmd);
@@ -612,4 +650,5 @@ void cli_command_register_all() {
     FreeRTOS_CLIRegisterCommand(&partition_cmd);
     FreeRTOS_CLIRegisterCommand(&display_cmd);
     FreeRTOS_CLIRegisterCommand(&nvs_cmd);
+    FreeRTOS_CLIRegisterCommand(&conditions_cmd);
 }

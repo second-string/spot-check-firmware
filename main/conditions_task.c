@@ -1,45 +1,54 @@
 #include <string.h>
 
 #include "freertos/FreeRTOS.h"
-#include "log.h"
+#include "freertos/task.h"
 
 #include "conditions_task.h"
 #include "gpio.h"
 #include "http_client.h"
 #include "json.h"
+#include "log.h"
 #include "nvs.h"
+#include "screen_img_handler.h"
 #include "timer.h"
 #include "wifi.h"
 
 #define TAG "sc-conditions-task"
 
 #define CONDITIONS_UPDATE_INTERVAL_MINUTES (20)
+#define CHARTS_UPDATE_INTERVAL_MINUTES (60)
 
-/*
- * Initialize this to pass our check is (since we normally divide this num by 60)
- * to force a conditions request on startup
- */
-static volatile unsigned int seconds_elapsed      = CONDITIONS_UPDATE_INTERVAL_MINUTES * 60;
-static volatile bool         fetch_new_conditions = false;
+#define UPDATE_CONDITIONS_BIT (1 << 0)
+#define UPDATE_TIDE_CHART_BIT (1 << 1)
+#define UPDATE_SWELL_CHART_BIT (1 << 2)
+
+static TaskHandle_t conditions_update_task_handle;
+
+static volatile unsigned int seconds_elapsed;
 static conditions_t          last_retrieved_conditions;
 
 static void conditions_timer_expired_callback(void *timer_args) {
     seconds_elapsed++;
+    uint32_t minutes_elapsed = seconds_elapsed / 60;
 
-    if ((seconds_elapsed / 60) >= CONDITIONS_UPDATE_INTERVAL_MINUTES || new_location_set) {
+    if ((minutes_elapsed % CONDITIONS_UPDATE_INTERVAL_MINUTES == 0) || new_location_set) {
         if (new_location_set) {
             // If we have currently scrolling text, clear the LEDs for us to push a new conditions string
             // led_text_stop_scroll();
         }
 
-        new_location_set     = false;
-        seconds_elapsed      = 0;
-        fetch_new_conditions = true;
-        log_printf(TAG, LOG_LEVEL_INFO, "Reached %d minutes elapsed, updating conditions...", seconds_elapsed / 60);
+        new_location_set = false;
+        conditions_trigger_conditions_update();
+        log_printf(TAG, LOG_LEVEL_INFO, "Reached %d minutes elapsed, updating conditions...", minutes_elapsed);
+    }
+
+    if (minutes_elapsed % CHARTS_UPDATE_INTERVAL_MINUTES == 0) {
+        conditions_trigger_both_charts_update();
+        log_printf(TAG, LOG_LEVEL_INFO, "Reached %d minutes elapsed, updating conditions...", minutes_elapsed);
     }
 }
 
-static void refresh_conditions(conditions_t *new_conditions) {
+static void conditions_refresh(conditions_t *new_conditions) {
     spot_check_config *config = nvs_get_config();
     char               url_buf[strlen(URL_BASE) + 20];
     query_param        params[3];
@@ -120,23 +129,7 @@ static void refresh_conditions(conditions_t *new_conditions) {
     }
 }
 
-void display_conditions(conditions_t *conditions) {
-    char conditions_str[40] = {0};
-    sprintf(conditions_str,
-            "%dF %d%s %sft",
-            conditions->temperature,
-            conditions->wind_speed,
-            conditions->wind_dir,
-            conditions->tide_height);
-    log_printf(TAG, LOG_LEVEL_INFO, "Showing: '%s'", conditions_str);
-    // led_text_show_text(conditions_str, strlen(conditions_str));
-}
-
-void display_last_retrieved_conditions() {
-    display_conditions(&last_retrieved_conditions);
-}
-
-void update_conditions_task(void *args) {
+static void conditions_update_task(void *args) {
     timer_info_handle conditions_handle =
         timer_init("conditions",
                    conditions_timer_expired_callback,
@@ -147,21 +140,78 @@ void update_conditions_task(void *args) {
     // Wait forever until connected
     wifi_block_until_connected();
 
+    uint32_t update_bits = 0;
     while (1) {
-        vTaskDelay(5000 / portTICK_PERIOD_MS);
+        // Wait forever until a notification received. Clears all bits on exit since we'll handle every set bit in one
+        // go
+        xTaskNotifyWait(0x0, UINT32_MAX, &update_bits, portMAX_DELAY);
 
-        if (!fetch_new_conditions) {
-            continue;
+        log_printf(TAG,
+                   LOG_LEVEL_INFO,
+                   "update-conditions task received task notification of value 0x%02X, updating accordingly",
+                   update_bits);
+
+        if (update_bits & UPDATE_CONDITIONS_BIT) {
+            conditions_t new_conditions;
+            conditions_refresh(&new_conditions);
+            conditions_display(&new_conditions);
+            log_printf(TAG, LOG_LEVEL_INFO, "update-conditions task updated conditions");
         }
 
-        fetch_new_conditions = false;
+        if (update_bits & UPDATE_TIDE_CHART_BIT) {
+            screen_img_handler_download_and_save(SCREEN_IMG_TIDE_CHART);
+            screen_img_handler_render_screen_img(SCREEN_IMG_TIDE_CHART);
+            log_printf(TAG, LOG_LEVEL_INFO, "update-conditions task updated tide chart");
+        }
 
-        log_printf(
-            TAG,
-            LOG_LEVEL_INFO,
-            "Picked up fetch_new_conditions flag set in conditions task main loop, running refresh then display");
-        conditions_t new_conditions;
-        refresh_conditions(&new_conditions);
-        display_conditions(&new_conditions);
+        if (update_bits & UPDATE_SWELL_CHART_BIT) {
+            screen_img_handler_download_and_save(SCREEN_IMG_SWELL_CHART);
+            screen_img_handler_render_screen_img(SCREEN_IMG_SWELL_CHART);
+            log_printf(TAG, LOG_LEVEL_INFO, "update-conditions task updated swell chart");
+        }
     }
+}
+
+void conditions_trigger_conditions_update() {
+    xTaskNotify(conditions_update_task_handle, UPDATE_CONDITIONS_BIT, eSetBits);
+}
+
+void conditions_trigger_tide_chart_update() {
+    xTaskNotify(conditions_update_task_handle, UPDATE_TIDE_CHART_BIT, eSetBits);
+}
+
+void conditions_trigger_swell_chart_update() {
+    xTaskNotify(conditions_update_task_handle, UPDATE_SWELL_CHART_BIT, eSetBits);
+}
+
+void conditions_trigger_both_charts_update() {
+    xTaskNotify(conditions_update_task_handle, UPDATE_SWELL_CHART_BIT | UPDATE_TIDE_CHART_BIT, eSetBits);
+}
+
+void conditions_display(conditions_t *conditions) {
+    char conditions_str[40] = {0};
+    sprintf(conditions_str,
+            "%dF %d%s %sft",
+            conditions->temperature,
+            conditions->wind_speed,
+            conditions->wind_dir,
+            conditions->tide_height);
+    log_printf(TAG, LOG_LEVEL_INFO, "Showing: '%s'", conditions_str);
+}
+
+void conditions_display_last_retrieved() {
+    conditions_display(&last_retrieved_conditions);
+}
+
+void conditions_update_task_start() {
+    // Start off with update to all, then resume regular timer triggering
+    conditions_trigger_conditions_update();
+    conditions_trigger_both_charts_update();
+
+    xTaskCreate(&conditions_update_task,
+                "conditions-update",
+                SPOT_CHECK_MINIMAL_STACK_SIZE_BYTES * 3,
+                NULL,
+                tskIDLE_PRIORITY,
+                &conditions_update_task_handle);
 }

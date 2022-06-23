@@ -27,19 +27,5 @@ typedef enum {
     SCREEN_IMG_COUNT,
 } screen_img_t;
 
-typedef struct {
-    screen_img_t screen_img;
-    uint32_t     x_coord;
-    uint32_t     y_coord;
-    char        *screen_img_size_key;
-    char        *screen_img_width_key;
-    char        *screen_img_height_key;
-    uint32_t     screen_img_offset;
-    uint32_t     screen_img_size;
-    uint32_t     screen_img_width;
-    uint32_t     screen_img_height;
-    char        *endpoint;
-} screen_img_metadata_t;
-
 bool screen_img_handler_download_and_save(screen_img_t screen_img);
 bool screen_img_handler_render_screen_img(screen_img_t screen_img);

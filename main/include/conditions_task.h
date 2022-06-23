@@ -10,8 +10,12 @@ typedef struct {
     char    tide_height[7];  // minus sign, two digits, decimal point, two digits, null
 } conditions_t;
 
-void update_conditions_task(void *args);
-void display_conditions(conditions_t *conditions);
-void display_last_retrieved_conditions();
+void conditions_trigger_conditions_update();
+void conditions_trigger_tide_chart_update();
+void conditions_trigger_swell_chart_update();
+void conditions_trigger_both_charts_update();
+void conditions_display(conditions_t *conditions);
+void conditions_display_last_retrieved();
+void conditions_update_task_start();
 
 #endif

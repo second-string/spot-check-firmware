@@ -83,15 +83,10 @@ static void app_start() {
 
     wifi_start_provisioning(false);
 
-    TaskHandle_t update_conditions_task_handle;
-    xTaskCreate(&update_conditions_task,
-                "update-conditions",
-                SPOT_CHECK_MINIMAL_STACK_SIZE_BYTES * 3,
-                NULL,
-                tskIDLE_PRIORITY,
-                &update_conditions_task_handle);
+    conditions_update_task_start();
 
     // minimal * 3 is the smallest we can go w/o SO
+    // TODO :: move this into an ota_task_start() func
     TaskHandle_t ota_task_handle;
     xTaskCreate(&check_ota_update_task,
                 "check-ota-update",
