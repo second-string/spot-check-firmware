@@ -1,5 +1,7 @@
 #pragma once
 
+#include "conditions_task.h"
+
 // Keys in NVS for the current number of bytes saved in the screen_img partition as a single image.
 // Saving the key separately in the NVS KVS avoids having to use a packed header prefix in the image data partition for
 // metadata
@@ -28,4 +30,6 @@ typedef enum {
 } screen_img_t;
 
 bool screen_img_handler_download_and_save(screen_img_t screen_img);
-bool screen_img_handler_render_screen_img(screen_img_t screen_img);
+bool screen_img_handler_draw_screen_img(screen_img_t screen_img);
+bool screen_img_handler_draw_conditions(conditions_t *conditions);
+void screen_img_handler_render();

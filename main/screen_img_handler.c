@@ -102,7 +102,7 @@ static int screen_img_handler_save(esp_http_client_handle_t *client,
     return bytes_saved;
 }
 
-bool screen_img_handler_render_screen_img(screen_img_t screen_img) {
+bool screen_img_handler_draw_screen_img(screen_img_t screen_img) {
     const esp_partition_t *screen_img_partition = flash_partition_get_screen_img_partition();
     screen_img_metadata_t  metadata             = {0};
     screen_img_handler_get_metadata(screen_img, &metadata);
@@ -117,12 +117,12 @@ bool screen_img_handler_render_screen_img(screen_img_t screen_img) {
                        SPI_FLASH_MMAP_DATA,
                        (const void **)&mapped_flash,
                        &spi_flash_handle);
-    display_render_image((uint8_t *)mapped_flash,
-                         metadata.screen_img_width,
-                         metadata.screen_img_height,
-                         1,
-                         metadata.x_coord,
-                         metadata.y_coord);
+    display_draw_image((uint8_t *)mapped_flash,
+                       metadata.screen_img_width,
+                       metadata.screen_img_height,
+                       1,
+                       metadata.x_coord,
+                       metadata.y_coord);
     spi_flash_munmap(spi_flash_handle);
 
     log_printf(TAG,
@@ -164,4 +164,21 @@ bool screen_img_handler_download_and_save(screen_img_t screen_img) {
     }
 
     return success;
+}
+
+bool screen_img_handler_draw_conditions(conditions_t *conditions) {
+    display_draw_text("13:55", 100, 120, DISPLAY_FONT_SIZE_LARGE, DISPLAY_FONT_ALIGN_LEFT);
+    display_draw_text("June 24th, 2022", 100, 170, DISPLAY_FONT_SIZE_SMALL, DISPLAY_FONT_ALIGN_LEFT);
+    display_draw_text("72º F", 700, 80, DISPLAY_FONT_SIZE_MEDIUM, DISPLAY_FONT_ALIGN_RIGHT);
+    display_draw_text("7 kt. SSE", 700, 130, DISPLAY_FONT_SIZE_MEDIUM, DISPLAY_FONT_ALIGN_RIGHT);
+    display_draw_text("5.3 ft. rising", 700, 180, DISPLAY_FONT_SIZE_MEDIUM, DISPLAY_FONT_ALIGN_RIGHT);
+
+    return true;
+}
+
+/*
+ * Wrapper for display_render so our logic modules don't have a dependency on display driver
+ */
+void screen_img_handler_render() {
+    display_render();
 }

@@ -471,7 +471,8 @@ static BaseType_t cli_command_display(char *write_buffer, size_t write_buffer_si
         (void)x_coord;
         (void)y_coord;
 
-        bool success = screen_img_handler_render_screen_img(screen_img);
+        bool success = screen_img_handler_draw_screen_img(screen_img);
+        screen_img_handler_render();
         if (!success) {
             strcpy(write_buffer, "CLI command to render screen_img failed");
         }

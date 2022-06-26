@@ -14,8 +14,6 @@ void conditions_trigger_conditions_update();
 void conditions_trigger_tide_chart_update();
 void conditions_trigger_swell_chart_update();
 void conditions_trigger_both_charts_update();
-void conditions_display(conditions_t *conditions);
-void conditions_display_last_retrieved();
 void conditions_update_task_start();
 
 #endif

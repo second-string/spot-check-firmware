@@ -2,15 +2,36 @@
 
 #include "constants.h"
 
+typedef enum {
+    DISPLAY_FONT_ALIGN_LEFT,
+    DISPLAY_FONT_ALIGN_CENTER,
+    DISPLAY_FONT_ALIGN_RIGHT,
+
+    DISPLAY_FONT_ALIGN_COUNT
+} display_font_align_t;
+
+typedef enum {
+    DISPLAY_FONT_SIZE_SMALL,
+    DISPLAY_FONT_SIZE_MEDIUM,
+    DISPLAY_FONT_SIZE_LARGE,
+
+    DISPLAY_FONT_SIZE_COUNT,
+} display_font_size_t;
+
 void display_init();
 void display_start();
+void display_render();
 void display_full_clear();
 void display_render_splash_screen();
-void display_render_text(char *text);
-void display_render_image(uint8_t *image_buffer,
-                          size_t   width_px,
-                          size_t   height_px,
-                          uint8_t  bytes_per_px,
-                          uint32_t screen_x,
-                          uint32_t screen_y);
-void display_render_image_fullscreen(uint8_t *image_buffer, uint8_t bytes_per_px);
+void display_draw_text(char                *text,
+                       uint32_t             x_coord,
+                       uint32_t             y_coord,
+                       display_font_size_t  size,
+                       display_font_align_t alignment);
+void display_draw_image(uint8_t *image_buffer,
+                        size_t   width_px,
+                        size_t   height_px,
+                        uint8_t  bytes_per_px,
+                        uint32_t screen_x,
+                        uint32_t screen_y);
+void display_draw_image_fullscreen(uint8_t *image_buffer, uint8_t bytes_per_px);

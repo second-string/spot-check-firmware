@@ -26,6 +26,7 @@
 #include "nvs.h"
 #include "ota_task.h"
 #include "raw_image.h"
+#include "screen_img_handler.h"
 #include "timer.h"
 #include "uart.h"
 #include "wifi.h"
@@ -111,19 +112,38 @@ void app_main(void) {
     log_printf(TAG, LOG_LEVEL_INFO, "");
     log_printf(TAG, LOG_LEVEL_INFO, "");
     free(info_buffer);
+    info_buffer = NULL;
 
     app_start();
 
     display_render_splash_screen();
-    vTaskDelay(pdMS_TO_TICKS(1000));
+    vTaskDelay(pdMS_TO_TICKS(1500));
+
+    // TODO :: this needs to check if it's provisioned && gets network connection, or at least hold off on displaying
+    // data in else clause until we pass internet connection. If provisioned but now not around that network, it's
+    // currently displaying saved data but shouldn't.
+    // Maybe a timeout for network connection before this screen is shown to give network a chance to try to connect for
+    // a hot sec?
     if (!wifi_is_provisioned()) {
-        display_render_text(
+        display_full_clear();
+        display_draw_text(
             "Download the Spot Check app and follow\nthe configuration steps to connect\n your device to a wifi "
-            "network");
+            "network",
+            400,
+            300,
+            DISPLAY_FONT_SIZE_SMALL,
+            DISPLAY_FONT_ALIGN_CENTER);
     } else {
-        display_render_text("Loading forecast...");
+        // Render whatever we have in flash to get up and showing asap, then kick off update to all
+        display_full_clear();
+        screen_img_handler_draw_conditions(NULL);
+        screen_img_handler_draw_screen_img(SCREEN_IMG_TIDE_CHART);
+        screen_img_handler_draw_screen_img(SCREEN_IMG_SWELL_CHART);
+        conditions_trigger_conditions_update();
+        conditions_trigger_both_charts_update();
     }
-    vTaskDelay(pdMS_TO_TICKS(1000));
+
+    screen_img_handler_render();
 
     while (1) {
         // TODO :: wdg with tasks
