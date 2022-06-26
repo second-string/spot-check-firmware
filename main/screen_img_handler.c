@@ -1,3 +1,5 @@
+#include <sys/time.h>
+
 #include "freertos/FreeRTOS.h"
 
 #include "esp_partition.h"
@@ -167,8 +169,17 @@ bool screen_img_handler_download_and_save(screen_img_t screen_img) {
 }
 
 bool screen_img_handler_draw_conditions(conditions_t *conditions) {
-    display_draw_text("13:55", 100, 120, DISPLAY_FONT_SIZE_LARGE, DISPLAY_FONT_ALIGN_LEFT);
-    display_draw_text("June 24th, 2022", 100, 170, DISPLAY_FONT_SIZE_SMALL, DISPLAY_FONT_ALIGN_LEFT);
+    time_t    now      = 0;
+    struct tm timeinfo = {0};
+    time(&now);
+    localtime_r(&now, &timeinfo);
+    char time_string[6];
+    char date_string[64];
+    strftime(time_string, 6, "%H:%M", &timeinfo);
+    strftime(date_string, sizeof(date_string), "%A %B %d, %Y", &timeinfo);
+
+    display_draw_text(time_string, 100, 120, DISPLAY_FONT_SIZE_LARGE, DISPLAY_FONT_ALIGN_LEFT);
+    display_draw_text(date_string, 100, 170, DISPLAY_FONT_SIZE_SMALL, DISPLAY_FONT_ALIGN_LEFT);
     display_draw_text("72º F", 700, 80, DISPLAY_FONT_SIZE_MEDIUM, DISPLAY_FONT_ALIGN_RIGHT);
     display_draw_text("7 kt. SSE", 700, 130, DISPLAY_FONT_SIZE_MEDIUM, DISPLAY_FONT_ALIGN_RIGHT);
     display_draw_text("5.3 ft. rising", 700, 180, DISPLAY_FONT_SIZE_MEDIUM, DISPLAY_FONT_ALIGN_RIGHT);
