@@ -437,9 +437,9 @@ static BaseType_t cli_command_display(char *write_buffer, size_t write_buffer_si
         }
 
         screen_img_t screen_img = SCREEN_IMG_COUNT;
-        if (screen_len == 4 && strncmp(screen, "tide", screen_len) == 0) {
+        if (screen_len == 4 && strncmp(screen, "tides_chart", screen_len) == 0) {
             screen_img = SCREEN_IMG_TIDE_CHART;
-        } else if (screen_len == 5 && strncmp(screen, "swell", screen_len) == 0) {
+        } else if (screen_len == 5 && strncmp(screen, "swell_chart", screen_len) == 0) {
             screen_img = SCREEN_IMG_SWELL_CHART;
         } else {
             char msg[80];
@@ -603,9 +603,11 @@ void cli_command_register_all() {
     };
 
     static const CLI_Command_Definition_t api_cmd = {
-        .pcCommand            = "api",
-        .pcHelpString         = "api:\n\t<endpoint>: send request to API endpoint with base URL set in menuconfig",
-        .pxCommandInterpreter = cli_command_api,
+        .pcCommand = "api",
+        .pcHelpString =
+            "api:\n\timg <tides_chart|swell_chart>: download and save image to flash\n\t<endpoint>: send request to "
+            "API endpoint with base URL set in menuconfig",
+        .pxCommandInterpreter        = cli_command_api,
         .cExpectedNumberOfParameters = -1,
     };
 
@@ -619,8 +621,10 @@ void cli_command_register_all() {
     };
 
     static const CLI_Command_Definition_t display_cmd = {
-        .pcCommand    = "display",
-        .pcHelpString = "display:\n\tflash <x> <y>: render the image currently in flash as the specified coordinates",
+        .pcCommand = "display",
+        .pcHelpString =
+            "display:\n\tclear: clear full display\n\timg <tides_chart|swell_chart> [<x> <y>]: render an image "
+            "currently in flash at the specified coordinates",
         .pxCommandInterpreter        = cli_command_display,
         .cExpectedNumberOfParameters = -1,
     };
@@ -639,8 +643,8 @@ void cli_command_register_all() {
     static const CLI_Command_Definition_t conditions_cmd = {
         .pcCommand = "conditions",
         .pcHelpString =
-            "conditions <time|conditions|tide|swell: Trigger an update of one of the conditions types as if it were "
-            "triggered by normal timer expiration",
+            "conditions <time|conditions|tide|swell>: Trigger an update of one of the conditions as if triggered by "
+            "normal expiration",
         .pxCommandInterpreter        = cli_command_conditions,
         .cExpectedNumberOfParameters = 1,
     };
