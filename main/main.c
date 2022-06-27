@@ -1,8 +1,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <sys/time.h>
+#include <time.h>
 
-#include "esp_sntp.h"
 #include "esp_system.h"
 #include "esp_task_wdt.h"
 #include "esp_wifi.h"
@@ -29,6 +29,7 @@
 #include "ota_task.h"
 #include "raw_image.h"
 #include "screen_img_handler.h"
+#include "sntp_time.h"
 #include "timer.h"
 #include "uart.h"
 #include "wifi.h"
@@ -66,6 +67,7 @@ static void app_init() {
     i2c_init(BQ24196_I2C_PORT, BQ24196_I2C_SDA_PIN, BQ24196_I2C_SCL_PIN, &bq24196_i2c_handle);
     gpio_init();
     bq24196_init(&bq24196_i2c_handle);
+    sntp_time_init();
     cd54hc4094_init(SHIFTREG_CLK_PIN, SHIFTREG_DATA_PIN, SHIFTREG_STROBE_PIN);
     display_init();
 
@@ -99,18 +101,9 @@ static void app_start() {
                 &ota_task_handle);
 
     cli_task_start();
-}
 
-void time_sync_notification_cb(struct timeval *tv) {
-    (void)tv;
-
-    time_t    now      = 0;
-    struct tm timeinfo = {0};
-    time(&now);
-    localtime_r(&now, &timeinfo);
-    char time_string[64];
-    strftime(time_string, 64, "%c", &timeinfo);
-    log_printf(TAG, LOG_LEVEL_DEBUG, "GOT TIME: %s", time_string);
+    // TODO :: blocking!!!
+    sntp_time_start();
 }
 
 void app_main(void) {
@@ -131,25 +124,6 @@ void app_main(void) {
     app_start();
 
     display_render_splash_screen();
-
-    sntp_setoperatingmode(SNTP_SYNC_MODE_IMMED);
-    // TODO :: look into dhcp as primary server if we can update time from router w/o internet connection
-    // https://github.com/espressif/esp-idf/blob/c2ccc383dae2a47c2c2dc8c7ad78175a3fd11361/examples/protocols/sntp/main/sntp_example_main.c#L139
-    sntp_setservername(0, "pool.ntp.org");
-    sntp_set_time_sync_notification_cb(time_sync_notification_cb);
-    sntp_init();
-    log_printf(TAG, LOG_LEVEL_DEBUG, "List of configured NTP servers:");
-
-    // TODO :: blocking wait for time to be set, obviously shouldn't be blocking but need to make sure we don't show the
-    // wrong time. Might be handled with no effort since we won't show screen till internet connection and the time sync
-    // should happen quick enough that it will be accurate (depends on time sync interval in menuconfig) ((maybe force
-    // time sync in internet connection event handler))
-    int       retry       = 0;
-    const int retry_count = 15;
-    while (sntp_get_sync_status() == SNTP_SYNC_STATUS_RESET && ++retry < retry_count) {
-        log_printf(TAG, LOG_LEVEL_DEBUG, "Waiting for system time to be set... (%d/%d)", retry, retry_count);
-        vTaskDelay(2000 / portTICK_PERIOD_MS);
-    }
 
     // TODO :: this needs to check if it's provisioned && gets network connection, or at least hold off on displaying
     // data in else clause until we pass internet connection. If provisioned but now not around that network, it's

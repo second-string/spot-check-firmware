@@ -1,8 +1,10 @@
 #include <sys/time.h>
+#include <time.h>
 
 #include "freertos/FreeRTOS.h"
 
 #include "esp_partition.h"
+#include "esp_sntp.h"
 #include "esp_spi_flash.h"
 
 #include "display.h"

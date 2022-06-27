@@ -22,5 +22,6 @@ idf_component_register(
                                  "raw_image.c"
                                  "flash_partition.c"
                                  "screen_img_handler.c"
+                                 "sntp_time.c"
                     INCLUDE_DIRS "include"
                     EMBED_TXTFILES ${project_dir}/server_certs/ca_cert.pem)
