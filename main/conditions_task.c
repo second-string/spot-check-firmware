@@ -16,9 +16,9 @@
 
 #define TAG "sc-conditions-task"
 
-#define TIME_UPDATE_INTERVAL_SECONDS (60)
-#define CONDITIONS_UPDATE_INTERVAL_MINUTES (20)
-#define CHARTS_UPDATE_INTERVAL_MINUTES (60)
+#define TIME_UPDATE_INTERVAL_SECONDS (1 * SECONDS_PER_MIN)
+#define CONDITIONS_UPDATE_INTERVAL_SECONDS (20 * SECONDS_PER_MIN)
+#define CHARTS_UPDATE_INTERVAL_SECONDS (60 * SECONDS_PER_MIN)
 
 #define UPDATE_CONDITIONS_BIT (1 << 0)
 #define UPDATE_TIDE_CHART_BIT (1 << 1)
@@ -32,7 +32,6 @@ static conditions_t          last_retrieved_conditions;
 
 static void conditions_timer_expired_callback(void *timer_args) {
     seconds_elapsed++;
-    uint32_t minutes_elapsed = seconds_elapsed / 60;
 
     if (seconds_elapsed % TIME_UPDATE_INTERVAL_SECONDS == 0) {
         conditions_trigger_time_update();
@@ -40,7 +39,7 @@ static void conditions_timer_expired_callback(void *timer_args) {
     }
 
     // TODO :: switch this new_location_set flag to just calling conditions trigger function
-    if ((minutes_elapsed && (minutes_elapsed % CONDITIONS_UPDATE_INTERVAL_MINUTES == 0)) || new_location_set) {
+    if ((seconds_elapsed % CONDITIONS_UPDATE_INTERVAL_SECONDS == 0) || new_location_set) {
         if (new_location_set) {
             // If we have currently scrolling text, clear the LEDs for us to push a new conditions string
             // led_text_stop_scroll();
@@ -50,16 +49,16 @@ static void conditions_timer_expired_callback(void *timer_args) {
         conditions_trigger_conditions_update();
         log_printf(TAG,
                    LOG_LEVEL_INFO,
-                   "Reached %d minutes elapsed, triggering conditions update and display...",
-                   minutes_elapsed);
+                   "Reached %d seconds elapsed, triggering conditions update and display...",
+                   seconds_elapsed);
     }
 
-    if (minutes_elapsed && (minutes_elapsed % CHARTS_UPDATE_INTERVAL_MINUTES == 0)) {
+    if (seconds_elapsed % CHARTS_UPDATE_INTERVAL_SECONDS == 0) {
         conditions_trigger_both_charts_update();
         log_printf(TAG,
                    LOG_LEVEL_INFO,
-                   "Reached %d minutes elapsed, triggering tide and swell charts update and display...",
-                   minutes_elapsed);
+                   "Reached %d seconds elapsed, triggering tide and swell charts update and display...",
+                   seconds_elapsed);
     }
 }
 
