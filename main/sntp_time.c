@@ -8,6 +8,10 @@
 
 #define TAG "sc-sntp"
 
+/*
+ * Callback that fires every time the SNTP service syncs system time with received rmeote value. Superfluous with the
+ * sntp_time_is_synced function below unless we wanted this to set a flag so we didn't have to poll that function
+ */
 static void sntp_time_sync_notification_cb(struct timeval *tv) {
     (void)tv;
 
@@ -30,14 +34,11 @@ void sntp_time_init() {
 }
 
 void sntp_time_start() {
-    // TODO :: blocking wait for time to be set, obviously shouldn't be blocking but need to make sure we don't show the
-    // wrong time. Might be handled with no effort since we won't show screen till internet connection and the time sync
-    // should happen quick enough that it will be accurate (depends on time sync interval in menuconfig) ((maybe force
-    // time sync in internet connection event handler))
-    int       retry       = 0;
-    const int retry_count = 5;
-    while (sntp_get_sync_status() == SNTP_SYNC_STATUS_RESET && ++retry < retry_count) {
-        log_printf(TAG, LOG_LEVEL_DEBUG, "Waiting for system time to be set... (%d/%d)", retry, retry_count);
-        vTaskDelay(2000 / portTICK_PERIOD_MS);
-    }
+}
+
+/*
+ * Returns success if at least one time value has been received from remote
+ */
+bool sntp_time_is_synced() {
+    return sntp_get_sync_status() != SNTP_SYNC_STATUS_RESET;
 }

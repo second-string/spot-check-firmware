@@ -85,9 +85,8 @@ static void app_start() {
     i2c_start(&bq24196_i2c_handle);
     bq24196_start();
     display_start();
-
     wifi_start_provisioning(false);
-
+    sntp_time_start();
     conditions_update_task_start();
 
     // minimal * 3 is the smallest we can go w/o SO
@@ -101,9 +100,6 @@ static void app_start() {
                 &ota_task_handle);
 
     cli_task_start();
-
-    // TODO :: blocking!!!
-    sntp_time_start();
 }
 
 void app_main(void) {
@@ -125,11 +121,18 @@ void app_main(void) {
 
     display_render_splash_screen();
 
+    int       retry       = 0;
+    const int retry_count = 5;
+    while (!sntp_time_is_synced() && ++retry < retry_count) {
+        log_printf(TAG, LOG_LEVEL_DEBUG, "Waiting for system time to be set... (%d/%d)", retry, retry_count);
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
+    }
+
     // TODO :: this needs to check if it's provisioned && gets network connection, or at least hold off on displaying
     // data in else clause until we pass internet connection. If provisioned but now not around that network, it's
     // currently displaying saved data but shouldn't.
     // Maybe a timeout for network connection before this screen is shown to give network a chance to try to connect for
-    // a hot sec?
+    // a hot sec? Also should include ntp time sync. Maybe one overall 'readiness' function to bundle all these?
     if (!wifi_is_provisioned()) {
         display_full_clear();
         display_draw_text(
