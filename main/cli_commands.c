@@ -543,7 +543,10 @@ static BaseType_t cli_command_conditions(char *write_buffer, size_t write_buffer
     }
 
     memset(write_buffer, 0x0, write_buffer_size);
-    if (type_len == 10 && strncmp(type, "conditions", type_len) == 0) {
+    if (type_len == 4 && strncmp(type, "time", type_len) == 0) {
+        conditions_trigger_time_update();
+        strcpy(write_buffer, "Triggered time update");
+    } else if (type_len == 10 && strncmp(type, "conditions", type_len) == 0) {
         conditions_trigger_conditions_update();
         strcpy(write_buffer, "Triggered conditions update");
     } else if (type_len == 4 && strncmp(type, "tide", type_len) == 0) {
@@ -636,7 +639,7 @@ void cli_command_register_all() {
     static const CLI_Command_Definition_t conditions_cmd = {
         .pcCommand = "conditions",
         .pcHelpString =
-            "conditions <[conditions|tide|swell]: Trigger an update of one of the conditions types as if it were "
+            "conditions <time|conditions|tide|swell: Trigger an update of one of the conditions types as if it were "
             "triggered by normal timer expiration",
         .pxCommandInterpreter        = cli_command_conditions,
         .cExpectedNumberOfParameters = 1,

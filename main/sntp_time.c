@@ -6,20 +6,18 @@
 #include "log.h"
 #include "sntp_time.h"
 
-#define TAG "sc-time"
+#define TAG "sc-sntp"
 
 static void sntp_time_sync_notification_cb(struct timeval *tv) {
     (void)tv;
 
-    // time_t    now      = 0;
-    // struct tm timeinfo = {0};
-    // (void)now;
-    // (void)timeinfo;
-    // time(&now);
-    // localtime_r(&now, &timeinfo);
-    // char time_string[64];
-    // strftime(time_string, 64, "%c", &timeinfo);
-    // log_printf(TAG, LOG_LEVEL_DEBUG, "GOT TIME: %s", time_string);
+    time_t    now      = 0;
+    struct tm timeinfo = {0};
+    time(&now);
+    localtime_r(&now, &timeinfo);
+    char time_string[64];
+    strftime(time_string, 64, "%c", &timeinfo);
+    log_printf(TAG, LOG_LEVEL_DEBUG, "SNTP updated current time to %s", time_string);
 }
 
 void sntp_time_init() {
@@ -37,7 +35,7 @@ void sntp_time_start() {
     // should happen quick enough that it will be accurate (depends on time sync interval in menuconfig) ((maybe force
     // time sync in internet connection event handler))
     int       retry       = 0;
-    const int retry_count = 15;
+    const int retry_count = 5;
     while (sntp_get_sync_status() == SNTP_SYNC_STATUS_RESET && ++retry < retry_count) {
         log_printf(TAG, LOG_LEVEL_DEBUG, "Waiting for system time to be set... (%d/%d)", retry, retry_count);
         vTaskDelay(2000 / portTICK_PERIOD_MS);

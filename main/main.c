@@ -142,6 +142,7 @@ void app_main(void) {
     } else {
         // Render whatever we have in flash to get up and showing asap, then kick off update to all
         display_full_clear();
+        screen_img_handler_draw_time();
         screen_img_handler_draw_conditions(NULL);
         screen_img_handler_draw_screen_img(SCREEN_IMG_TIDE_CHART);
         screen_img_handler_draw_screen_img(SCREEN_IMG_SWELL_CHART);

@@ -16,12 +16,14 @@
 
 #define TAG "sc-conditions-task"
 
+#define TIME_UPDATE_INTERVAL_SECONDS (60)
 #define CONDITIONS_UPDATE_INTERVAL_MINUTES (20)
 #define CHARTS_UPDATE_INTERVAL_MINUTES (60)
 
 #define UPDATE_CONDITIONS_BIT (1 << 0)
 #define UPDATE_TIDE_CHART_BIT (1 << 1)
 #define UPDATE_SWELL_CHART_BIT (1 << 2)
+#define UPDATE_TIME_BIT (1 << 2)
 
 static TaskHandle_t conditions_update_task_handle;
 
@@ -32,8 +34,13 @@ static void conditions_timer_expired_callback(void *timer_args) {
     seconds_elapsed++;
     uint32_t minutes_elapsed = seconds_elapsed / 60;
 
+    if (seconds_elapsed % TIME_UPDATE_INTERVAL_SECONDS == 0) {
+        conditions_trigger_time_update();
+        log_printf(TAG, LOG_LEVEL_INFO, "Reached %d seconds elapsed, triggering screen time update..", seconds_elapsed);
+    }
+
     // TODO :: switch this new_location_set flag to just calling conditions trigger function
-    if ((minutes_elapsed % CONDITIONS_UPDATE_INTERVAL_MINUTES == 0) || new_location_set) {
+    if ((minutes_elapsed && (minutes_elapsed % CONDITIONS_UPDATE_INTERVAL_MINUTES == 0)) || new_location_set) {
         if (new_location_set) {
             // If we have currently scrolling text, clear the LEDs for us to push a new conditions string
             // led_text_stop_scroll();
@@ -41,14 +48,17 @@ static void conditions_timer_expired_callback(void *timer_args) {
 
         new_location_set = false;
         conditions_trigger_conditions_update();
-        log_printf(TAG, LOG_LEVEL_INFO, "Reached %d minutes elapsed, updating conditions...", minutes_elapsed);
+        log_printf(TAG,
+                   LOG_LEVEL_INFO,
+                   "Reached %d minutes elapsed, triggering conditions update and display...",
+                   minutes_elapsed);
     }
 
-    if (minutes_elapsed % CHARTS_UPDATE_INTERVAL_MINUTES == 0) {
+    if (minutes_elapsed && (minutes_elapsed % CHARTS_UPDATE_INTERVAL_MINUTES == 0)) {
         conditions_trigger_both_charts_update();
         log_printf(TAG,
                    LOG_LEVEL_INFO,
-                   "Reached %d minutes elapsed, updating tide and swell charts...",
+                   "Reached %d minutes elapsed, triggering tide and swell charts update and display...",
                    minutes_elapsed);
     }
 }
@@ -112,10 +122,7 @@ static void conditions_refresh() {
 
 static void conditions_update_task(void *args) {
     timer_info_handle conditions_handle =
-        timer_init("conditions",
-                   conditions_timer_expired_callback,
-                   NULL,
-                   CONDITIONS_UPDATE_INTERVAL_MINUTES * SECONDS_PER_MIN * MS_PER_SECOND);
+        timer_init("conditions", conditions_timer_expired_callback, NULL, MS_PER_SECOND);
     timer_reset(conditions_handle, true);
 
     // Wait forever until connected
@@ -131,6 +138,11 @@ static void conditions_update_task(void *args) {
                    LOG_LEVEL_INFO,
                    "update-conditions task received task notification of value 0x%02X, updating accordingly",
                    update_bits);
+
+        if (update_bits & UPDATE_TIME_BIT) {
+            screen_img_handler_draw_time();
+            log_printf(TAG, LOG_LEVEL_INFO, "update-conditions task updated time");
+        }
 
         if (update_bits & UPDATE_CONDITIONS_BIT) {
             conditions_refresh();
@@ -155,6 +167,10 @@ static void conditions_update_task(void *args) {
             screen_img_handler_render();
         }
     }
+}
+
+void conditions_trigger_time_update() {
+    xTaskNotify(conditions_update_task_handle, UPDATE_TIME_BIT, eSetBits);
 }
 
 void conditions_trigger_conditions_update() {

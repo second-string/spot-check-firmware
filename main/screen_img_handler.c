@@ -170,7 +170,7 @@ bool screen_img_handler_download_and_save(screen_img_t screen_img) {
     return success;
 }
 
-bool screen_img_handler_draw_conditions(conditions_t *conditions) {
+bool screen_img_handler_draw_time() {
     time_t    now      = 0;
     struct tm timeinfo = {0};
     time(&now);
@@ -182,6 +182,11 @@ bool screen_img_handler_draw_conditions(conditions_t *conditions) {
 
     display_draw_text(time_string, 100, 120, DISPLAY_FONT_SIZE_LARGE, DISPLAY_FONT_ALIGN_LEFT);
     display_draw_text(date_string, 100, 170, DISPLAY_FONT_SIZE_SMALL, DISPLAY_FONT_ALIGN_LEFT);
+
+    return true;
+}
+
+bool screen_img_handler_draw_conditions(conditions_t *conditions) {
     display_draw_text("72º F", 700, 80, DISPLAY_FONT_SIZE_MEDIUM, DISPLAY_FONT_ALIGN_RIGHT);
     display_draw_text("7 kt. SSE", 700, 130, DISPLAY_FONT_SIZE_MEDIUM, DISPLAY_FONT_ALIGN_RIGHT);
     display_draw_text("5.3 ft. rising", 700, 180, DISPLAY_FONT_SIZE_MEDIUM, DISPLAY_FONT_ALIGN_RIGHT);

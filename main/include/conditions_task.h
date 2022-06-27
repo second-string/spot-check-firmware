@@ -10,6 +10,7 @@ typedef struct {
     char    tide_height[7];  // minus sign, two digits, decimal point, two digits, null
 } conditions_t;
 
+void conditions_trigger_time_update();
 void conditions_trigger_conditions_update();
 void conditions_trigger_tide_chart_update();
 void conditions_trigger_swell_chart_update();
