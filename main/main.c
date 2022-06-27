@@ -165,6 +165,7 @@ void app_main(void) {
         log_printf(TAG,
                    LOG_LEVEL_INFO,
                    "Boot successful, showing time + last saved conditions / charts and kicking off update");
+
         // Render whatever we have in flash to get up and showing asap, then kick off update to all
         display_full_clear();
         screen_img_handler_draw_time();
@@ -177,59 +178,6 @@ void app_main(void) {
 
     screen_img_handler_render();
 
-    while (1) {
-        // TODO :: wdg with tasks
-        // ESP_ERROR_CHECK(esp_task_wdt_reset());
-
-        // yielding 100 seconds every loop for now. I think we'll be able to take this loop out and delete the default
-        // task
-        vTaskDelay(pdMS_TO_TICKS(100000));
-
-        /*
-        TODO :: this whole logic block should be either a simple timer with a callback to run the fetch of new forecast
-        info or in a task. We don't need to wait for user trigger to scroll now, so we can handle the update in the
-        background if (false) { log_printf(TAG, LOG_LEVEL_DEBUG, "Button pressed");
-            ESP_ERROR_CHECK(gpio_set_level(LED_PIN, !gpio_get_level(LED_PIN)));
-
-            // Space for base url + endpoint. Query param space handled when building full url in perform_request
-            // func
-            char               url_buf[strlen(URL_BASE) + 20];
-            request            request;
-            query_param        params[2];
-            spot_check_config *config = nvs_get_config();
-
-            char *next_forecast_type = get_next_forecast_type(config->forecast_types);
-            request                  = http_client_build_request(next_forecast_type, config, url_buf, params, 2);
-
-            // TODO :: both the request performing and the executed logic for doing something with the spot check
-            // response strings should be in another task / file
-            char *server_response = NULL;
-            int   data_length     = http_client_perform_request(&request, &server_response);
-            if (data_length != 0) {
-                cJSON *json       = parse_json(server_response);
-                cJSON *data_value = cJSON_GetObjectItem(json, "data");
-                if (cJSON_IsArray(data_value)) {
-                    cJSON *data_list_value = NULL;
-                    cJSON_ArrayForEach(data_list_value, data_value) {
-                        log_printf(TAG, LOG_LEVEL_INFO, "Used to execute logic for adding text to scroll buffer here");
-                    }
-                } else {
-                    log_printf(TAG, LOG_LEVEL_INFO, "Didn't get json array of strings to print, bailing");
-                }
-
-                if (data_value != NULL) {
-                    cJSON_free(data_value);
-                }
-                if (json != NULL) {
-                    cJSON_free(json);
-                }
-            }
-
-            // Caller responsible for freeing buffer if non-null on return
-            if (server_response != NULL) {
-                free(server_response);
-            }
-        }
-        */
-    }
+    // yeet the default task, everything run from conditions task, ota task, and timers
+    vTaskDelete(NULL);
 }
