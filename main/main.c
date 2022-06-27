@@ -121,19 +121,38 @@ void app_main(void) {
 
     display_render_splash_screen();
 
-    int       retry       = 0;
-    const int retry_count = 5;
-    while (!sntp_time_is_synced() && ++retry < retry_count) {
-        log_printf(TAG, LOG_LEVEL_DEBUG, "Waiting for system time to be set... (%d/%d)", retry, retry_count);
-        vTaskDelay(1000 / portTICK_PERIOD_MS);
+    // Wait for each system process that's necessary for operation to finish its startup sequence (including retries
+    // internal to things like wifi and provisioning). If all are successful, proceed to normal operation and diplay of
+    // info. If any unsuccessful, show provisioning screen.
+    // Technically this could be error prone since it just makes sure all things have completed (like STA connection
+    // retries -> forcing re-provisioning) by making sure the timeout is long enough that all things have occurred
+    bool     wifi_connected_to_network = false;
+    bool     wifi_provisioned          = false;
+    bool     sntp_time_set             = false;
+    bool     boot_successful           = false;
+    uint32_t start_ticks               = xTaskGetTickCount();
+    uint32_t now_ticks                 = start_ticks;
+    while (!boot_successful && (now_ticks - start_ticks < pdMS_TO_TICKS(10 * 1000))) {
+        log_printf(TAG, LOG_LEVEL_INFO, "Waiting for successful boot criteria");
+        wifi_connected_to_network = wifi_is_network_connected();
+        wifi_provisioned          = wifi_is_provisioned();
+        sntp_time_set             = sntp_time_is_synced();
+        boot_successful           = wifi_connected_to_network && wifi_provisioned && sntp_time_set;
+
+        vTaskDelay(pdMS_TO_TICKS(1000));
+        now_ticks = xTaskGetTickCount();
     }
 
-    // TODO :: this needs to check if it's provisioned && gets network connection, or at least hold off on displaying
-    // data in else clause until we pass internet connection. If provisioned but now not around that network, it's
-    // currently displaying saved data but shouldn't.
-    // Maybe a timeout for network connection before this screen is shown to give network a chance to try to connect for
-    // a hot sec? Also should include ntp time sync. Maybe one overall 'readiness' function to bundle all these?
-    if (!wifi_is_provisioned()) {
+    if (!boot_successful) {
+        // TODO :: should do more detailed error handling here based on the individual bool success values
+        log_printf(
+            TAG,
+            LOG_LEVEL_ERROR,
+            "Boot unsuccessful, showing provisioning screen. wifi_connected_to_network: 0x%X - wifi_provisioned: "
+            "0x%X - sntp_time_set: 0x%X",
+            wifi_connected_to_network,
+            wifi_provisioned,
+            sntp_time_set);
         display_full_clear();
         display_draw_text(
             "Download the Spot Check app and follow\nthe configuration steps to connect\n your device to a wifi "
@@ -143,6 +162,9 @@ void app_main(void) {
             DISPLAY_FONT_SIZE_SMALL,
             DISPLAY_FONT_ALIGN_CENTER);
     } else {
+        log_printf(TAG,
+                   LOG_LEVEL_INFO,
+                   "Boot successful, showing time + last saved conditions / charts and kicking off update");
         // Render whatever we have in flash to get up and showing asap, then kick off update to all
         display_full_clear();
         screen_img_handler_draw_time();
