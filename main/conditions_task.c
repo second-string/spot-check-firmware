@@ -23,7 +23,7 @@
 #define UPDATE_CONDITIONS_BIT (1 << 0)
 #define UPDATE_TIDE_CHART_BIT (1 << 1)
 #define UPDATE_SWELL_CHART_BIT (1 << 2)
-#define UPDATE_TIME_BIT (1 << 2)
+#define UPDATE_TIME_BIT (1 << 3)
 
 static TaskHandle_t conditions_update_task_handle;
 
@@ -35,7 +35,10 @@ static void conditions_timer_expired_callback(void *timer_args) {
 
     if (seconds_elapsed % TIME_UPDATE_INTERVAL_SECONDS == 0) {
         conditions_trigger_time_update();
-        log_printf(TAG, LOG_LEVEL_INFO, "Reached %d seconds elapsed, triggering screen time update..", seconds_elapsed);
+        log_printf(TAG,
+                   LOG_LEVEL_DEBUG,
+                   "Reached %d seconds elapsed, triggering screen time update..",
+                   seconds_elapsed);
     }
 
     // TODO :: switch this new_location_set flag to just calling conditions trigger function
@@ -48,7 +51,7 @@ static void conditions_timer_expired_callback(void *timer_args) {
         new_location_set = false;
         conditions_trigger_conditions_update();
         log_printf(TAG,
-                   LOG_LEVEL_INFO,
+                   LOG_LEVEL_DEBUG,
                    "Reached %d seconds elapsed, triggering conditions update and display...",
                    seconds_elapsed);
     }
@@ -56,7 +59,7 @@ static void conditions_timer_expired_callback(void *timer_args) {
     if (seconds_elapsed % CHARTS_UPDATE_INTERVAL_SECONDS == 0) {
         conditions_trigger_both_charts_update();
         log_printf(TAG,
-                   LOG_LEVEL_INFO,
+                   LOG_LEVEL_DEBUG,
                    "Reached %d seconds elapsed, triggering tide and swell charts update and display...",
                    seconds_elapsed);
     }
@@ -134,7 +137,7 @@ static void conditions_update_task(void *args) {
         xTaskNotifyWait(0x0, UINT32_MAX, &update_bits, portMAX_DELAY);
 
         log_printf(TAG,
-                   LOG_LEVEL_INFO,
+                   LOG_LEVEL_DEBUG,
                    "update-conditions task received task notification of value 0x%02X, updating accordingly",
                    update_bits);
 

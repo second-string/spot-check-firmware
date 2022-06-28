@@ -30,15 +30,44 @@ void sntp_time_init() {
     // https://github.com/espressif/esp-idf/blob/c2ccc383dae2a47c2c2dc8c7ad78175a3fd11361/examples/protocols/sntp/main/sntp_example_main.c#L139
     sntp_setservername(0, "pool.ntp.org");
     sntp_set_time_sync_notification_cb(sntp_time_sync_notification_cb);
-    sntp_init();
 }
 
 void sntp_time_start() {
+    // Restart returns true if sntp was running and it stopped +_re-inited, false if it wasn't running (and it does
+    // nothing if so, so we manually init).
+    if (!sntp_restart()) {
+        sntp_init();
+    }
 }
 
 /*
  * Returns success if at least one time value has been received from remote
  */
 bool sntp_time_is_synced() {
-    return sntp_get_sync_status() != SNTP_SYNC_STATUS_RESET;
+    sntp_sync_status_t status = sntp_get_sync_status();
+    char               status_str[12];
+    sntp_time_status_str(status_str);
+
+    log_printf(TAG, LOG_LEVEL_DEBUG, "Checking SNTP time status, currently: %s", status_str);
+    return status == SNTP_SYNC_STATUS_COMPLETED;
+}
+
+/*
+ * Max length needed by out_str buffer is 12 bytes
+ */
+void sntp_time_status_str(char *out_str) {
+    sntp_sync_status_t status = sntp_get_sync_status();
+    switch (status) {
+        case SNTP_SYNC_STATUS_RESET:
+            strcpy(out_str, "reset");
+            break;
+        case SNTP_SYNC_STATUS_IN_PROGRESS:
+            strcpy(out_str, "in progress");
+            break;
+        case SNTP_SYNC_STATUS_COMPLETED:
+            strcpy(out_str, "completed");
+            break;
+        default:
+            configASSERT(0);
+    }
 }

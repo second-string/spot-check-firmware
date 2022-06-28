@@ -19,6 +19,7 @@
 #include "log.h"
 #include "nvs.h"
 #include "screen_img_handler.h"
+#include "sntp_time.h"
 
 #define TAG "sc-cli-cmd"
 
@@ -565,6 +566,26 @@ static BaseType_t cli_command_conditions(char *write_buffer, size_t write_buffer
     return pdFALSE;
 }
 
+BaseType_t cli_command_sntp(char *write_buffer, size_t write_buffer_size, const char *cmd_str) {
+    BaseType_t  action_len;
+    const char *action = FreeRTOS_CLIGetParameter(cmd_str, 1, &action_len);
+    if (action == NULL) {
+        strcpy(write_buffer, "Error: usage is 'sntp <action>' where action is 'sync|status'");
+        return pdFALSE;
+    }
+
+    if (action_len == 4 && strncmp(action, "sync", action_len) == 0) {
+        sntp_time_start();
+        strcpy(write_buffer, "OK");
+    } else if (action_len == 6 && strncmp(action, "status", action_len) == 0) {
+        char status_str[12];
+        sntp_time_status_str(status_str);
+        strcpy(write_buffer, status_str);
+    }
+
+    return pdFALSE;
+}
+
 void cli_command_register_all() {
     static const CLI_Command_Definition_t info_cmd = {
         .pcCommand                   = "info",
@@ -649,6 +670,13 @@ void cli_command_register_all() {
         .cExpectedNumberOfParameters = 1,
     };
 
+    static const CLI_Command_Definition_t sntp_cmd = {
+        .pcCommand                   = "sntp",
+        .pcHelpString                = "sntp:\n\tsync: Force sntp re-sync\n\tstatus: print the sntp current status",
+        .pxCommandInterpreter        = cli_command_sntp,
+        .cExpectedNumberOfParameters = 1,
+    };
+
     FreeRTOS_CLIRegisterCommand(&info_cmd);
     FreeRTOS_CLIRegisterCommand(&reset_cmd);
     FreeRTOS_CLIRegisterCommand(&bq_cmd);
@@ -659,4 +687,5 @@ void cli_command_register_all() {
     FreeRTOS_CLIRegisterCommand(&display_cmd);
     FreeRTOS_CLIRegisterCommand(&nvs_cmd);
     FreeRTOS_CLIRegisterCommand(&conditions_cmd);
+    FreeRTOS_CLIRegisterCommand(&sntp_cmd);
 }
