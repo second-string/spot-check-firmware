@@ -22,6 +22,7 @@ void display_init();
 void display_start();
 void display_render();
 void display_full_clear();
+void display_clear_area(uint32_t x, uint32_t y, uint32_t width, uint32_t height);
 void display_render_splash_screen();
 void display_draw_text(char                *text,
                        uint32_t             x_coord,
@@ -35,3 +36,10 @@ void display_draw_image(uint8_t *image_buffer,
                         uint32_t screen_x,
                         uint32_t screen_y);
 void display_draw_image_fullscreen(uint8_t *image_buffer, uint8_t bytes_per_px);
+void display_get_text_bounds(char                *text,
+                             uint32_t             x,
+                             uint32_t             y,
+                             display_font_size_t  size,
+                             display_font_align_t alignment,
+                             uint32_t            *width,
+                             uint32_t            *height);

@@ -114,7 +114,26 @@ void display_full_clear() {
     // TODO :: delay needed?
     vTaskDelay(pdMS_TO_TICKS(100));
     epd_poweroff();
-    log_printf(TAG, LOG_LEVEL_DEBUG, "Cleared full display");
+}
+
+void display_clear_area(uint32_t x, uint32_t y, uint32_t width, uint32_t height) {
+    EpdRect rect = {
+        .x      = x,
+        .y      = y,
+        .width  = width,
+        .height = height,
+    };
+
+    uint8_t *fb = epd_hl_get_framebuffer(&hl);
+    epd_fill_rect(rect, 0xFF, fb);
+
+    epd_poweron();
+    epd_hl_update_area(&hl, MODE_GL16, 25, rect);
+    epd_clear_area(rect);
+    // TODO :: delay needed?
+    vTaskDelay(pdMS_TO_TICKS(100));
+    epd_poweroff();
+    log_printf(TAG, LOG_LEVEL_DEBUG, "Cleared %uw %uh rect at (%u, %u)", width, height, x, y);
 }
 
 void display_render_splash_screen() {
@@ -140,11 +159,10 @@ void display_draw_text(char                *text,
     configASSERT(x_coord < ED060SC4_WIDTH_PX);
     configASSERT(y_coord < ED060SC4_HEIGHT_PX);
 
-    EpdFontProperties font_props = {
-        .flags = display_get_epd_font_flags_enum(alignment),
-    };
-    const EpdFont *font = display_get_epd_font_enum(size);
-    uint8_t       *fb   = epd_hl_get_framebuffer(&hl);
+    EpdFontProperties font_props = epd_font_properties_default();
+    font_props.flags             = display_get_epd_font_flags_enum(alignment);
+    const EpdFont *font          = display_get_epd_font_enum(size);
+    uint8_t       *fb            = epd_hl_get_framebuffer(&hl);
     epd_write_string(font, text, (int32_t *)&x_coord, (int32_t *)&y_coord, fb, &font_props);
 
     log_printf(TAG,
@@ -184,4 +202,37 @@ void display_draw_image(uint8_t *image_buffer,
  */
 void display_draw_image_fullscreen(uint8_t *image_buffer, uint8_t bytes_per_px) {
     display_draw_image(image_buffer, ED060SC4_WIDTH_PX, ED060SC4_HEIGHT_PX, bytes_per_px, 0, 0);
+}
+
+void display_get_text_bounds(char                *text,
+                             uint32_t             x,
+                             uint32_t             y,
+                             display_font_size_t  size,
+                             display_font_align_t alignment,
+                             uint32_t            *width,
+                             uint32_t            *height) {
+    EpdFontProperties font_props = {
+        .flags = display_get_epd_font_flags_enum(alignment),
+    };
+    const EpdFont *font = display_get_epd_font_enum(size);
+    int32_t        x1   = 0;
+    int32_t        y1   = 0;
+    epd_get_text_bounds(font,
+                        text,
+                        (int32_t *)&x,
+                        (int32_t *)&y,
+                        &x1,
+                        &y1,
+                        (int32_t *)width,
+                        (int32_t *)height,
+                        &font_props);
+    log_printf(TAG,
+               LOG_LEVEL_DEBUG,
+               "BOUNDS: x: %d, y: %d, x1: %d, y1: %d, width: %d, height: %d",
+               x,
+               y,
+               x1,
+               y1,
+               *width,
+               *height);
 }

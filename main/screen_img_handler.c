@@ -16,6 +16,13 @@
 
 #define TAG "sc-screenimg"
 
+#define TIME_DRAW_X_PX 100
+#define TIME_DRAW_Y_PX 120
+
+// Init with rough values - shouldn't matter since there should be nothing to clear when we draw thw first time
+static uint32_t previous_time_width_px  = 200;
+static uint32_t previous_time_height_px = 60;
+
 typedef struct {
     screen_img_t screen_img;
     uint32_t     x_coord;
@@ -180,10 +187,29 @@ bool screen_img_handler_draw_time() {
     strftime(time_string, 6, "%H:%M", &timeinfo);
     strftime(date_string, sizeof(date_string), "%A %B %d, %Y", &timeinfo);
 
-    display_draw_text(time_string, 100, 120, DISPLAY_FONT_SIZE_LARGE, DISPLAY_FONT_ALIGN_LEFT);
+    display_draw_text(time_string, TIME_DRAW_X_PX, TIME_DRAW_Y_PX, DISPLAY_FONT_SIZE_LARGE, DISPLAY_FONT_ALIGN_LEFT);
     display_draw_text(date_string, 100, 170, DISPLAY_FONT_SIZE_SMALL, DISPLAY_FONT_ALIGN_LEFT);
 
+    // Set time width/height for next time we clear time
+    display_get_text_bounds(time_string,
+                            TIME_DRAW_X_PX,
+                            TIME_DRAW_Y_PX,
+                            DISPLAY_FONT_SIZE_LARGE,
+                            DISPLAY_FONT_ALIGN_LEFT,
+                            &previous_time_width_px,
+                            &previous_time_height_px);
+
     return true;
+}
+
+void screen_img_handler_clear_time() {
+    // Text draws from x,y in lower left corner, but erase rect treats x,y as upper right, so compensate by subracting
+    // height from y. Use bounds from previous time since different digits have different widths, and add a bit of
+    // padding to be 100% sure we clear all artifacts
+    display_clear_area(TIME_DRAW_X_PX - 5,
+                       TIME_DRAW_Y_PX - previous_time_height_px - 5,
+                       previous_time_width_px + 10,
+                       previous_time_height_px + 10);
 }
 
 bool screen_img_handler_draw_conditions(conditions_t *conditions) {
