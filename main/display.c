@@ -214,6 +214,7 @@ void display_get_text_bounds(char                *text,
     EpdFontProperties font_props = {
         .flags = display_get_epd_font_flags_enum(alignment),
     };
+
     const EpdFont *font = display_get_epd_font_enum(size);
     int32_t        x1   = 0;
     int32_t        y1   = 0;
@@ -228,7 +229,8 @@ void display_get_text_bounds(char                *text,
                         &font_props);
     log_printf(TAG,
                LOG_LEVEL_DEBUG,
-               "BOUNDS: x: %d, y: %d, x1: %d, y1: %d, width: %d, height: %d",
+               "BOUNDS for '%s': x: %d, y: %d, x1: %d, y1: %d, width: %d, height: %d",
+               text,
                x,
                y,
                x1,

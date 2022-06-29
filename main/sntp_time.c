@@ -1,6 +1,3 @@
-#include <sys/time.h>
-#include <time.h>
-
 #include "esp_sntp.h"
 
 #include "log.h"
@@ -69,5 +66,29 @@ void sntp_time_status_str(char *out_str) {
             break;
         default:
             configASSERT(0);
+    }
+}
+
+/*
+ * Pull the local time from the RTC and return in the tm struct. Assumes SNTP has already synced to an accurate value.
+ */
+void sntp_time_get_local_time(struct tm *now_local_out) {
+    time_t    now            = 0;
+    struct tm now_local_temp = {0};
+    time(&now);
+    localtime_r(&now, &now_local_temp);
+    memcpy(now_local_out, &now_local_temp, sizeof(struct tm));
+}
+
+/*
+ * time_string only neecds to be 6 chars. date_string is a toss up and we're blindly copying 64 bytes right now
+ */
+void sntp_time_get_time_str(struct tm *now_local, char *time_string, char *date_string) {
+    if (time_string) {
+        strftime(time_string, 6, "%H:%M", now_local);
+    }
+
+    if (date_string) {
+        strftime(date_string, 64, "%A %B %d, %Y", now_local);
     }
 }
