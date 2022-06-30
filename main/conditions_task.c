@@ -91,6 +91,13 @@ static void conditions_refresh() {
             server_response = NULL;
         }
 
+        if (wind_dir_object == NULL || tide_height_object == NULL) {
+            log_printf(TAG,
+                       LOG_LEVEL_ERROR,
+                       "Parsed cJSON fields to null. That usually means a successful request response code, but not "
+                       "the expected data (like a wifi login portal)");
+            return;
+        }
         char *wind_dir_str    = cJSON_GetStringValue(wind_dir_object);
         char *tide_height_str = cJSON_GetStringValue(tide_height_object);
 
@@ -142,6 +149,7 @@ static void conditions_update_task(void *args) {
                    update_bits);
 
         if (update_bits & UPDATE_TIME_BIT) {
+            screen_img_handler_clear_time();
             screen_img_handler_draw_time();
             log_printf(TAG, LOG_LEVEL_INFO, "update-conditions task updated time");
         }
