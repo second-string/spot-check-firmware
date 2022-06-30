@@ -5,12 +5,11 @@
 #include "log.h"
 #include "nvs_flash.h"
 
+#include "conditions_task.h"
 #include "http_server.h"
 #include "nvs.h"
 
 #define TAG "sc-nvs"
-
-bool new_location_set;
 
 static nvs_handle_t handle = 0;
 
@@ -35,8 +34,6 @@ void nvs_init() {
     nvs_handle_t h;
     ESP_ERROR_CHECK(nvs_open("storage", NVS_READWRITE, &h));
     handle = h;
-
-    new_location_set = false;
 
     log_printf(TAG, LOG_LEVEL_INFO, "NVS successfully inited and opened");
 }
@@ -90,10 +87,10 @@ void nvs_save_config(spot_check_config *config) {
         return;
     }
 
-    // Kick weather update if we have a new spot. 1 second timer monitors this bool while task loop runs once
-    // every 5 seconds. Max time between save and new weather is 6 seconds
+    // Kick conditions & both charts update if we have a new spot
     if (current_config.spot_lat != config->spot_lat || current_config.spot_lon != config->spot_lon) {
-        new_location_set = true;
+        conditions_trigger_conditions_update();
+        conditions_trigger_both_charts_update();
     }
 
     ESP_ERROR_CHECK(nvs_set_str(handle, "number_of_days", config->number_of_days));

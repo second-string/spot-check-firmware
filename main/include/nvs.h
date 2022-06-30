@@ -16,8 +16,6 @@ typedef struct {
     unsigned int forecast_type_count;
 } spot_check_config;
 
-extern bool new_location_set;
-
 void               nvs_init();
 bool               nvs_get_uint32(char *key, uint32_t *val);
 bool               nvs_set_uint32(char *key, uint32_t val);

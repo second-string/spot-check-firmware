@@ -41,14 +41,7 @@ static void conditions_timer_expired_callback(void *timer_args) {
                    seconds_elapsed);
     }
 
-    // TODO :: switch this new_location_set flag to just calling conditions trigger function
-    if ((seconds_elapsed % CONDITIONS_UPDATE_INTERVAL_SECONDS == 0) || new_location_set) {
-        if (new_location_set) {
-            // If we have currently scrolling text, clear the LEDs for us to push a new conditions string
-            // led_text_stop_scroll();
-        }
-
-        new_location_set = false;
+    if (seconds_elapsed % CONDITIONS_UPDATE_INTERVAL_SECONDS == 0) {
         conditions_trigger_conditions_update();
         log_printf(TAG,
                    LOG_LEVEL_DEBUG,
