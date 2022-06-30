@@ -46,10 +46,10 @@ void timer_reset(timer_info_handle handle, bool auto_reload) {
 
     // ESP timers run on microseconds for some dumb reason, so scall MS params accordingly
     if (auto_reload) {
-        log_printf(TAG, LOG_LEVEL_DEBUG, "Starting repeating timer with period %ums", handle->timeout_milliseconds);
+        log_printf(LOG_LEVEL_DEBUG, "Starting repeating timer with period %ums", handle->timeout_milliseconds);
         ESP_ERROR_CHECK(esp_timer_start_periodic(handle->timer_handle, handle->timeout_milliseconds * 1000));
     } else {
-        log_printf(TAG, LOG_LEVEL_DEBUG, "Starting one-shot timer with period %ums", handle->timeout_milliseconds);
+        log_printf(LOG_LEVEL_DEBUG, "Starting one-shot timer with period %ums", handle->timeout_milliseconds);
         ESP_ERROR_CHECK(esp_timer_start_once(handle->timer_handle, handle->timeout_milliseconds * 1000));
     }
 }

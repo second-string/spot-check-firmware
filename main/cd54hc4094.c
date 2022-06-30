@@ -30,7 +30,7 @@ void cd54hc4094_init(gpio_num_t clk_pin, gpio_num_t data_pin, gpio_num_t strobe_
     ESP_ERROR_CHECK(gpio_set_level(data, 0));
     ESP_ERROR_CHECK(gpio_set_level(strobe, 0));
 
-    log_printf(TAG, LOG_LEVEL_DEBUG, "CD55HC4094 inited with pins CLK: %u - DATA: %u - STROBE: %u", clk, data, strobe);
+    log_printf(LOG_LEVEL_DEBUG, "CD55HC4094 inited with pins CLK: %u - DATA: %u - STROBE: %u", clk, data, strobe);
 }
 
 void cd54hc4094_set_output(uint8_t bits) {
@@ -42,7 +42,7 @@ void cd54hc4094_set_output(uint8_t bits) {
     ESP_ERROR_CHECK(gpio_set_level(strobe, 0));
 
     for (int8_t i = sizeof(uint8_t) * 8 - 1; i >= 0; i--) {
-        log_printf(TAG, LOG_LEVEL_DEBUG, "Setting shiftreg pin %u to %s", i, ((bits >> i) & 0x1) ? "HIGH" : "LOW");
+        log_printf(LOG_LEVEL_DEBUG, "Setting shiftreg pin %u to %s", i, ((bits >> i) & 0x1) ? "HIGH" : "LOW");
         if ((bits >> i) & 0x1) {
             ESP_ERROR_CHECK(gpio_set_level(data, 1));
         } else {

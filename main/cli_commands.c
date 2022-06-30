@@ -278,7 +278,7 @@ static BaseType_t cli_command_api(char *write_buffer, size_t write_buffer_size, 
             if (strlen(endpoints_with_query_params[i]) == endpoint_len &&
                 strncmp(endpoints_with_query_params[i], endpoint, endpoint_len) == 0) {
                 include_params = true;
-                log_printf(TAG, LOG_LEVEL_DEBUG, "Including normal query params in this CLI API request");
+                log_printf(LOG_LEVEL_DEBUG, "Including normal query params in this CLI API request");
                 break;
             }
         }
@@ -300,7 +300,7 @@ static BaseType_t cli_command_api(char *write_buffer, size_t write_buffer_size, 
         esp_http_client_handle_t client;
         bool                     success = http_client_perform_request(&req, &client);
         if (!success) {
-            log_printf(TAG, LOG_LEVEL_ERROR, "Error making request, aborting");
+            log_printf(LOG_LEVEL_ERROR, "Error making request, aborting");
             return pdFALSE;
         }
         esp_err_t http_err = http_client_read_response_to_buffer(&client, &res, &bytes_alloced);
@@ -341,9 +341,9 @@ static BaseType_t cli_command_partition(char *write_buffer, size_t write_buffer_
         uint8_t temp[16];
         ESP_ERROR_CHECK(esp_partition_read(part, 0x00, temp, 16));
 
-        log_printf(TAG, LOG_LEVEL_INFO, "First 16 bytes of the %s partition:", part_label);
+        log_printf(LOG_LEVEL_INFO, "First 16 bytes of the %s partition:", part_label);
         for (int i = 0; i < sizeof(temp); i++) {
-            log_printf(TAG, LOG_LEVEL_INFO, "%02X", temp[i]);
+            log_printf(LOG_LEVEL_INFO, "%02X", temp[i]);
         }
 
         // Empty out the buffer since we'll print the output of the last command if we don't

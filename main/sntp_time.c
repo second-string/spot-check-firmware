@@ -18,7 +18,7 @@ static void sntp_time_sync_notification_cb(struct timeval *tv) {
     localtime_r(&now, &timeinfo);
     char time_string[64];
     strftime(time_string, 64, "%c", &timeinfo);
-    log_printf(TAG, LOG_LEVEL_DEBUG, "SNTP updated current time to %s", time_string);
+    log_printf(LOG_LEVEL_DEBUG, "SNTP updated current time to %s", time_string);
 }
 
 void sntp_time_init() {
@@ -45,7 +45,7 @@ bool sntp_time_is_synced() {
     char               status_str[12];
     sntp_time_status_str(status_str);
 
-    log_printf(TAG, LOG_LEVEL_DEBUG, "Checking SNTP time status, currently: %s", status_str);
+    log_printf(LOG_LEVEL_DEBUG, "Checking SNTP time status, currently: %s", status_str);
     return status == SNTP_SYNC_STATUS_COMPLETED;
 }
 

@@ -93,7 +93,7 @@ static void cli_process_command(void *args) {
         do {
             more_data =
                 FreeRTOS_CLIProcessCommand(cmd.cmd, command_processing_out, CLI_COMMAND_PROCESS_OUT_BUFFER_BYTES);
-            log_printf(TAG, LOG_LEVEL_INFO, "%s", command_processing_out);
+            log_printf(LOG_LEVEL_INFO, "%s", command_processing_out);
         } while (more_data);
 
         // Free the string malloced by uart rx task

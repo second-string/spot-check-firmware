@@ -34,7 +34,7 @@ static enum EpdFontFlags display_get_epd_font_flags_enum(display_font_align_t al
         case DISPLAY_FONT_ALIGN_RIGHT:
             return EPD_DRAW_ALIGN_RIGHT;
         default:
-            log_printf(TAG, LOG_LEVEL_ERROR, "Invalid font alignment! Defaulting to left aligned.");
+            log_printf(LOG_LEVEL_ERROR, "Invalid font alignment! Defaulting to left aligned.");
             return EPD_DRAW_ALIGN_LEFT;
     }
 }
@@ -50,7 +50,7 @@ static const EpdFont *display_get_epd_font_enum(display_font_size_t size) {
         case DISPLAY_FONT_SIZE_LARGE:
             return &FONT_40;
         default:
-            log_printf(TAG, LOG_LEVEL_ERROR, "Invalid font size! Defaulting to medium.");
+            log_printf(LOG_LEVEL_ERROR, "Invalid font size! Defaulting to medium.");
             return &FONT_20;
     }
 }
@@ -90,7 +90,7 @@ void display_init() {
     hl             = epd_hl_init(EPD_BUILTIN_WAVEFORM);
     display_width  = epd_rotated_display_width();
     display_height = epd_rotated_display_height();
-    log_printf(TAG, LOG_LEVEL_INFO, "Display dimensions,  width: %dpx height: %dpx", display_width, display_height);
+    log_printf(LOG_LEVEL_INFO, "Display dimensions,  width: %dpx height: %dpx", display_width, display_height);
 }
 
 void display_start() {
@@ -133,7 +133,7 @@ void display_clear_area(uint32_t x, uint32_t y, uint32_t width, uint32_t height)
     // TODO :: delay needed?
     vTaskDelay(pdMS_TO_TICKS(100));
     epd_poweroff();
-    log_printf(TAG, LOG_LEVEL_DEBUG, "Cleared %uw %uh rect at (%u, %u)", width, height, x, y);
+    log_printf(LOG_LEVEL_DEBUG, "Cleared %uw %uh rect at (%u, %u)", width, height, x, y);
 }
 
 void display_render_splash_screen() {
@@ -147,7 +147,7 @@ void display_render_splash_screen() {
                       DISPLAY_FONT_SIZE_SMALL,
                       DISPLAY_FONT_ALIGN_CENTER);
 
-    log_printf(TAG, LOG_LEVEL_DEBUG, "Rendering splash screen on display");
+    log_printf(LOG_LEVEL_DEBUG, "Rendering splash screen on display");
     display_render();
 }
 
@@ -165,8 +165,7 @@ void display_draw_text(char                *text,
     uint8_t       *fb            = epd_hl_get_framebuffer(&hl);
     epd_write_string(font, text, (int32_t *)&x_coord, (int32_t *)&y_coord, fb, &font_props);
 
-    log_printf(TAG,
-               LOG_LEVEL_DEBUG,
+    log_printf(LOG_LEVEL_DEBUG,
                "Rendering %s, %s-aligned text on display: '%s'",
                display_get_epd_font_enum_string(size),
                display_get_epd_font_flags_enum_string(alignment),
@@ -227,8 +226,7 @@ void display_get_text_bounds(char                *text,
                         (int32_t *)width,
                         (int32_t *)height,
                         &font_props);
-    log_printf(TAG,
-               LOG_LEVEL_DEBUG,
+    log_printf(LOG_LEVEL_DEBUG,
                "BOUNDS for '%s': x: %d, y: %d, x1: %d, y1: %d, width: %d, height: %d",
                text,
                x,

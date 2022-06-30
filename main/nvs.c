@@ -35,7 +35,7 @@ void nvs_init() {
     ESP_ERROR_CHECK(nvs_open("storage", NVS_READWRITE, &h));
     handle = h;
 
-    log_printf(TAG, LOG_LEVEL_INFO, "NVS successfully inited and opened");
+    log_printf(LOG_LEVEL_INFO, "NVS successfully inited and opened");
 }
 
 bool nvs_get_uint32(char *key, uint32_t *val) {
@@ -48,15 +48,11 @@ bool nvs_get_uint32(char *key, uint32_t *val) {
             retval = true;
             break;
         case ESP_ERR_NVS_NOT_FOUND:
-            log_printf(TAG, LOG_LEVEL_INFO, "The NVS value for key '%s' is not initialized yet", key);
+            log_printf(LOG_LEVEL_INFO, "The NVS value for key '%s' is not initialized yet", key);
             *val = 0;
             break;
         default:
-            log_printf(TAG,
-                       LOG_LEVEL_ERROR,
-                       "Error (%s) reading value for key '%s' from NVS\n",
-                       esp_err_to_name(err),
-                       key);
+            log_printf(LOG_LEVEL_ERROR, "Error (%s) reading value for key '%s' from NVS\n", esp_err_to_name(err), key);
     }
 
     return retval;
@@ -70,8 +66,7 @@ bool nvs_set_uint32(char *key, uint32_t val) {
     if (err == ESP_OK) {
         retval = true;
     } else {
-        log_printf(TAG,
-                   LOG_LEVEL_ERROR,
+        log_printf(LOG_LEVEL_ERROR,
                    "Error (%s) setting uint32 value '%u' for key '%s' in NVS",
                    esp_err_to_name(err),
                    val,
@@ -83,7 +78,7 @@ bool nvs_set_uint32(char *key, uint32_t val) {
 
 void nvs_save_config(spot_check_config *config) {
     if (handle == 0) {
-        log_printf(TAG, LOG_LEVEL_ERROR, "Attempting to save to NVS before calling nvs_init(), not saving values");
+        log_printf(LOG_LEVEL_ERROR, "Attempting to save to NVS before calling nvs_init(), not saving values");
         return;
     }
 
@@ -130,9 +125,7 @@ void nvs_save_config(spot_check_config *config) {
 
 spot_check_config *nvs_get_config() {
     if (handle == 0) {
-        log_printf(TAG,
-                   LOG_LEVEL_ERROR,
-                   "Attempting to retrieve from NVS before calling nvs_init(), returning null ptr");
+        log_printf(LOG_LEVEL_ERROR, "Attempting to retrieve from NVS before calling nvs_init(), returning null ptr");
         return NULL;
     }
 
@@ -227,7 +220,7 @@ spot_check_config *nvs_get_config() {
     }
 
     if (num_forecast_types == 0) {
-        log_printf(TAG, LOG_LEVEL_INFO, "Read zero forecast types out of flash, defaulting to ['swell']");
+        log_printf(LOG_LEVEL_INFO, "Read zero forecast types out of flash, defaulting to ['swell']");
         strcpy(_forecast_types[0], "swell");
         num_forecast_types = 1;
     }
@@ -248,7 +241,7 @@ spot_check_config *nvs_get_config() {
 esp_err_t nvs_full_erase() {
     esp_err_t err = nvs_flash_erase();
     if (err != ESP_OK) {
-        log_printf(TAG, LOG_LEVEL_ERROR, "Failed to erase NVS flash! %s", esp_err_to_name(err));
+        log_printf(LOG_LEVEL_ERROR, "Failed to erase NVS flash! %s", esp_err_to_name(err));
     }
 
     return err;

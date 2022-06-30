@@ -20,22 +20,21 @@ void i2c_init(i2c_port_t port, gpio_num_t sda_pin, gpio_num_t scl_pin, i2c_handl
 
     esp_err_t err = i2c_param_config(handle->port, &handle->config);
     if (err != ESP_OK) {
-        log_printf(TAG, LOG_LEVEL_DEBUG, "Error! %u", err);
+        log_printf(LOG_LEVEL_DEBUG, "Error! %u", err);
         assert(false);
     }
 }
 
 void i2c_start(i2c_handle_t *handle) {
     // Current start func only suports master (zerod rx/tx buffer lengths)
-    log_printf(TAG,
-               LOG_LEVEL_DEBUG,
+    log_printf(LOG_LEVEL_DEBUG,
                "instantiating with sda: %u and scl: %u",
                handle->config.sda_io_num,
                handle->config.scl_io_num);
     esp_err_t err =
         i2c_driver_install(handle->port, handle->config.mode, I2C_MASTER_RX_BUF_DISABLE, I2C_MASTER_TX_BUF_DISABLE, 0);
     if (err != ESP_OK) {
-        log_printf(TAG, LOG_LEVEL_DEBUG, "Error! %u", err);
+        log_printf(LOG_LEVEL_DEBUG, "Error! %u", err);
         assert(false);
     }
 }

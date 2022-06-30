@@ -35,24 +35,19 @@ static void conditions_timer_expired_callback(void *timer_args) {
 
     if (seconds_elapsed % TIME_UPDATE_INTERVAL_SECONDS == 0) {
         conditions_trigger_time_update();
-        log_printf(TAG,
-                   LOG_LEVEL_DEBUG,
-                   "Reached %d seconds elapsed, triggering screen time update..",
-                   seconds_elapsed);
+        log_printf(LOG_LEVEL_DEBUG, "Reached %d seconds elapsed, triggering screen time update..", seconds_elapsed);
     }
 
     if (seconds_elapsed % CONDITIONS_UPDATE_INTERVAL_SECONDS == 0) {
         conditions_trigger_conditions_update();
-        log_printf(TAG,
-                   LOG_LEVEL_DEBUG,
+        log_printf(LOG_LEVEL_DEBUG,
                    "Reached %d seconds elapsed, triggering conditions update and display...",
                    seconds_elapsed);
     }
 
     if (seconds_elapsed % CHARTS_UPDATE_INTERVAL_SECONDS == 0) {
         conditions_trigger_both_charts_update();
-        log_printf(TAG,
-                   LOG_LEVEL_DEBUG,
+        log_printf(LOG_LEVEL_DEBUG,
                    "Reached %d seconds elapsed, triggering tide and swell charts update and display...",
                    seconds_elapsed);
     }
@@ -78,15 +73,14 @@ static void conditions_refresh() {
         cJSON *wind_dir_object    = cJSON_GetObjectItem(data_value, "wind_dir");
         cJSON *tide_height_object = cJSON_GetObjectItem(data_value, "tide_height");
 
-        log_printf(TAG, LOG_LEVEL_DEBUG, "Server response: %s", server_response);
+        log_printf(LOG_LEVEL_DEBUG, "Server response: %s", server_response);
         if (server_response != NULL) {
             free(server_response);
             server_response = NULL;
         }
 
         if (wind_dir_object == NULL || tide_height_object == NULL) {
-            log_printf(TAG,
-                       LOG_LEVEL_ERROR,
+            log_printf(LOG_LEVEL_ERROR,
                        "Parsed cJSON fields to null. That usually means a successful request response code, but not "
                        "the expected data (like a wifi login portal)");
             return;
@@ -112,7 +106,7 @@ static void conditions_refresh() {
         // Copy into global last_retrieved_conditions struct now that everything parsed correctly
         memcpy(&last_retrieved_conditions, &temp_conditions, sizeof(conditions_t));
     } else {
-        log_printf(TAG, LOG_LEVEL_INFO, "Failed to get new conditions, leaving last saved values displayed");
+        log_printf(LOG_LEVEL_INFO, "Failed to get new conditions, leaving last saved values displayed");
     }
 
     // Caller responsible for freeing buffer if non-null on return
@@ -136,33 +130,32 @@ static void conditions_update_task(void *args) {
         // go
         xTaskNotifyWait(0x0, UINT32_MAX, &update_bits, portMAX_DELAY);
 
-        log_printf(TAG,
-                   LOG_LEVEL_DEBUG,
+        log_printf(LOG_LEVEL_DEBUG,
                    "update-conditions task received task notification of value 0x%02X, updating accordingly",
                    update_bits);
 
         if (update_bits & UPDATE_TIME_BIT) {
             screen_img_handler_clear_time();
             screen_img_handler_draw_time();
-            log_printf(TAG, LOG_LEVEL_INFO, "update-conditions task updated time");
+            log_printf(LOG_LEVEL_INFO, "update-conditions task updated time");
         }
 
         if (update_bits & UPDATE_CONDITIONS_BIT) {
             conditions_refresh();
             screen_img_handler_draw_conditions(&last_retrieved_conditions);
-            log_printf(TAG, LOG_LEVEL_INFO, "update-conditions task updated conditions");
+            log_printf(LOG_LEVEL_INFO, "update-conditions task updated conditions");
         }
 
         if (update_bits & UPDATE_TIDE_CHART_BIT) {
             screen_img_handler_download_and_save(SCREEN_IMG_TIDE_CHART);
             screen_img_handler_draw_screen_img(SCREEN_IMG_TIDE_CHART);
-            log_printf(TAG, LOG_LEVEL_INFO, "update-conditions task updated tide chart");
+            log_printf(LOG_LEVEL_INFO, "update-conditions task updated tide chart");
         }
 
         if (update_bits & UPDATE_SWELL_CHART_BIT) {
             screen_img_handler_download_and_save(SCREEN_IMG_SWELL_CHART);
             screen_img_handler_draw_screen_img(SCREEN_IMG_SWELL_CHART);
-            log_printf(TAG, LOG_LEVEL_INFO, "update-conditions task updated swell chart");
+            log_printf(LOG_LEVEL_INFO, "update-conditions task updated swell chart");
         }
 
         // Render after we've made all changes

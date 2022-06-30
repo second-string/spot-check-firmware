@@ -107,13 +107,13 @@ void app_main(void) {
 
     size_t info_buffer_size = 200 * sizeof(char);
     char  *info_buffer      = (char *)malloc(info_buffer_size);
-    log_printf(TAG, LOG_LEVEL_INFO, "");
-    log_printf(TAG, LOG_LEVEL_INFO, "");
+    log_printf(LOG_LEVEL_INFO, "");
+    log_printf(LOG_LEVEL_INFO, "");
     while (cli_command_info(info_buffer, info_buffer_size, NULL) == pdTRUE) {
-        log_printf(TAG, LOG_LEVEL_INFO, info_buffer);
+        log_printf(LOG_LEVEL_INFO, info_buffer);
     }
-    log_printf(TAG, LOG_LEVEL_INFO, "");
-    log_printf(TAG, LOG_LEVEL_INFO, "");
+    log_printf(LOG_LEVEL_INFO, "");
+    log_printf(LOG_LEVEL_INFO, "");
     free(info_buffer);
     info_buffer = NULL;
 
@@ -132,7 +132,7 @@ void app_main(void) {
     uint32_t start_ticks               = xTaskGetTickCount();
     uint32_t now_ticks                 = start_ticks;
     while (!connection_successful && (now_ticks - start_ticks < pdMS_TO_TICKS(10 * 1000))) {
-        log_printf(TAG, LOG_LEVEL_INFO, "Waiting for successful boot criteria");
+        log_printf(LOG_LEVEL_INFO, "Waiting for successful boot criteria");
         wifi_connected_to_network = wifi_is_network_connected();
         wifi_provisioned          = wifi_is_provisioned();
         connection_successful     = wifi_connected_to_network && wifi_provisioned;
@@ -143,7 +143,6 @@ void app_main(void) {
 
     if (!connection_successful) {
         log_printf(
-            TAG,
             LOG_LEVEL_ERROR,
             "Connection unsuccessful, showing provisioning screen. wifi_connected_to_network: 0x%X - wifi_provisioned: "
             "0x%X",
@@ -160,8 +159,7 @@ void app_main(void) {
 
         screen_img_handler_render();
     } else {
-        log_printf(TAG,
-                   LOG_LEVEL_INFO,
+        log_printf(LOG_LEVEL_INFO,
                    "Connection successful, showing 'fetching data' screen while waiting for time to sync");
 
         display_draw_text("Please wait, fetching latest conditions...",
@@ -179,7 +177,7 @@ void app_main(void) {
         start_ticks        = xTaskGetTickCount();
         now_ticks          = start_ticks;
         while (!sntp_time_set && (now_ticks - start_ticks < pdMS_TO_TICKS(10 * 1000))) {
-            log_printf(TAG, LOG_LEVEL_INFO, "Waiting for successful boot criteria");
+            log_printf(LOG_LEVEL_INFO, "Waiting for successful boot criteria");
             sntp_time_set = sntp_time_is_synced();
 
             vTaskDelay(pdMS_TO_TICKS(1000));
@@ -187,9 +185,7 @@ void app_main(void) {
         }
 
         if (!sntp_time_set) {
-            log_printf(TAG,
-                       LOG_LEVEL_ERROR,
-                       "Did not receive SNTP update before timing out! Showing all conditions anyway");
+            log_printf(LOG_LEVEL_ERROR, "Did not receive SNTP update before timing out! Showing all conditions anyway");
         }
 
         // Render whatever we have in flash to get up and showing asap, then kick off update to all
@@ -202,8 +198,7 @@ void app_main(void) {
         conditions_trigger_both_charts_update();
         screen_img_handler_render();
 
-        log_printf(TAG,
-                   LOG_LEVEL_INFO,
+        log_printf(LOG_LEVEL_INFO,
                    "Boot successful, showing time + last saved conditions / charts and kicking off update");
     }
 

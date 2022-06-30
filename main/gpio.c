@@ -37,21 +37,21 @@ static void button_timer_expired_callback(void *timer_args) {
     if (current_state == DEBOUNCING_PRESS) {
         if (level) {
             // TODO :: Signal button event bits / mutex / semaphore
-            log_printf(TAG, LOG_LEVEL_INFO, "Successfully debounced button press");
+            log_printf(LOG_LEVEL_INFO, "Successfully debounced button press");
             current_state = WAITING_FOR_RELEASE;
         } else {
             // Failed debounce check, back to waiting for press
-            log_printf(TAG, LOG_LEVEL_INFO, "Failed press debounce, returning to waiting for press");
+            log_printf(LOG_LEVEL_INFO, "Failed press debounce, returning to waiting for press");
             current_state = WAITING_FOR_PRESS;
         }
     } else if (current_state == DEBOUNCING_RELEASE) {
         if (!level) {
             // TODO :: Signal button event bits / mutex / semaphore
-            log_printf(TAG, LOG_LEVEL_INFO, "Successfully debounced button release");
+            log_printf(LOG_LEVEL_INFO, "Successfully debounced button release");
             current_state = WAITING_FOR_PRESS;
         } else {
             // Failed debounce check, back to waiting for release
-            log_printf(TAG, LOG_LEVEL_INFO, "Failed release debounce, returning to waiting for release");
+            log_printf(LOG_LEVEL_INFO, "Failed release debounce, returning to waiting for release");
             current_state = WAITING_FOR_RELEASE;
         }
     } else {

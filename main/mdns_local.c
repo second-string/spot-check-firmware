@@ -20,11 +20,11 @@ void mdns_local_init() {
     // Instance name is the readable text supplied from the initial mDNS lookup of  _spot-check
     mdns_instance_name_set("Spot Check");
 
-    log_printf(TAG, LOG_LEVEL_INFO, "mDNS initialized");
+    log_printf(LOG_LEVEL_INFO, "mDNS initialized");
 }
 
 void mdns_advertise_tcp_service() {
     unsigned int port = 5207;
     ESP_ERROR_CHECK(mdns_service_add(NULL, "_spot-check", "_tcp", port, NULL, 0));
-    log_printf(TAG, LOG_LEVEL_INFO, "Advertising _spot-check mDNS service on port %d with hostname %s", port, hostname);
+    log_printf(LOG_LEVEL_INFO, "Advertising _spot-check mDNS service on port %d with hostname %s", port, hostname);
 }

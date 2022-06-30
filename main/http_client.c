@@ -19,32 +19,31 @@ extern const uint8_t server_cert_pem_start[] asm("_binary_ca_cert_pem_start");
 esp_err_t http_event_handler(esp_http_client_event_t *event) {
     switch (event->event_id) {
         case HTTP_EVENT_ERROR:
-            log_printf(TAG, LOG_LEVEL_DEBUG, "HTTP_EVENT_ERROR");
+            log_printf(LOG_LEVEL_DEBUG, "HTTP_EVENT_ERROR");
             break;
         case HTTP_EVENT_ON_CONNECTED:
-            log_printf(TAG, LOG_LEVEL_DEBUG, "HTTP_EVENT_ON_CONNECTED");
+            log_printf(LOG_LEVEL_DEBUG, "HTTP_EVENT_ON_CONNECTED");
             break;
         case HTTP_EVENT_HEADER_SENT:
-            log_printf(TAG, LOG_LEVEL_DEBUG, "HTTP_EVENT_HEADER_SENT");
+            log_printf(LOG_LEVEL_DEBUG, "HTTP_EVENT_HEADER_SENT");
             break;
         case HTTP_EVENT_ON_HEADER:
-            log_printf(TAG,
-                       LOG_LEVEL_DEBUG,
+            log_printf(LOG_LEVEL_DEBUG,
                        "HTTP_EVENT_ON_HEADER, key=%s, value=%s",
                        event->header_key,
                        event->header_value);
             break;
         case HTTP_EVENT_ON_DATA:
-            log_printf(TAG, LOG_LEVEL_DEBUG, "HTTP_EVENT_ON_DATA, len=%d", event->data_len);
+            log_printf(LOG_LEVEL_DEBUG, "HTTP_EVENT_ON_DATA, len=%d", event->data_len);
             break;
         case HTTP_EVENT_ON_FINISH:
-            log_printf(TAG, LOG_LEVEL_DEBUG, "HTTP_EVENT_ON_FINISH");
+            log_printf(LOG_LEVEL_DEBUG, "HTTP_EVENT_ON_FINISH");
             break;
         case HTTP_EVENT_DISCONNECTED:
-            log_printf(TAG, LOG_LEVEL_DEBUG, "HTTP_EVENT_DISCONNECTED");
+            log_printf(LOG_LEVEL_DEBUG, "HTTP_EVENT_DISCONNECTED");
             break;
         case HTTP_EVENT_REDIRECT:
-            log_printf(TAG, LOG_LEVEL_DEBUG, "HTTP_EVENT_REDIRECT");
+            log_printf(LOG_LEVEL_DEBUG, "HTTP_EVENT_REDIRECT");
             break;
     }
     return ESP_OK;
@@ -84,10 +83,10 @@ request http_client_build_request(char              *endpoint,
         strcat(url_buf, endpoint);
     }
     req.url = url_buf;
-    log_printf(TAG, LOG_LEVEL_DEBUG, "Built request URL: %s", url_buf);
-    log_printf(TAG, LOG_LEVEL_DEBUG, "Built %u request query params:", req.num_params);
+    log_printf(LOG_LEVEL_DEBUG, "Built request URL: %s", url_buf);
+    log_printf(LOG_LEVEL_DEBUG, "Built %u request query params:", req.num_params);
     for (uint8_t i = 0; i < num_params; i++) {
-        log_printf(TAG, LOG_LEVEL_DEBUG, "Param %u - %s: %s", i, req.params[i].key, req.params[i].value);
+        log_printf(LOG_LEVEL_DEBUG, "Param %u - %s: %s", i, req.params[i].key, req.params[i].value);
     }
 
     return req;
@@ -103,11 +102,11 @@ bool http_client_perform_request(request *request_obj, esp_http_client_handle_t 
     configASSERT(client);
 
     if (!wifi_is_network_connected()) {
-        log_printf(TAG, LOG_LEVEL_INFO, "Attempted to make GET request, not connected to internet yet so bailing");
+        log_printf(LOG_LEVEL_INFO, "Attempted to make GET request, not connected to internet yet so bailing");
         return 0;
     }
 
-    log_printf(TAG, LOG_LEVEL_INFO, "Initing http client for request...");
+    log_printf(LOG_LEVEL_INFO, "Initing http client for request...");
 
     esp_http_client_config_t http_config = {
         .host           = "spotcheck.brianteam.dev",
@@ -120,7 +119,7 @@ bool http_client_perform_request(request *request_obj, esp_http_client_handle_t 
 
     *client = esp_http_client_init(&http_config);
     if (!client) {
-        log_printf(TAG, LOG_LEVEL_INFO, "Error initing http client, returning without sending request");
+        log_printf(LOG_LEVEL_INFO, "Error initing http client, returning without sending request");
         return 0;
     }
 
@@ -130,7 +129,7 @@ bool http_client_perform_request(request *request_obj, esp_http_client_handle_t 
         strcpy(req_url, request_obj->url);
 
         if (request_obj->num_params > 0) {
-            log_printf(TAG, LOG_LEVEL_DEBUG, "Adding %d query params to URL", request_obj->num_params);
+            log_printf(LOG_LEVEL_DEBUG, "Adding %d query params to URL", request_obj->num_params);
             strcat(req_url, "?");
             for (int i = 0; i < request_obj->num_params; i++) {
                 query_param param = request_obj->params[i];
@@ -142,7 +141,7 @@ bool http_client_perform_request(request *request_obj, esp_http_client_handle_t 
         }
 
         ESP_ERROR_CHECK(esp_http_client_set_url(*client, req_url));
-        log_printf(TAG, LOG_LEVEL_INFO, "Setting url to %s", req_url);
+        log_printf(LOG_LEVEL_INFO, "Setting url to %s", req_url);
     }
 
     ESP_ERROR_CHECK(esp_http_client_set_method(*client, HTTP_METHOD_GET));
@@ -151,12 +150,12 @@ bool http_client_perform_request(request *request_obj, esp_http_client_handle_t 
     esp_err_t err = esp_http_client_open(*client, 0);
     // Opens and sends the request since we have no data
     if (err != ESP_OK) {
-        log_printf(TAG, LOG_LEVEL_ERROR, "Error opening http client, error: %s", esp_err_to_name(err));
+        log_printf(LOG_LEVEL_ERROR, "Error opening http client, error: %s", esp_err_to_name(err));
 
         // clean up and return no space allocated
         err = esp_http_client_cleanup(*client);
         if (err != ESP_OK) {
-            log_printf(TAG, LOG_LEVEL_INFO, "Error cleaning up  http client connection");
+            log_printf(LOG_LEVEL_INFO, "Error cleaning up  http client connection");
         }
 
         return false;
@@ -173,11 +172,11 @@ int http_client_perform_post(request                  *request_obj,
                              size_t                    post_data_size,
                              esp_http_client_handle_t *client) {
     if (!wifi_is_network_connected()) {
-        log_printf(TAG, LOG_LEVEL_INFO, "Attempted to make POST request, not connected to internet yet so bailing");
+        log_printf(LOG_LEVEL_INFO, "Attempted to make POST request, not connected to internet yet so bailing");
         return 0;
     }
 
-    log_printf(TAG, LOG_LEVEL_INFO, "Initing http client for post...");
+    log_printf(LOG_LEVEL_INFO, "Initing http client for post...");
 
     esp_http_client_config_t http_config = {
         .host           = "spotcheck.brianteam.dev",
@@ -190,7 +189,7 @@ int http_client_perform_post(request                  *request_obj,
 
     *client = esp_http_client_init(&http_config);
     if (!client) {
-        log_printf(TAG, LOG_LEVEL_INFO, "Error initing http client, returning without sending request");
+        log_printf(LOG_LEVEL_INFO, "Error initing http client, returning without sending request");
         return 0;
     }
 
@@ -201,10 +200,10 @@ int http_client_perform_post(request                  *request_obj,
     ESP_ERROR_CHECK(esp_http_client_set_header(*client, "Content-type", "application/json"));
     ESP_ERROR_CHECK(esp_http_client_set_post_field(*client, post_data, post_data_size));
 
-    log_printf(TAG, LOG_LEVEL_INFO, "Performing POST to %s with data size %u", request_obj->url, post_data_size);
+    log_printf(LOG_LEVEL_INFO, "Performing POST to %s with data size %u", request_obj->url, post_data_size);
     esp_err_t err = esp_http_client_perform(*client);
     if (err != ESP_OK) {
-        log_printf(TAG, LOG_LEVEL_ERROR, "Error performing POST, error: %s", esp_err_to_name(err));
+        log_printf(LOG_LEVEL_ERROR, "Error performing POST, error: %s", esp_err_to_name(err));
         retval = -1;
     } else {
         uint16_t status = esp_http_client_get_status_code(*client);
@@ -233,21 +232,18 @@ static bool http_client_check_response(esp_http_client_handle_t *client, int *co
     int status = esp_http_client_get_status_code(*client);
     if (status >= 200 && status <= 299) {
         if (*content_length < 0) {
-            log_printf(TAG,
-                       LOG_LEVEL_INFO,
+            log_printf(LOG_LEVEL_INFO,
                        "Status code successful (%d), but error fetching headers with negative content-length, bailing",
                        status);
         } else if (content_length == 0) {
-            log_printf(TAG,
-                       LOG_LEVEL_ERROR,
+            log_printf(LOG_LEVEL_ERROR,
                        "Status code successful (%d), but content length of zero after fetching headers, bailing");
         } else {
             success = true;
-            log_printf(TAG, LOG_LEVEL_INFO, "Request success! Status=%d, Content-length=%d", status, *content_length);
+            log_printf(LOG_LEVEL_INFO, "Request success! Status=%d, Content-length=%d", status, *content_length);
         }
     } else {
-        log_printf(TAG,
-                   LOG_LEVEL_INFO,
+        log_printf(LOG_LEVEL_INFO,
                    "Request failed: status=%d, "
                    "Content-length=%d",
                    status,
@@ -282,7 +278,7 @@ esp_err_t http_client_read_response_to_buffer(esp_http_client_handle_t *client,
         if (content_length < MAX_READ_BUFFER_SIZE) {
             *response_data = malloc(content_length + 1);
             if (!response_data) {
-                log_printf(TAG, LOG_LEVEL_ERROR, "Malloc of %u bytes failed for http response!", content_length + 1);
+                log_printf(LOG_LEVEL_ERROR, "Malloc of %u bytes failed for http response!", content_length + 1);
                 break;
             }
 
@@ -291,17 +287,16 @@ esp_err_t http_client_read_response_to_buffer(esp_http_client_handle_t *client,
                 // Don't bother making the caller free anything since we have nothing to give them. Free here and return
                 // -1 for error
                 free(*response_data);
-                log_printf(TAG, LOG_LEVEL_ERROR, "Error reading response after successful http client request");
+                log_printf(LOG_LEVEL_ERROR, "Error reading response after successful http client request");
                 break;
             } else {
                 (*response_data)[length_received] = '\0';
                 bytes_received                    = length_received + 1;
                 err                               = ESP_OK;
-                log_printf(TAG, LOG_LEVEL_DEBUG, "Rcvd %zu bytes of response data: %s", bytes_received, *response_data);
+                log_printf(LOG_LEVEL_DEBUG, "Rcvd %zu bytes of response data: %s", bytes_received, *response_data);
             }
         } else {
             log_printf(
-                TAG,
                 LOG_LEVEL_ERROR,
                 "Content length received in response (%d) larger than max read buffer size of %u, aborting request",
                 content_length,
@@ -334,8 +329,7 @@ int http_client_read_response_to_flash(esp_http_client_handle_t *client,
     }
 
     size_t bytes_received = 0;
-    log_printf(TAG,
-               LOG_LEVEL_INFO,
+    log_printf(LOG_LEVEL_INFO,
                "Reading %u payload bytes into flash in chunks of size %u",
                content_length,
                MAX_READ_BUFFER_SIZE);
@@ -344,7 +338,7 @@ int http_client_read_response_to_flash(esp_http_client_handle_t *client,
     int      length_received        = 0;
     uint8_t *response_data          = malloc(MAX_READ_BUFFER_SIZE);
     if (!response_data) {
-        log_printf(TAG, LOG_LEVEL_ERROR, "Malloc of %u bytes failed for http response!", content_length + 1);
+        log_printf(LOG_LEVEL_ERROR, "Malloc of %u bytes failed for http response!", content_length + 1);
         return -1;
     }
     do {
@@ -352,8 +346,7 @@ int http_client_read_response_to_flash(esp_http_client_handle_t *client,
         length_received = esp_http_client_read(*client, (char *)response_data, MAX_READ_BUFFER_SIZE);
         if (length_received > 0) {
             if (moving_screen_img_addr + length_received > partition->size) {
-                log_printf(TAG,
-                           LOG_LEVEL_ERROR,
+                log_printf(LOG_LEVEL_ERROR,
                            "Attempting to write 0x%02X bytes to partition at offset 0x%02X which would "
                            "overflow the boundary of 0x%02X bytes, aborting",
                            length_received,
@@ -362,8 +355,7 @@ int http_client_read_response_to_flash(esp_http_client_handle_t *client,
                 break;
             }
             esp_partition_write(partition, moving_screen_img_addr, response_data, length_received);
-            log_printf(TAG,
-                       LOG_LEVEL_DEBUG,
+            log_printf(LOG_LEVEL_DEBUG,
                        "Wrote %d bytes to screen image partition at offset %d",
                        length_received,
                        moving_screen_img_addr);
@@ -378,10 +370,10 @@ int http_client_read_response_to_flash(esp_http_client_handle_t *client,
 
     if (length_received < 0) {
         // NVS has already been marked as invalid at time of flash erase, so just return error
-        log_printf(TAG, LOG_LEVEL_ERROR, "Error reading response after successful http client request");
+        log_printf(LOG_LEVEL_ERROR, "Error reading response after successful http client request");
         return -1;
     } else {
-        log_printf(TAG, LOG_LEVEL_DEBUG, "Rcvd %zu bytes total of response data and saved to flash", bytes_received);
+        log_printf(LOG_LEVEL_DEBUG, "Rcvd %zu bytes total of response data and saved to flash", bytes_received);
     }
 
     return bytes_received;

@@ -64,15 +64,15 @@ static void screen_img_handler_get_metadata(screen_img_t screen_img, screen_img_
 
     bool success = nvs_get_uint32(metadata->screen_img_size_key, &metadata->screen_img_size);
     if (!success) {
-        log_printf(TAG, LOG_LEVEL_ERROR, "No screen img size value stored in NVS, setting to zero");
+        log_printf(LOG_LEVEL_ERROR, "No screen img size value stored in NVS, setting to zero");
     }
     success = nvs_get_uint32(metadata->screen_img_width_key, &metadata->screen_img_width);
     if (!success) {
-        log_printf(TAG, LOG_LEVEL_ERROR, "No screen img width value stored in NVS, setting to zero");
+        log_printf(LOG_LEVEL_ERROR, "No screen img width value stored in NVS, setting to zero");
     }
     success = nvs_get_uint32(metadata->screen_img_height_key, &metadata->screen_img_height);
     if (!success) {
-        log_printf(TAG, LOG_LEVEL_ERROR, "No screen img height value stored in NVS, setting to zero");
+        log_printf(LOG_LEVEL_ERROR, "No screen img height value stored in NVS, setting to zero");
     }
 }
 
@@ -92,10 +92,9 @@ static int screen_img_handler_save(esp_http_client_handle_t *client,
         nvs_set_uint32(metadata->screen_img_size_key, 0);
         nvs_set_uint32(metadata->screen_img_width_key, 0);
         nvs_set_uint32(metadata->screen_img_height_key, 0);
-        log_printf(TAG, LOG_LEVEL_DEBUG, "Erased %u bytes from %u screen_img_t", metadata->screen_img_size, screen_img);
+        log_printf(LOG_LEVEL_DEBUG, "Erased %u bytes from %u screen_img_t", metadata->screen_img_size, screen_img);
     } else {
-        log_printf(TAG,
-                   LOG_LEVEL_DEBUG,
+        log_printf(LOG_LEVEL_DEBUG,
                    "%s NVS key had zero value, not erasing any of screen img partition",
                    metadata->screen_img_size_key);
     }
@@ -108,7 +107,7 @@ static int screen_img_handler_save(esp_http_client_handle_t *client,
         nvs_set_uint32(metadata->screen_img_width_key, 700);
         nvs_set_uint32(metadata->screen_img_height_key, 200);
 
-        log_printf(TAG, LOG_LEVEL_INFO, "Saved %u bytes to screen_img flash partition at 0x%X offset", bytes_saved, 0);
+        log_printf(LOG_LEVEL_INFO, "Saved %u bytes to screen_img flash partition at 0x%X offset", bytes_saved, 0);
     }
 
     return bytes_saved;
@@ -137,8 +136,7 @@ bool screen_img_handler_draw_screen_img(screen_img_t screen_img) {
                        metadata.y_coord);
     spi_flash_munmap(spi_flash_handle);
 
-    log_printf(TAG,
-               LOG_LEVEL_INFO,
+    log_printf(LOG_LEVEL_INFO,
                "Rendered image from flash at (%u, %u) sized %u bytes (W: %u, H: %u)",
                metadata.x_coord,
                metadata.y_coord,
@@ -165,13 +163,13 @@ bool screen_img_handler_download_and_save(screen_img_t screen_img) {
     esp_http_client_handle_t client;
     success = http_client_perform_request(&req, &client);
     if (!success) {
-        log_printf(TAG, LOG_LEVEL_ERROR, "Error making request, aborting");
+        log_printf(LOG_LEVEL_ERROR, "Error making request, aborting");
         return false;
     }
 
     success = screen_img_handler_save(&client, screen_img, &metadata);
     if (!success) {
-        log_printf(TAG, LOG_LEVEL_ERROR, "Error saving screen img");
+        log_printf(LOG_LEVEL_ERROR, "Error saving screen img");
         return false;
     }
 
@@ -225,7 +223,7 @@ bool screen_img_handler_draw_time() {
 
     // If the day has advanced, update date text too
     if (now_local.tm_mday != last_time_displayed.tm_mday) {
-        log_printf(TAG, LOG_LEVEL_INFO, "Date has advanced, clearing and re-rendering date as well");
+        log_printf(LOG_LEVEL_INFO, "Date has advanced, clearing and re-rendering date as well");
         screen_img_handler_clear_date();
         screen_img_handler_draw_date();
     }
@@ -308,8 +306,7 @@ void screen_img_handler_clear_time() {
     // height from y. Add a bit of padding to be 100% sure we clear all artifacts
     if (erase_width > 0 && erase_height > 0) {
         display_clear_area(erase_x - 5, erase_y - 5, erase_width + 10, erase_height + 10);
-        log_printf(TAG,
-                   LOG_LEVEL_DEBUG,
+        log_printf(LOG_LEVEL_DEBUG,
                    "Erasing text starting (%u, %u) width: %u height: %u",
                    erase_x,
                    erase_y,

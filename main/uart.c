@@ -60,8 +60,7 @@ void uart_generic_rx_task(void *args) {
                 uart_write_bytes(handle->port, full, base_len + 2);
             }
         } else {
-            log_printf(TAG,
-                       LOG_LEVEL_ERROR,
+            log_printf(LOG_LEVEL_ERROR,
                        "uart_read_bytes returned with no bytes read, but we should yield forever until bytes exist");
         }
     }
