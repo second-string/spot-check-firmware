@@ -19,6 +19,7 @@
 #include "log.h"
 #include "nvs.h"
 #include "screen_img_handler.h"
+#include "sleep_handler.h"
 #include "sntp_time.h"
 
 #define TAG "sc-cli-cmd"
@@ -632,6 +633,26 @@ BaseType_t cli_command_log(char *write_buffer, size_t write_buffer_size, const c
     return pdFALSE;
 }
 
+BaseType_t cli_command_sleep(char *write_buffer, size_t write_buffer_size, const char *cmd_str) {
+    BaseType_t  action_len;
+    const char *action = FreeRTOS_CLIGetParameter(cmd_str, 1, &action_len);
+    if (action == NULL) {
+        strcpy(write_buffer, "Error: usage is 'log <action> <arg>' where action is 'level'");
+        return pdFALSE;
+    }
+
+    memset(write_buffer, 0x0, write_buffer_size);
+    if (action_len == 4 && strncmp(action, "busy", action_len) == 0) {
+        sleep_handler_set_busy(SYSTEM_IDLE_CLI_BIT);
+    } else if (action_len == 4 && strncmp(action, "idle", action_len) == 0) {
+        sleep_handler_set_idle(SYSTEM_IDLE_CLI_BIT);
+    } else {
+        strcpy(write_buffer, "Unknown sleep command");
+    }
+
+    return pdFALSE;
+}
+
 void cli_command_register_all() {
     static const CLI_Command_Definition_t info_cmd = {
         .pcCommand                   = "info",
@@ -732,6 +753,15 @@ void cli_command_register_all() {
         .cExpectedNumberOfParameters = 2,
     };
 
+    static const CLI_Command_Definition_t sleep_cmd = {
+        .pcCommand = "sleep",
+        .pcHelpString =
+            "sleep:\n\tbusy: Set test CLI bit to busy in sleep handler idle event group\n\tidle: Set test CLI bit to "
+            "idle in sleep handler idle event group",
+        .pxCommandInterpreter        = cli_command_sleep,
+        .cExpectedNumberOfParameters = 1,
+    };
+
     FreeRTOS_CLIRegisterCommand(&info_cmd);
     FreeRTOS_CLIRegisterCommand(&reset_cmd);
     FreeRTOS_CLIRegisterCommand(&bq_cmd);
@@ -744,4 +774,5 @@ void cli_command_register_all() {
     FreeRTOS_CLIRegisterCommand(&conditions_cmd);
     FreeRTOS_CLIRegisterCommand(&sntp_cmd);
     FreeRTOS_CLIRegisterCommand(&log_cmd);
+    FreeRTOS_CLIRegisterCommand(&sleep_cmd);
 }

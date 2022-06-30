@@ -29,6 +29,7 @@
 #include "ota_task.h"
 #include "raw_image.h"
 #include "screen_img_handler.h"
+#include "sleep_handler.h"
 #include "sntp_time.h"
 #include "timer.h"
 #include "uart.h"
@@ -58,11 +59,6 @@ static void app_init() {
               NULL,
               &cli_uart_handle);
     log_init(&cli_uart_handle);
-
-    // Init nvs to allow storage of wifi config directly to flash.
-    // This enables us to pull config info directly out of flash after
-    // first setup.
-    // https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-guides/wifi.html#wi-fi-configuration-phase
     nvs_init();
     i2c_init(BQ24196_I2C_PORT, BQ24196_I2C_SDA_PIN, BQ24196_I2C_SCL_PIN, &bq24196_i2c_handle);
     gpio_init();
@@ -70,6 +66,7 @@ static void app_init() {
     sntp_time_init();
     cd54hc4094_init(SHIFTREG_CLK_PIN, SHIFTREG_DATA_PIN, SHIFTREG_STROBE_PIN);
     display_init();
+    sleep_handler_init();
 
     ESP_ERROR_CHECK(esp_event_loop_create_default());
     mdns_local_init();
@@ -86,6 +83,7 @@ static void app_start() {
     bq24196_start();
     display_start();
     wifi_start_provisioning(false);
+    sleep_handler_start();
     sntp_time_start();
     conditions_update_task_start();
 
@@ -201,6 +199,10 @@ void app_main(void) {
         log_printf(LOG_LEVEL_INFO,
                    "Boot successful, showing time + last saved conditions / charts and kicking off update");
     }
+
+    // Wait for all running 'processes' to finish (downloading and image, saving things to flash, running a display
+    // update, etc) before entering deep sleep
+    sleep_handler_block_until_system_idle();
 
     // yeet the default task, everything run from conditions task, ota task, and timers
     vTaskDelete(NULL);

@@ -11,6 +11,7 @@
 #include "log.h"
 #include "nvs.h"
 #include "screen_img_handler.h"
+#include "sleep_handler.h"
 #include "timer.h"
 #include "wifi.h"
 
@@ -135,27 +136,35 @@ static void conditions_update_task(void *args) {
                    update_bits);
 
         if (update_bits & UPDATE_TIME_BIT) {
+            sleep_handler_set_busy(SYSTEM_IDLE_TIME_BIT);
             screen_img_handler_clear_time();
             screen_img_handler_draw_time();
             log_printf(LOG_LEVEL_INFO, "update-conditions task updated time");
+            sleep_handler_set_idle(SYSTEM_IDLE_TIME_BIT);
         }
 
         if (update_bits & UPDATE_CONDITIONS_BIT) {
+            sleep_handler_set_busy(SYSTEM_IDLE_CONDITIONS_BIT);
             conditions_refresh();
             screen_img_handler_draw_conditions(&last_retrieved_conditions);
             log_printf(LOG_LEVEL_INFO, "update-conditions task updated conditions");
+            sleep_handler_set_idle(SYSTEM_IDLE_CONDITIONS_BIT);
         }
 
         if (update_bits & UPDATE_TIDE_CHART_BIT) {
+            sleep_handler_set_busy(SYSTEM_IDLE_TIDE_CHART_BIT);
             screen_img_handler_download_and_save(SCREEN_IMG_TIDE_CHART);
             screen_img_handler_draw_screen_img(SCREEN_IMG_TIDE_CHART);
             log_printf(LOG_LEVEL_INFO, "update-conditions task updated tide chart");
+            sleep_handler_set_idle(SYSTEM_IDLE_TIDE_CHART_BIT);
         }
 
         if (update_bits & UPDATE_SWELL_CHART_BIT) {
+            sleep_handler_set_busy(SYSTEM_IDLE_SWELL_CHART_BIT);
             screen_img_handler_download_and_save(SCREEN_IMG_SWELL_CHART);
             screen_img_handler_draw_screen_img(SCREEN_IMG_SWELL_CHART);
             log_printf(LOG_LEVEL_INFO, "update-conditions task updated swell chart");
+            sleep_handler_set_idle(SYSTEM_IDLE_SWELL_CHART_BIT);
         }
 
         // Render after we've made all changes

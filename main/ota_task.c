@@ -13,6 +13,7 @@
 #include "http_client.h"
 #include "json.h"
 #include "ota_task.h"
+#include "sleep_handler.h"
 #include "wifi.h"
 
 #define TAG "sc-ota-task"
@@ -131,10 +132,12 @@ static bool check_forced_update(esp_app_desc_t *current_image_info, char *versio
 }
 
 void check_ota_update_task(void *args) {
+    sleep_handler_set_busy(SYSTEM_IDLE_OTA_BIT);
     log_printf(LOG_LEVEL_INFO, "Starting OTA task to check update status");
 
 #ifdef CONFIG_DISABLE_OTA
     log_printf(LOG_LEVEL_INFO, "FW compiled with ENABLE_OTA menuconfig option disabled, bailing out of OTA task");
+    sleep_handler_set_idle(SYSTEM_IDLE_OTA_BIT);
     vTaskDelete(NULL);
 #endif
 
@@ -156,6 +159,7 @@ void check_ota_update_task(void *args) {
     esp_err_t      error = esp_https_ota_get_img_desc(ota_handle, &ota_image_desc);
     if (error != ESP_OK) {
         log_printf(LOG_LEVEL_ERROR, "OTA failed at esp_https_ota_get_img_desc: %s", esp_err_to_name(error));
+        sleep_handler_set_idle(SYSTEM_IDLE_OTA_BIT);
         vTaskDelete(NULL);
     }
 
@@ -186,6 +190,7 @@ void check_ota_update_task(void *args) {
             ota_start_ota(forced_version_url);
         } else {
             log_printf(LOG_LEVEL_INFO, "Still got no go-ahead from force OTA endpoint, deleting OTA task");
+            sleep_handler_set_idle(SYSTEM_IDLE_OTA_BIT);
             vTaskDelete(NULL);
         }
     }
@@ -216,6 +221,7 @@ void check_ota_update_task(void *args) {
     bool received_full_image = esp_https_ota_is_complete_data_received(ota_handle);
     if (!received_full_image) {
         log_printf(LOG_LEVEL_ERROR, "Did not receive full image package from server, aborting.");
+        sleep_handler_set_idle(SYSTEM_IDLE_OTA_BIT);
         vTaskDelete(NULL);
     }
 
@@ -235,5 +241,6 @@ void check_ota_update_task(void *args) {
     }
 
     // Delete this task once we've checked
+    sleep_handler_set_idle(SYSTEM_IDLE_OTA_BIT);
     vTaskDelete(NULL);
 }

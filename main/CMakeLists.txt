@@ -23,5 +23,6 @@ idf_component_register(
                                  "flash_partition.c"
                                  "screen_img_handler.c"
                                  "sntp_time.c"
+                                 "sleep_handler.c"
                     INCLUDE_DIRS "include"
                     EMBED_TXTFILES ${project_dir}/server_certs/ca_cert.pem)
