@@ -17,8 +17,10 @@
 
 #define TAG "sc-screenimg"
 
-#define TIME_DRAW_X_PX 100
-#define TIME_DRAW_Y_PX 120
+#define TIME_DRAW_X_PX (100)
+#define TIME_DRAW_Y_PX (120)
+#define DATE_DRAW_X_PX (120)
+#define DATE_DRAW_Y_PX (170)
 
 static struct tm last_time_displayed = {0};
 
@@ -176,18 +178,59 @@ bool screen_img_handler_download_and_save(screen_img_t screen_img) {
     return success;
 }
 
+/*
+ * Draw the date string at the correct location. static scoped since it's only triggered from
+ * screen_img_handler_draw_time if the date has advanced
+ */
+static bool screen_img_handler_draw_date() {
+    struct tm now_local = {0};
+    char      date_string[64];
+    sntp_time_get_local_time(&now_local);
+    sntp_time_get_time_str(&now_local, NULL, date_string);
+
+    display_draw_text(date_string, DATE_DRAW_X_PX, DATE_DRAW_Y_PX, DISPLAY_FONT_SIZE_SMALL, DISPLAY_FONT_ALIGN_LEFT);
+    return true;
+}
+
+/*
+ * Clears the date string. Dumb-clear, clears full rect every time instead of determining single digit, month, day of
+ * week, etc specific clear area.. static scoped since it's only triggered from screen_img_handler_draw_time if the date
+ * has advanced
+ */
+static void screen_img_handler_clear_date() {
+    char     date_string[64];
+    uint32_t previous_date_width_px;
+    uint32_t previous_date_height_px;
+    sntp_time_get_time_str(&last_time_displayed, NULL, date_string);
+    display_get_text_bounds(date_string,
+                            DATE_DRAW_X_PX,
+                            DATE_DRAW_Y_PX,
+                            DISPLAY_FONT_SIZE_LARGE,
+                            DISPLAY_FONT_ALIGN_LEFT,
+                            &previous_date_width_px,
+                            &previous_date_height_px);
+
+    if (previous_date_width_px > 0 && previous_date_height_px > 0) {
+        display_clear_area(DATE_DRAW_X_PX, DATE_DRAW_Y_PX, previous_date_width_px, previous_date_height_px);
+    }
+}
+
 bool screen_img_handler_draw_time() {
     struct tm now_local = {0};
     char      time_string[6];
-    char      date_string[64];
     sntp_time_get_local_time(&now_local);
-    sntp_time_get_time_str(&now_local, time_string, date_string);
+    sntp_time_get_time_str(&now_local, time_string, NULL);
 
     display_draw_text(time_string, TIME_DRAW_X_PX, TIME_DRAW_Y_PX, DISPLAY_FONT_SIZE_LARGE, DISPLAY_FONT_ALIGN_LEFT);
-    display_draw_text(date_string, 100, 170, DISPLAY_FONT_SIZE_SMALL, DISPLAY_FONT_ALIGN_LEFT);
+
+    // If the day has advanced, update date text too
+    if (now_local.tm_mday != last_time_displayed.tm_mday) {
+        log_printf(TAG, LOG_LEVEL_INFO, "Date has advanced, clearing and re-rendering date as well");
+        screen_img_handler_clear_date();
+        screen_img_handler_draw_date();
+    }
 
     memcpy(&last_time_displayed, &now_local, sizeof(struct tm));
-
     return true;
 }
 
