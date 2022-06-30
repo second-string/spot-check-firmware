@@ -117,7 +117,9 @@ void display_full_clear() {
 }
 
 void display_clear_area(uint32_t x, uint32_t y, uint32_t width, uint32_t height) {
-    // TODO :: limit these bounds to be w/in the framebuffer
+    // Limit these bounds to be w/in the framebuffer, epdiy will happily buffer overflow it
+    configASSERT(x + width <= ED060SC4_WIDTH_PX);
+    configASSERT(y + height <= ED060SC4_HEIGHT_PX);
 
     EpdRect rect = {
         .x      = x,
@@ -185,6 +187,10 @@ void display_draw_image(uint8_t *image_buffer,
                         uint8_t  bytes_per_px,
                         uint32_t screen_x,
                         uint32_t screen_y) {
+    // Limit these bounds to be w/in the framebuffer, epdiy will happily buffer overflow it
+    configASSERT(screen_x + width_px <= ED060SC4_WIDTH_PX);
+    configASSERT(screen_y + height_px <= ED060SC4_HEIGHT_PX);
+
     uint8_t *fb   = epd_hl_get_framebuffer(&hl);
     EpdRect  rect = {
          .x      = screen_x,
