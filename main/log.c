@@ -14,6 +14,7 @@ static uart_handle_t    *cli_uart_handle;
 static char             *log_out_buffer;
 static SemaphoreHandle_t mutex_handle;
 static StaticSemaphore_t mutex_buffer;
+static log_level_t       max_log_level;
 
 static const char *level_strs[] = {
     [LOG_LEVEL_ERROR] = "[ERR]",
@@ -31,9 +32,15 @@ void log_init(uart_handle_t *cli_handle) {
     assert(mutex_handle);
 
     cli_uart_handle = cli_handle;
+    max_log_level   = LOG_LEVEL_DEBUG;
 }
 
 void log_log_line(char *tag, log_level_t level, char *fmt, ...) {
+    // Drop log line entirely if max level set less verbose than line verbosity
+    if (level > max_log_level) {
+        return;
+    }
+
     BaseType_t rval = xSemaphoreTake(mutex_handle, pdMS_TO_TICKS(50));
     // TODO :: could handle this more elegantly
     assert(rval == pdTRUE);
@@ -67,4 +74,15 @@ void log_log_line(char *tag, log_level_t level, char *fmt, ...) {
     // Let go of the mutex before sending to serial, it'll handle re-entrancy with it's own internal queueing
     // (maybe?)
     uart_write_bytes(cli_uart_handle->port, log_out_buffer, bytes_written + formatted_size + 1);
+}
+
+void log_set_max_log_level(log_level_t level) {
+    // I don't think we really have to worry about this since it's mostly for re-entrant log calls overwriting the
+    // buffer but why not
+    BaseType_t rval = xSemaphoreTake(mutex_handle, pdMS_TO_TICKS(50));
+    assert(rval == pdTRUE);
+
+    max_log_level = level;
+
+    xSemaphoreGive(mutex_handle);
 }

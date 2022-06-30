@@ -581,6 +581,52 @@ BaseType_t cli_command_sntp(char *write_buffer, size_t write_buffer_size, const 
         char status_str[12];
         sntp_time_status_str(status_str);
         strcpy(write_buffer, status_str);
+    } else {
+        strcpy(write_buffer, "Unknown sntp command");
+    }
+
+    return pdFALSE;
+}
+
+BaseType_t cli_command_log(char *write_buffer, size_t write_buffer_size, const char *cmd_str) {
+    BaseType_t  action_len;
+    const char *action = FreeRTOS_CLIGetParameter(cmd_str, 1, &action_len);
+    if (action == NULL) {
+        strcpy(write_buffer, "Error: usage is 'log <action> <arg>' where action is 'level'");
+        return pdFALSE;
+    }
+
+    BaseType_t  arg_len;
+    const char *arg = FreeRTOS_CLIGetParameter(cmd_str, 2, &arg_len);
+    if (arg == NULL) {
+        strcpy(write_buffer, "Error: usage is 'log <arg> <arg>' where arg is 'level'");
+        return pdFALSE;
+    }
+
+    memset(write_buffer, 0x0, write_buffer_size);
+    if (action_len == 5 && strncmp(action, "level", action_len) == 0) {
+        if (arg == NULL) {
+            strcpy(write_buffer, "Error: usage is 'log level <level>' where level is 'err|warn|info|dbg'");
+            return pdFALSE;
+        }
+
+        log_level_t new_level;
+        if (strncmp(arg, "err", 3) == 0) {
+            new_level = LOG_LEVEL_ERROR;
+        } else if (strncmp(arg, "warn", 4) == 0) {
+            new_level = LOG_LEVEL_WARN;
+        } else if (strncmp(arg, "info", 4) == 0) {
+            new_level = LOG_LEVEL_INFO;
+        } else if (strncmp(arg, "dbg", 3) == 0) {
+            new_level = LOG_LEVEL_DEBUG;
+        } else {
+            sprintf(write_buffer, "Invalid log level '%s', choices are 'err|warn|info|dbg'", arg);
+            return pdFALSE;
+        }
+
+        log_set_max_log_level(new_level);
+    } else {
+        strcpy(write_buffer, "Unknown log command");
     }
 
     return pdFALSE;
@@ -626,7 +672,8 @@ void cli_command_register_all() {
     static const CLI_Command_Definition_t api_cmd = {
         .pcCommand = "api",
         .pcHelpString =
-            "api:\n\timg <tides_chart|swell_chart>: download and save image to flash\n\t<endpoint>: send request to "
+            "api:\n\timg <tides_chart|swell_chart>: download and save image to flash\n\t<endpoint>: send request "
+            "to "
             "API endpoint with base URL set in menuconfig",
         .pxCommandInterpreter        = cli_command_api,
         .cExpectedNumberOfParameters = -1,
@@ -664,7 +711,8 @@ void cli_command_register_all() {
     static const CLI_Command_Definition_t conditions_cmd = {
         .pcCommand = "conditions",
         .pcHelpString =
-            "conditions <time|conditions|tide|swell>: Trigger an update of one of the conditions as if triggered by "
+            "conditions <time|conditions|tide|swell>: Trigger an update of one of the conditions as if triggered "
+            "by "
             "normal expiration",
         .pxCommandInterpreter        = cli_command_conditions,
         .cExpectedNumberOfParameters = 1,
@@ -675,6 +723,13 @@ void cli_command_register_all() {
         .pcHelpString                = "sntp:\n\tsync: Force sntp re-sync\n\tstatus: print the sntp current status",
         .pxCommandInterpreter        = cli_command_sntp,
         .cExpectedNumberOfParameters = 1,
+    };
+
+    static const CLI_Command_Definition_t log_cmd = {
+        .pcCommand                   = "log",
+        .pcHelpString                = "log:\n\tlevel: set max log level output to serial",
+        .pxCommandInterpreter        = cli_command_log,
+        .cExpectedNumberOfParameters = 2,
     };
 
     FreeRTOS_CLIRegisterCommand(&info_cmd);
@@ -688,4 +743,5 @@ void cli_command_register_all() {
     FreeRTOS_CLIRegisterCommand(&nvs_cmd);
     FreeRTOS_CLIRegisterCommand(&conditions_cmd);
     FreeRTOS_CLIRegisterCommand(&sntp_cmd);
+    FreeRTOS_CLIRegisterCommand(&log_cmd);
 }
