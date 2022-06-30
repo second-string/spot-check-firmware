@@ -117,6 +117,8 @@ void display_full_clear() {
 }
 
 void display_clear_area(uint32_t x, uint32_t y, uint32_t width, uint32_t height) {
+    // TODO :: limit these bounds to be w/in the framebuffer
+
     EpdRect rect = {
         .x      = x,
         .y      = y,

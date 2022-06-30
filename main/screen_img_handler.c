@@ -203,7 +203,7 @@ static void screen_img_handler_clear_date() {
     display_get_text_bounds(date_string,
                             DATE_DRAW_X_PX,
                             DATE_DRAW_Y_PX,
-                            DISPLAY_FONT_SIZE_LARGE,
+                            DISPLAY_FONT_SIZE_SMALL,
                             DISPLAY_FONT_ALIGN_LEFT,
                             &previous_date_width_px,
                             &previous_date_height_px);
