@@ -17,3 +17,7 @@ server_cert:
 # Assumes current commit is the one to be released and is tagged with correct version
 release:
 	./release.sh
+
+# Just saving rough command for the future, not really needed as a target
+font:
+	python fontconvert.py FiraSans_15 15 ~/Library/Fonts/FiraSans-Regular.ttf /System/Library/Fonts/HelveticaNeue.ttc > ~/Developer/spot-check-firmware/main/include/firasans_15.h
