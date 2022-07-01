@@ -18,6 +18,7 @@ static log_level_t       max_log_level;
 
 static const char *level_strs[] = {
     [LOG_LEVEL_ERROR] = "[ERR]",
+    [LOG_LEVEL_WARN]  = "[WRN]",
     [LOG_LEVEL_INFO]  = "[INF]",
     [LOG_LEVEL_DEBUG] = "[DBG]",
 };
