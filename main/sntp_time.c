@@ -27,6 +27,12 @@ void sntp_time_init() {
     // https://github.com/espressif/esp-idf/blob/c2ccc383dae2a47c2c2dc8c7ad78175a3fd11361/examples/protocols/sntp/main/sntp_example_main.c#L139
     sntp_setservername(0, "pool.ntp.org");
     sntp_set_time_sync_notification_cb(sntp_time_sync_notification_cb);
+
+    // EST +5 from GMT - DST starts 3rd month, second (2) sunday (0) at 2am (/2) - DST ends 11th month first (1) sunday
+    // (1) at 2am (/2)
+    // https://www.gnu.org/software/libc/manual/html_node/TZ-Variable.html
+    setenv("TZ", "EST+5EDT,M3.2.0/2,M11.1.0/2", 1);
+    tzset();
 }
 
 void sntp_time_start() {
