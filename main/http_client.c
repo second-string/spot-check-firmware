@@ -100,48 +100,44 @@ request http_client_build_request(char              *endpoint,
  */
 bool http_client_perform_request(request *request_obj, esp_http_client_handle_t *client) {
     configASSERT(client);
+    configASSERT(request_obj);
 
     if (!wifi_is_network_connected()) {
         log_printf(LOG_LEVEL_INFO, "Attempted to make GET request, not connected to internet yet so bailing");
         return 0;
     }
 
-    log_printf(LOG_LEVEL_INFO, "Initing http client for request...");
+    // assume we won't have that many query params. Could calc this too
+    char req_url[strlen(request_obj->url) + 80];
+    strcpy(req_url, request_obj->url);
 
+    if (request_obj->num_params > 0) {
+        log_printf(LOG_LEVEL_DEBUG, "Adding %d query params to URL", request_obj->num_params);
+        strcat(req_url, "?");
+        for (int i = 0; i < request_obj->num_params; i++) {
+            query_param param = request_obj->params[i];
+            strcat(req_url, param.key);
+            strcat(req_url, "=");
+            strcat(req_url, param.value);
+            strcat(req_url, "&");
+        }
+    }
+
+    // Note: using port field means you have to use host and path options instead of URL - it generates the URL
+    // internally based on these and setting the url field manually overwrites all that
     esp_http_client_config_t http_config = {
-        .host           = "spotcheck.brianteam.dev",
-        .path           = "/",
+        .url            = req_url,
         .event_handler  = http_event_handler,
         .buffer_size    = MAX_READ_BUFFER_SIZE,
         .cert_pem       = (char *)&server_cert_pem_start,
         .transport_type = HTTP_TRANSPORT_OVER_SSL,
     };
 
+    log_printf(LOG_LEVEL_INFO, "Initing http client for request with url '%s'...", http_config.url, http_config.port);
     *client = esp_http_client_init(&http_config);
     if (!client) {
         log_printf(LOG_LEVEL_INFO, "Error initing http client, returning without sending request");
         return 0;
-    }
-
-    if (request_obj) {
-        // assume we won't have that many query params. Could calc this too
-        char req_url[strlen(request_obj->url) + 60];
-        strcpy(req_url, request_obj->url);
-
-        if (request_obj->num_params > 0) {
-            log_printf(LOG_LEVEL_DEBUG, "Adding %d query params to URL", request_obj->num_params);
-            strcat(req_url, "?");
-            for (int i = 0; i < request_obj->num_params; i++) {
-                query_param param = request_obj->params[i];
-                strcat(req_url, param.key);
-                strcat(req_url, "=");
-                strcat(req_url, param.value);
-                strcat(req_url, "&");
-            }
-        }
-
-        ESP_ERROR_CHECK(esp_http_client_set_url(*client, req_url));
-        log_printf(LOG_LEVEL_INFO, "Setting url to %s", req_url);
     }
 
     ESP_ERROR_CHECK(esp_http_client_set_method(*client, HTTP_METHOD_GET));
