@@ -10,7 +10,7 @@
 
 // Needs trailing slash!
 // #define URL_BASE "https://spotcheck.brianteam.dev/"
-#define URL_BASE "http://common-room.s3.us-east-2.amazonaws.com/"
+#define URL_BASE "http://192.168.86.31:9080/"
 
 typedef struct {
     char *key;

@@ -297,7 +297,7 @@ void screen_img_handler_clear_time() {
     // If hours haven't changed but minutes have, erase one or two digits depending on what the new minutes value is.
     if (now_local.tm_hour != last_time_displayed.tm_hour) {
         erase_x      = TIME_DRAW_X_PX;
-        erase_y      = TIME_DRAW_Y_PX;
+        erase_y      = TIME_DRAW_Y_PX - previous_time_height_px;
         erase_width  = previous_time_width_px;
         erase_height = previous_time_height_px;
     } else if (now_local.tm_min != last_time_displayed.tm_min) {
