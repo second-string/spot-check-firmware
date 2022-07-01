@@ -17,13 +17,16 @@
 
 #define TAG "sc-screenimg"
 
-#define TIME_DRAW_X_PX (100)
+#define TIME_DRAW_X_PX (75)
 #define TIME_DRAW_Y_PX (120)
-#define DATE_DRAW_X_PX (120)
+
+#define DATE_DRAW_X_PX (75)
 #define DATE_DRAW_Y_PX (170)
-#define CONDITIONS_DRAW_X_PX (700)  // text is right-aligned, so far side of rect
-#define CONDITIONS_TEMPERATURE_DRAW_Y_PX (80)
-#define CONDITIONS_WIND_DRAW_Y_PX (130)
+
+#define CONDITIONS_DRAW_X_PX (725)  // text is right-aligned, so far side of rect
+#define CONDITIONS_SPOT_NAME_DRAW_Y_PX (80)
+#define CONDITIONS_TEMPERATURE_DRAW_Y_PX (120)
+#define CONDITIONS_WIND_DRAW_Y_PX (150)
 #define CONDITIONS_TIDE_DRAW_Y_PX (180)
 
 static struct tm last_time_displayed = {0};
@@ -51,7 +54,7 @@ static void screen_img_handler_get_metadata(screen_img_t screen_img, screen_img_
             metadata->screen_img_width_key  = SCREEN_IMG_TIDE_CHART_WIDTH_PX_NVS_KEY;
             metadata->screen_img_height_key = SCREEN_IMG_TIDE_CHART_HEIGHT_PX_NVS_KEY;
             metadata->screen_img_offset     = SCREEN_IMG_TIDE_CHART_OFFSET;
-            metadata->endpoint              = "test_tide_chart.raw";
+            metadata->endpoint              = "tides_chart";
             break;
         case SCREEN_IMG_SWELL_CHART:
             metadata->x_coord               = 50;
@@ -60,7 +63,7 @@ static void screen_img_handler_get_metadata(screen_img_t screen_img, screen_img_
             metadata->screen_img_width_key  = SCREEN_IMG_SWELL_CHART_WIDTH_PX_NVS_KEY;
             metadata->screen_img_height_key = SCREEN_IMG_SWELL_CHART_HEIGHT_PX_NVS_KEY;
             metadata->screen_img_offset     = SCREEN_IMG_SWELL_CHART_OFFSET;
-            metadata->endpoint              = "test_swell_chart.raw";
+            metadata->endpoint              = "swell_chart";
             break;
         default:
             configASSERT(0);
@@ -121,6 +124,13 @@ bool screen_img_handler_draw_screen_img(screen_img_t screen_img) {
     const esp_partition_t *screen_img_partition = flash_partition_get_screen_img_partition();
     screen_img_metadata_t  metadata             = {0};
     screen_img_handler_get_metadata(screen_img, &metadata);
+
+    if (metadata.screen_img_size == 0 || metadata.screen_img_width == 0 || metadata.screen_img_height == 0) {
+        log_printf(LOG_LEVEL_INFO,
+                   "Zero size, width, and/or height for screen image %d found in NVS. Assuming this image hasn't been "
+                   "downloaded, returning from draw function");
+        return false;
+    }
 
     // TODO :: make sure screen_img_len length is less that buffer size (or at least a reasonable number to
     // malloc) mmap handles the large malloc internally, and the call the munmap below frees it
@@ -190,7 +200,7 @@ static bool screen_img_handler_draw_date() {
     sntp_time_get_local_time(&now_local);
     sntp_time_get_time_str(&now_local, NULL, date_string);
 
-    display_draw_text(date_string, DATE_DRAW_X_PX, DATE_DRAW_Y_PX, DISPLAY_FONT_SIZE_SMALL, DISPLAY_FONT_ALIGN_LEFT);
+    display_draw_text(date_string, DATE_DRAW_X_PX, DATE_DRAW_Y_PX, DISPLAY_FONT_SIZE_SHMEDIUM, DISPLAY_FONT_ALIGN_LEFT);
     return true;
 }
 
@@ -207,7 +217,7 @@ static void screen_img_handler_clear_date() {
     display_get_text_bounds(date_string,
                             DATE_DRAW_X_PX,
                             DATE_DRAW_Y_PX,
-                            DISPLAY_FONT_SIZE_SMALL,
+                            DISPLAY_FONT_SIZE_SHMEDIUM,
                             DISPLAY_FONT_ALIGN_LEFT,
                             &previous_date_width_px,
                             &previous_date_height_px);
@@ -319,12 +329,14 @@ void screen_img_handler_clear_time() {
     }
 }
 
-void screen_img_handler_clear_conditions(bool clear_temperature, bool clear_wind, bool clear_tide) {
+void screen_img_handler_clear_conditions(bool clear_spot_name,
+                                         bool clear_temperature,
+                                         bool clear_wind,
+                                         bool clear_tide) {
     // Hardcoding in separate variable for clarity
     const uint32_t max_conditions_width_px = 300;
 
-    // if it's all, blindly do a big block w/ plenty of padding for now since nothing is around it to need to worry
-    // about measuring bounds. If even one is false, erase individual lines.
+    // If one of the condition lines is false, erase individual lines. Otherwise erase as large box
     if (clear_temperature && clear_wind && clear_tide) {
         // CONDITIONS_DRAW_TEMPERATURE_Y is the bottom left corner of the top row of text. Need to get bounds of text
         // for the height so we can subtract it from the constant Y to get the top left corner, which is what the clear
@@ -334,28 +346,48 @@ void screen_img_handler_clear_conditions(bool clear_temperature, bool clear_wind
         display_get_text_bounds("F",
                                 0,
                                 0,
-                                DISPLAY_FONT_SIZE_MEDIUM,
+                                DISPLAY_FONT_SIZE_SHMEDIUM,
                                 DISPLAY_FONT_ALIGN_RIGHT,
                                 &font_width_px,
                                 &font_height_px);
 
-        // Erase from top left of conditions (top left of temp text, hardcoded max width of conditions block, down to
-        // bottom right of conditions (bottom right of tide text))
+        // Erase from top left of conditions (top left of highest row either spot name or temp depending on params,
+        // hardcoded max width of conditions block, down to bottom right of conditions (bottom right of tide text) plus
+        // a little buffer)
+        uint32_t top_row_y = clear_spot_name ? CONDITIONS_SPOT_NAME_DRAW_Y_PX : CONDITIONS_TEMPERATURE_DRAW_Y_PX;
         display_clear_area(CONDITIONS_DRAW_X_PX - max_conditions_width_px,
-                           CONDITIONS_TEMPERATURE_DRAW_Y_PX - font_height_px,
-                           +max_conditions_width_px,
-                           CONDITIONS_TIDE_DRAW_Y_PX);
+                           top_row_y - font_height_px,
+                           max_conditions_width_px,
+                           CONDITIONS_TIDE_DRAW_Y_PX - (top_row_y - font_height_px) + 10);
     } else {
         log_printf(LOG_LEVEL_ERROR, "CLEARINING INDIVIDUAL CONDITION LINES NOT YET SUPPORTED");
         configASSERT(0);
     }
 }
 
-bool screen_img_handler_draw_conditions(conditions_t *conditions) {
+bool screen_img_handler_draw_conditions(char *spot_name, conditions_t *conditions) {
+    // Draw spot name and underline no matter what
+    uint32_t spot_name_width  = 0;
+    uint32_t spot_name_height = 0;
+    display_get_text_bounds(spot_name,
+                            CONDITIONS_DRAW_X_PX,
+                            CONDITIONS_SPOT_NAME_DRAW_Y_PX,
+                            DISPLAY_FONT_SIZE_SHMEDIUM,
+                            DISPLAY_FONT_ALIGN_RIGHT,
+                            &spot_name_width,
+                            &spot_name_height);
+    display_draw_text(spot_name,
+                      CONDITIONS_DRAW_X_PX,
+                      CONDITIONS_SPOT_NAME_DRAW_Y_PX,
+                      DISPLAY_FONT_SIZE_SHMEDIUM,
+                      DISPLAY_FONT_ALIGN_RIGHT);
+    vTaskDelay(pdMS_TO_TICKS(1000));
+    display_draw_rect(CONDITIONS_DRAW_X_PX - spot_name_width, CONDITIONS_SPOT_NAME_DRAW_Y_PX + 5, spot_name_width, 2);
+
     if (conditions == NULL) {
         display_draw_text("Fetching latest conditions...",
                           CONDITIONS_DRAW_X_PX,
-                          CONDITIONS_WIND_DRAW_Y_PX,
+                          CONDITIONS_TEMPERATURE_DRAW_Y_PX,
                           DISPLAY_FONT_SIZE_SMALL,
                           DISPLAY_FONT_ALIGN_RIGHT);
     } else {
@@ -372,17 +404,17 @@ bool screen_img_handler_draw_conditions(conditions_t *conditions) {
         display_draw_text(temperature_str,
                           CONDITIONS_DRAW_X_PX,
                           CONDITIONS_TEMPERATURE_DRAW_Y_PX,
-                          DISPLAY_FONT_SIZE_MEDIUM,
+                          DISPLAY_FONT_SIZE_SHMEDIUM,
                           DISPLAY_FONT_ALIGN_RIGHT);
         display_draw_text(wind_str,
                           CONDITIONS_DRAW_X_PX,
                           CONDITIONS_WIND_DRAW_Y_PX,
-                          DISPLAY_FONT_SIZE_MEDIUM,
+                          DISPLAY_FONT_SIZE_SHMEDIUM,
                           DISPLAY_FONT_ALIGN_RIGHT);
         display_draw_text(tide_str,
                           CONDITIONS_DRAW_X_PX,
                           CONDITIONS_TIDE_DRAW_Y_PX,
-                          DISPLAY_FONT_SIZE_MEDIUM,
+                          DISPLAY_FONT_SIZE_SHMEDIUM,
                           DISPLAY_FONT_ALIGN_RIGHT);
     }
 
@@ -392,7 +424,7 @@ bool screen_img_handler_draw_conditions(conditions_t *conditions) {
 bool screen_img_handler_draw_conditions_error() {
     display_draw_text("Error fetching conditions",
                       CONDITIONS_DRAW_X_PX,
-                      CONDITIONS_WIND_DRAW_Y_PX,
+                      CONDITIONS_TEMPERATURE_DRAW_Y_PX,
                       DISPLAY_FONT_SIZE_SMALL,
                       DISPLAY_FONT_ALIGN_RIGHT);
     return true;

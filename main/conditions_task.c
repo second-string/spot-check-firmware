@@ -190,10 +190,14 @@ static void conditions_update_task(void *args) {
 
         if (update_bits & UPDATE_CONDITIONS_BIT) {
             sleep_handler_set_busy(SYSTEM_IDLE_CONDITIONS_BIT);
-            bool success = conditions_refresh();
-            screen_img_handler_clear_conditions(true, true, true);
+            bool               success = conditions_refresh();
+            spot_check_config *config  = nvs_get_config();
+            // TODO :: don't support clearing spot name logic when changing location yet. Need a way to pass more info
+            // to this case if we're clearing for a regular update or becase location changed and spot name will need to
+            // be cleared too.
+            screen_img_handler_clear_conditions(false, true, true, true);
             if (success) {
-                screen_img_handler_draw_conditions(&last_retrieved_conditions);
+                screen_img_handler_draw_conditions(config->spot_name, &last_retrieved_conditions);
             } else {
                 screen_img_handler_draw_conditions_error();
             }

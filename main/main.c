@@ -152,7 +152,7 @@ void app_main(void) {
             "network",
             400,
             300,
-            DISPLAY_FONT_SIZE_SMALL,
+            DISPLAY_FONT_SIZE_SHMEDIUM,
             DISPLAY_FONT_ALIGN_CENTER);
 
         screen_img_handler_render();
@@ -187,9 +187,10 @@ void app_main(void) {
         }
 
         // Render whatever we have in flash to get up and showing asap, then kick off update to all
+        spot_check_config *config = nvs_get_config();
         display_full_clear();
         screen_img_handler_draw_time();
-        screen_img_handler_draw_conditions(NULL);
+        screen_img_handler_draw_conditions(config->spot_name, NULL);
         screen_img_handler_draw_screen_img(SCREEN_IMG_TIDE_CHART);
         screen_img_handler_draw_screen_img(SCREEN_IMG_SWELL_CHART);
         // conditions_trigger_conditions_update();

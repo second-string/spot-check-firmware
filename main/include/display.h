@@ -12,6 +12,7 @@ typedef enum {
 
 typedef enum {
     DISPLAY_FONT_SIZE_SMALL,
+    DISPLAY_FONT_SIZE_SHMEDIUM,
     DISPLAY_FONT_SIZE_MEDIUM,
     DISPLAY_FONT_SIZE_LARGE,
 
@@ -35,6 +36,7 @@ void display_draw_image(uint8_t *image_buffer,
                         uint8_t  bytes_per_px,
                         uint32_t screen_x,
                         uint32_t screen_y);
+void display_draw_rect(uint32_t x, uint32_t y, uint32_t width_px, uint32_t height_px);
 void display_draw_image_fullscreen(uint8_t *image_buffer, uint8_t bytes_per_px);
 void display_get_text_bounds(char                *text,
                              uint32_t             x,

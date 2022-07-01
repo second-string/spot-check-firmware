@@ -4,6 +4,7 @@
 #include "epd_driver.h"
 #include "epd_highlevel.h"
 #include "firasans_10.h"
+#include "firasans_15.h"
 #include "firasans_20.h"
 #include "firasans_40.h"
 #include "flash_partition.h"
@@ -14,6 +15,7 @@
 
 #define FONT_40 FiraSans_40
 #define FONT_20 FiraSans_20
+#define FONT_15 FiraSans_15
 #define FONT_10 FiraSans_10
 
 #define ED060SC4_WIDTH_PX 800
@@ -45,6 +47,8 @@ static const EpdFont *display_get_epd_font_enum(display_font_size_t size) {
     switch (size) {
         case DISPLAY_FONT_SIZE_SMALL:
             return &FONT_10;
+        case DISPLAY_FONT_SIZE_SHMEDIUM:
+            return &FONT_15;
         case DISPLAY_FONT_SIZE_MEDIUM:
             return &FONT_20;
         case DISPLAY_FONT_SIZE_LARGE:
@@ -76,6 +80,8 @@ static const char *display_get_epd_font_enum_string(display_font_size_t size) {
     switch (size) {
         case DISPLAY_FONT_SIZE_SMALL:
             return "small";
+        case DISPLAY_FONT_SIZE_SHMEDIUM:
+            return "shmedium";
         case DISPLAY_FONT_SIZE_MEDIUM:
             return "medium";
         case DISPLAY_FONT_SIZE_LARGE:
@@ -144,7 +150,7 @@ void display_render_splash_screen() {
     configASSERT(hl.front_fb && hl.back_fb);
 
     display_draw_text("Spot Check", ED060SC4_WIDTH_PX / 2, 250, DISPLAY_FONT_SIZE_MEDIUM, DISPLAY_FONT_ALIGN_CENTER);
-    display_draw_text("rev. 3.1", ED060SC4_WIDTH_PX / 2, 300, DISPLAY_FONT_SIZE_SMALL, DISPLAY_FONT_ALIGN_CENTER);
+    display_draw_text("rev. 3.1", ED060SC4_WIDTH_PX / 2, 300, DISPLAY_FONT_SIZE_SHMEDIUM, DISPLAY_FONT_ALIGN_CENTER);
     display_draw_text("Second String Studios",
                       ED060SC4_WIDTH_PX / 2,
                       epd_rotated_display_height() - 50,
@@ -163,17 +169,23 @@ void display_draw_text(char                *text,
     configASSERT(x_coord < ED060SC4_WIDTH_PX);
     configASSERT(y_coord < ED060SC4_HEIGHT_PX);
 
+    int32_t x = x_coord;
+    int32_t y = y_coord;
+
     EpdFontProperties font_props = epd_font_properties_default();
     font_props.flags             = display_get_epd_font_flags_enum(alignment);
     const EpdFont *font          = display_get_epd_font_enum(size);
     uint8_t       *fb            = epd_hl_get_framebuffer(&hl);
-    epd_write_string(font, text, (int32_t *)&x_coord, (int32_t *)&y_coord, fb, &font_props);
 
     log_printf(LOG_LEVEL_DEBUG,
-               "Rendering %s, %s-aligned text on display: '%s'",
+               "Rendering %s, %s-aligned text at (%u, %u): '%s'",
                display_get_epd_font_enum_string(size),
                display_get_epd_font_flags_enum_string(alignment),
+               x,
+               y,
                text);
+
+    epd_write_string(font, text, &x, &y, fb, &font_props);
 }
 
 /*
@@ -201,6 +213,24 @@ void display_draw_image(uint8_t *image_buffer,
 
     // Data MUST be 2 pixels per byte, aka 1 pixel per 4-bit nibble.
     epd_copy_to_framebuffer(rect, image_buffer, fb);
+}
+
+void display_draw_rect(uint32_t x, uint32_t y, uint32_t width_px, uint32_t height_px) {
+    // Limit these bounds to be w/in the framebuffer, epdiy will happily buffer overflow it
+    configASSERT(x + width_px <= ED060SC4_WIDTH_PX);
+    configASSERT(y + height_px <= ED060SC4_HEIGHT_PX);
+
+    EpdRect rect = {
+        .x      = x,
+        .y      = y,
+        .width  = width_px,
+        .height = height_px,
+    };
+
+    uint8_t *fb = epd_hl_get_framebuffer(&hl);
+    epd_draw_rect(rect, 0x0, fb);
+
+    log_printf(LOG_LEVEL_DEBUG, "Rendering %uw %uh rect at (%u, %u)", width_px, height_px, x, y);
 }
 
 /*
