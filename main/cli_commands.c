@@ -561,7 +561,7 @@ static BaseType_t cli_command_conditions(char *write_buffer, size_t write_buffer
         conditions_trigger_both_charts_update();
         strcpy(write_buffer, "Triggered both charts update");
     } else {
-        strcpy(write_buffer, "Invalid conditions update type, must be 'conditions|tide|swell|both'");
+        strcpy(write_buffer, "Invalid conditions update type, must be 'time|conditions|tide|swell|both'");
     }
 
     return pdFALSE;

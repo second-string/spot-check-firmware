@@ -54,7 +54,10 @@ static void conditions_timer_expired_callback(void *timer_args) {
     }
 }
 
-static void conditions_refresh() {
+/*
+ * Returns success
+ */
+static bool conditions_refresh() {
     spot_check_config *config = nvs_get_config();
     char               url_buf[strlen(URL_BASE) + 80];
     query_param        params[3];
@@ -84,7 +87,7 @@ static void conditions_refresh() {
             log_printf(LOG_LEVEL_ERROR,
                        "Parsed cJSON fields to null. That usually means a successful request response code, but not "
                        "the expected data (like a wifi login portal)");
-            return;
+            return false;
         }
         char *wind_dir_str    = cJSON_GetStringValue(wind_dir_object);
         char *tide_height_str = cJSON_GetStringValue(tide_height_object);
@@ -108,6 +111,7 @@ static void conditions_refresh() {
         memcpy(&last_retrieved_conditions, &temp_conditions, sizeof(conditions_t));
     } else {
         log_printf(LOG_LEVEL_INFO, "Failed to get new conditions, leaving last saved values displayed");
+        return false;
     }
 
     // Caller responsible for freeing buffer if non-null on return
@@ -115,6 +119,8 @@ static void conditions_refresh() {
         free(server_response);
         server_response = NULL;
     }
+
+    return true;
 }
 
 static void conditions_update_task(void *args) {
@@ -145,8 +151,11 @@ static void conditions_update_task(void *args) {
 
         if (update_bits & UPDATE_CONDITIONS_BIT) {
             sleep_handler_set_busy(SYSTEM_IDLE_CONDITIONS_BIT);
-            conditions_refresh();
+            bool success = conditions_refresh();
+            // if (success) {
+            screen_img_handler_clear_conditions(true, true, true);
             screen_img_handler_draw_conditions(&last_retrieved_conditions);
+            // }
             log_printf(LOG_LEVEL_INFO, "update-conditions task updated conditions");
             sleep_handler_set_idle(SYSTEM_IDLE_CONDITIONS_BIT);
         }

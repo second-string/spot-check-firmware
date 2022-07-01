@@ -21,6 +21,10 @@
 #define TIME_DRAW_Y_PX (120)
 #define DATE_DRAW_X_PX (120)
 #define DATE_DRAW_Y_PX (170)
+#define CONDITIONS_DRAW_X_PX (700)  // text is right-aligned, so far side of rect
+#define CONDITIONS_TEMPERATURE_DRAW_Y_PX (80)
+#define CONDITIONS_WIND_DRAW_Y_PX (130)
+#define CONDITIONS_TIDE_DRAW_Y_PX (180)
 
 static struct tm last_time_displayed = {0};
 
@@ -315,10 +319,54 @@ void screen_img_handler_clear_time() {
     }
 }
 
+void screen_img_handler_clear_conditions(bool clear_temperature, bool clear_wind, bool clear_tide) {
+    // Hardcoding in separate variable for clarity
+    const uint32_t max_conditions_width_px = 300;
+
+    // if it's all, blindly do a big block w/ plenty of padding for now since nothing is around it to need to worry
+    // about measuring bounds. If even one is false, erase individual lines.
+    if (clear_temperature && clear_wind && clear_tide) {
+        // CONDITIONS_DRAW_TEMPERATURE_Y is the bottom left corner of the top row of text. Need to get bounds of text
+        // for the height so we can subtract it from the constant Y to get the top left corner, which is what the clear
+        // function expects its rect to start
+        uint32_t font_width_px  = 0;
+        uint32_t font_height_px = 0;
+        display_get_text_bounds("F",
+                                0,
+                                0,
+                                DISPLAY_FONT_SIZE_MEDIUM,
+                                DISPLAY_FONT_ALIGN_RIGHT,
+                                &font_width_px,
+                                &font_height_px);
+
+        // Erase from top left of conditions (top left of temp text, hardcoded max width of conditions block, down to
+        // bottom right of conditions (bottom right of tide text))
+        display_clear_area(CONDITIONS_DRAW_X_PX - max_conditions_width_px,
+                           CONDITIONS_TEMPERATURE_DRAW_Y_PX - font_height_px,
+                           +max_conditions_width_px,
+                           CONDITIONS_TIDE_DRAW_Y_PX);
+    } else {
+        log_printf(LOG_LEVEL_ERROR, "CLEARINING INDIVIDUAL CONDITION LINES NOT YET SUPPORTED");
+        configASSERT(0);
+    }
+}
+
 bool screen_img_handler_draw_conditions(conditions_t *conditions) {
-    display_draw_text("72º F", 700, 80, DISPLAY_FONT_SIZE_MEDIUM, DISPLAY_FONT_ALIGN_RIGHT);
-    display_draw_text("7 kt. SSE", 700, 130, DISPLAY_FONT_SIZE_MEDIUM, DISPLAY_FONT_ALIGN_RIGHT);
-    display_draw_text("5.3 ft. rising", 700, 180, DISPLAY_FONT_SIZE_MEDIUM, DISPLAY_FONT_ALIGN_RIGHT);
+    display_draw_text("72º F",
+                      CONDITIONS_DRAW_X_PX,
+                      CONDITIONS_TEMPERATURE_DRAW_Y_PX,
+                      DISPLAY_FONT_SIZE_MEDIUM,
+                      DISPLAY_FONT_ALIGN_RIGHT);
+    display_draw_text("7 kt. SSE",
+                      CONDITIONS_DRAW_X_PX,
+                      CONDITIONS_WIND_DRAW_Y_PX,
+                      DISPLAY_FONT_SIZE_MEDIUM,
+                      DISPLAY_FONT_ALIGN_RIGHT);
+    display_draw_text("5.3 ft. rising",
+                      CONDITIONS_DRAW_X_PX,
+                      CONDITIONS_TIDE_DRAW_Y_PX,
+                      DISPLAY_FONT_SIZE_MEDIUM,
+                      DISPLAY_FONT_ALIGN_RIGHT);
 
     return true;
 }

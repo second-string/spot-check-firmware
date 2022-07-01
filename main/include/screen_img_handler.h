@@ -33,5 +33,6 @@ bool screen_img_handler_download_and_save(screen_img_t screen_img);
 bool screen_img_handler_draw_screen_img(screen_img_t screen_img);
 void screen_img_handler_clear_time();
 bool screen_img_handler_draw_time();
+void screen_img_handler_clear_conditions(bool clear_temperature, bool clear_wind, bool clear_tide);
 bool screen_img_handler_draw_conditions(conditions_t *conditions);
 void screen_img_handler_render();
