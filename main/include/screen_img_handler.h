@@ -16,6 +16,7 @@
 // Start byte of each image saved inthe screen_img partition. Assumes the partition is 512K, which puts the second image
 // at the halfway point. If each image is 700x200 px, each takes up 140kb, so we've got a fair amount of
 // overcompensation. Could be dynamically calced but this is simpler for now.
+// NOTE: These MUST by 4k aligned for proper erasing
 #define SCREEN_IMG_TIDE_CHART_OFFSET 0x0
 #define SCREEN_IMG_SWELL_CHART_OFFSET 0x40000
 
@@ -30,6 +31,7 @@ typedef enum {
 } screen_img_t;
 
 bool screen_img_handler_download_and_save(screen_img_t screen_img);
+bool screen_img_handler_clear_screen_img(screen_img_t screen_img);
 bool screen_img_handler_draw_screen_img(screen_img_t screen_img);
 void screen_img_handler_clear_time();
 bool screen_img_handler_draw_time();

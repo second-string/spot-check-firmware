@@ -95,11 +95,20 @@ static int screen_img_handler_save(esp_http_client_handle_t *client,
     // Erase only the size of the image currently stored (internal spi flash functions will erase to page
     // boundary automatically)
     if (metadata->screen_img_size) {
-        esp_partition_erase_range(part, metadata->screen_img_offset, metadata->screen_img_size);
+        uint32_t alignment_remainder = metadata->screen_img_size % 4096;
+        uint32_t size_to_erase =
+            alignment_remainder ? (metadata->screen_img_size + (4096 - alignment_remainder)) : metadata->screen_img;
+
+        esp_err_t err = esp_partition_erase_range(part, metadata->screen_img_offset, size_to_erase);
+        if (err != ESP_OK) {
+            log_printf(LOG_LEVEL_ERROR, "Error erasing partition range: %s", esp_err_to_name(err));
+            return 0;
+        }
+
         nvs_set_uint32(metadata->screen_img_size_key, 0);
         nvs_set_uint32(metadata->screen_img_width_key, 0);
         nvs_set_uint32(metadata->screen_img_height_key, 0);
-        log_printf(LOG_LEVEL_DEBUG, "Erased %u bytes from %u screen_img_t", metadata->screen_img_size, screen_img);
+        log_printf(LOG_LEVEL_DEBUG, "Erased %u bytes from %u screen_img_t", size_to_erase, screen_img);
     } else {
         log_printf(LOG_LEVEL_DEBUG,
                    "%s NVS key had zero value, not erasing any of screen img partition",
@@ -118,6 +127,14 @@ static int screen_img_handler_save(esp_http_client_handle_t *client,
     }
 
     return bytes_saved;
+}
+
+bool screen_img_handler_clear_screen_img(screen_img_t screen_img) {
+    screen_img_metadata_t metadata = {0};
+    screen_img_handler_get_metadata(screen_img, &metadata);
+
+    display_clear_area(metadata.x_coord, metadata.y_coord, metadata.screen_img_width, metadata.screen_img_height);
+    return true;
 }
 
 bool screen_img_handler_draw_screen_img(screen_img_t screen_img) {
