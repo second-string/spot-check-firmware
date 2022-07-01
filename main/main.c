@@ -169,8 +169,8 @@ void app_main(void) {
 
         // TODO :: This is still really hacky. Sometimes SNTP gets a new value within a second, sometimes it takes 45
         // seconds. I don't know enough about ntp to know if the SNTP init code actively sends a sync packet or just
-        // passively waits for the next UDP broadcast. If the former, need to figure out how to force it. If the latter,
-        // we're kind of at the whim of the packet rate unless we can force it somehow.
+        // passively waits for the next UDP broadcast. If the latter, need to figure out how to force it. If the former,
+        // we're kind of at the whim of the slow update time.
         bool sntp_time_set = false;
         start_ticks        = xTaskGetTickCount();
         now_ticks          = start_ticks;

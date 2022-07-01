@@ -83,32 +83,71 @@ static bool conditions_refresh() {
             server_response = NULL;
         }
 
-        if (wind_dir_object == NULL || tide_height_object == NULL) {
+        if (wind_dir_object == NULL || tide_height_object == NULL || wind_speed_object == NULL ||
+            temperature_object == NULL) {
             log_printf(LOG_LEVEL_ERROR,
-                       "Parsed cJSON fields to null. That usually means a successful request response code, but not "
-                       "the expected data (like a wifi login portal)");
+                       "Parsed at least one field to a null cJSON object. That means the field wasn't in the response "
+                       "at all but a successful request response "
+                       "code (usually  a wifi login portal default login page)");
             return false;
         }
-        char *wind_dir_str    = cJSON_GetStringValue(wind_dir_object);
-        char *tide_height_str = cJSON_GetStringValue(tide_height_object);
 
-        // Build out local struct to make sure everything valid before we overwrite last saved values
-        conditions_t temp_conditions;
+        // char *temperature_debug_str = cJSON_Print(temperature_object);
+        // char *wind_speed_debug_str  = cJSON_Print(wind_speed_object);
+        // char *wind_dir_debug_str    = cJSON_Print(wind_dir_object);
+        // char *tide_height_debug_str = cJSON_Print(tide_height_object);
+        // log_printf(LOG_LEVEL_DEBUG, "cJSON_Print value for temperature: %s", temperature_debug_str);
+        // log_printf(LOG_LEVEL_DEBUG, "cJSON_Print value for wind_speed: %s", wind_speed_debug_str);
+        // log_printf(LOG_LEVEL_DEBUG, "cJSON_Print value for wind_dir: %s", wind_dir_debug_str);
+        // log_printf(LOG_LEVEL_DEBUG, "cJSON_Print value for tide_height: %s", tide_height_debug_str);
+        // free(temperature_debug_str);
+        // free(wind_speed_debug_str);
+        // free(wind_dir_debug_str);
+        // free(tide_height_debug_str);
 
-        // Set ints directly, then don't know if cjson null terminates strings so manually strncpy then slap the null
-        // term on
-        temp_conditions.temperature = temperature_object->valueint;
-        temp_conditions.wind_speed  = wind_speed_object->valueint;
-        strncpy(temp_conditions.wind_dir, wind_dir_str, sizeof(temp_conditions.wind_dir) - 1);
-        temp_conditions.wind_dir[sizeof(temp_conditions.wind_dir) - 1] = '\0';
-        strncpy(temp_conditions.tide_height, tide_height_str, sizeof(temp_conditions.tide_height) - 1);
-        temp_conditions.tide_height[sizeof(temp_conditions.tide_height) - 1] = '\0';
+        // Parse out end-result values with fallbacks in case value for key is not expected type
+        int8_t temperature = 0;
+        if (cJSON_IsNumber(temperature_object)) {
+            temperature = temperature_object->valueint;
+        } else {
+            log_printf(LOG_LEVEL_WARN, "Expecting number from api for temp key, did not get one. Defaulting to -99");
+            temperature = -99;
+        }
+
+        uint8_t wind_speed = 0;
+        if (cJSON_IsNumber(wind_speed_object)) {
+            wind_speed = wind_speed_object->valueint;
+        } else {
+            log_printf(LOG_LEVEL_WARN,
+                       "Expecting number from api for wind_speed key, did not get one. Defaulting to 99");
+            wind_speed = 99;
+        }
+
+        char *wind_dir_str = NULL;
+        if (cJSON_IsString(wind_dir_object)) {
+            wind_dir_str = cJSON_GetStringValue(wind_dir_object);
+        } else {
+            log_printf(LOG_LEVEL_WARN, "Expecting string from api for wind_dir key, did not get one. Defaulting to ?");
+            wind_dir_str = "X";
+        }
+
+        char *tide_height_str = NULL;
+        if (cJSON_IsString(tide_height_object)) {
+            tide_height_str = cJSON_GetStringValue(tide_height_object);
+        } else {
+            log_printf(LOG_LEVEL_WARN,
+                       "Expecting string from api for tide_height key, did not get one. Defaulting to ?");
+            tide_height_str = "?";
+        }
+
+        // Copy into global conditions after every field set
+        last_retrieved_conditions.temperature = temperature;
+        last_retrieved_conditions.wind_speed  = wind_speed;
+        strcpy(last_retrieved_conditions.wind_dir, wind_dir_str);
+        strcpy(last_retrieved_conditions.tide_height, tide_height_str);
 
         cJSON_free(data_value);
         cJSON_free(json);
-
-        // Copy into global last_retrieved_conditions struct now that everything parsed correctly
-        memcpy(&last_retrieved_conditions, &temp_conditions, sizeof(conditions_t));
     } else {
         log_printf(LOG_LEVEL_INFO, "Failed to get new conditions, leaving last saved values displayed");
         return false;
@@ -152,10 +191,12 @@ static void conditions_update_task(void *args) {
         if (update_bits & UPDATE_CONDITIONS_BIT) {
             sleep_handler_set_busy(SYSTEM_IDLE_CONDITIONS_BIT);
             bool success = conditions_refresh();
-            // if (success) {
             screen_img_handler_clear_conditions(true, true, true);
-            screen_img_handler_draw_conditions(&last_retrieved_conditions);
-            // }
+            if (success) {
+                screen_img_handler_draw_conditions(&last_retrieved_conditions);
+            } else {
+                screen_img_handler_draw_conditions_error();
+            }
             log_printf(LOG_LEVEL_INFO, "update-conditions task updated conditions");
             sleep_handler_set_idle(SYSTEM_IDLE_CONDITIONS_BIT);
         }

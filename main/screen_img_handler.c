@@ -352,22 +352,49 @@ void screen_img_handler_clear_conditions(bool clear_temperature, bool clear_wind
 }
 
 bool screen_img_handler_draw_conditions(conditions_t *conditions) {
-    display_draw_text("72º F",
-                      CONDITIONS_DRAW_X_PX,
-                      CONDITIONS_TEMPERATURE_DRAW_Y_PX,
-                      DISPLAY_FONT_SIZE_MEDIUM,
-                      DISPLAY_FONT_ALIGN_RIGHT);
-    display_draw_text("7 kt. SSE",
+    if (conditions == NULL) {
+        display_draw_text("Fetching latest conditions...",
+                          CONDITIONS_DRAW_X_PX,
+                          CONDITIONS_WIND_DRAW_Y_PX,
+                          DISPLAY_FONT_SIZE_SMALL,
+                          DISPLAY_FONT_ALIGN_RIGHT);
+    } else {
+        // Expect max 3 digit temp (or negative 2 digit)
+        char temperature_str[9];
+        // Expect max 2 digit speed & 3 char direction for wind
+        char wind_str[12];
+        // Expect max negative double-digit w/ decimal tide height
+        char tide_str[18];
+        sprintf(temperature_str, "%dº F", conditions->temperature);
+        sprintf(wind_str, "%d kt. %s", conditions->wind_speed, conditions->wind_dir);
+        // TODO :: still not retrieviing rising / falling from api
+        sprintf(tide_str, "%s ft. %s", conditions->tide_height, "rising");
+        display_draw_text(temperature_str,
+                          CONDITIONS_DRAW_X_PX,
+                          CONDITIONS_TEMPERATURE_DRAW_Y_PX,
+                          DISPLAY_FONT_SIZE_MEDIUM,
+                          DISPLAY_FONT_ALIGN_RIGHT);
+        display_draw_text(wind_str,
+                          CONDITIONS_DRAW_X_PX,
+                          CONDITIONS_WIND_DRAW_Y_PX,
+                          DISPLAY_FONT_SIZE_MEDIUM,
+                          DISPLAY_FONT_ALIGN_RIGHT);
+        display_draw_text(tide_str,
+                          CONDITIONS_DRAW_X_PX,
+                          CONDITIONS_TIDE_DRAW_Y_PX,
+                          DISPLAY_FONT_SIZE_MEDIUM,
+                          DISPLAY_FONT_ALIGN_RIGHT);
+    }
+
+    return true;
+}
+
+bool screen_img_handler_draw_conditions_error() {
+    display_draw_text("Error fetching conditions",
                       CONDITIONS_DRAW_X_PX,
                       CONDITIONS_WIND_DRAW_Y_PX,
-                      DISPLAY_FONT_SIZE_MEDIUM,
+                      DISPLAY_FONT_SIZE_SMALL,
                       DISPLAY_FONT_ALIGN_RIGHT);
-    display_draw_text("5.3 ft. rising",
-                      CONDITIONS_DRAW_X_PX,
-                      CONDITIONS_TIDE_DRAW_Y_PX,
-                      DISPLAY_FONT_SIZE_MEDIUM,
-                      DISPLAY_FONT_ALIGN_RIGHT);
-
     return true;
 }
 
