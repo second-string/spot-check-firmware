@@ -208,25 +208,10 @@ bool screen_img_handler_download_and_save(screen_img_t screen_img) {
 }
 
 /*
- * Draw the date string at the correct location. static scoped since it's only triggered from
- * screen_img_handler_draw_time if the date has advanced
- */
-static bool screen_img_handler_draw_date() {
-    struct tm now_local = {0};
-    char      date_string[64];
-    sntp_time_get_local_time(&now_local);
-    sntp_time_get_time_str(&now_local, NULL, date_string);
-
-    display_draw_text(date_string, DATE_DRAW_X_PX, DATE_DRAW_Y_PX, DISPLAY_FONT_SIZE_SHMEDIUM, DISPLAY_FONT_ALIGN_LEFT);
-    return true;
-}
-
-/*
  * Clears the date string. Dumb-clear, clears full rect every time instead of determining single digit, month, day of
- * week, etc specific clear area.. static scoped since it's only triggered from screen_img_handler_draw_time if the date
- * has advanced
- */
-static void screen_img_handler_clear_date() {
+ * week, etc specific clear area..
+ * */
+void screen_img_handler_clear_date() {
     char     date_string[64];
     uint32_t previous_date_width_px;
     uint32_t previous_date_height_px;
@@ -240,8 +225,25 @@ static void screen_img_handler_clear_date() {
                             &previous_date_height_px);
 
     if (previous_date_width_px > 0 && previous_date_height_px > 0) {
-        display_clear_area(DATE_DRAW_X_PX, DATE_DRAW_Y_PX, previous_date_width_px, previous_date_height_px);
+        // Add 5px buffer for lowercase letters
+        display_clear_area(DATE_DRAW_X_PX - 5,
+                           DATE_DRAW_Y_PX - previous_date_height_px - 5,
+                           previous_date_width_px + 10,
+                           previous_date_height_px + 10);
     }
+}
+
+/*
+ * Draw the date string at the correct location.
+ */
+bool screen_img_handler_draw_date() {
+    struct tm now_local = {0};
+    char      date_string[64];
+    sntp_time_get_local_time(&now_local);
+    sntp_time_get_time_str(&now_local, NULL, date_string);
+
+    display_draw_text(date_string, DATE_DRAW_X_PX, DATE_DRAW_Y_PX, DISPLAY_FONT_SIZE_SHMEDIUM, DISPLAY_FONT_ALIGN_LEFT);
+    return true;
 }
 
 bool screen_img_handler_draw_time() {

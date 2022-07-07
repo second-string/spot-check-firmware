@@ -548,6 +548,11 @@ static BaseType_t cli_command_conditions(char *write_buffer, size_t write_buffer
     if (type_len == 4 && strncmp(type, "time", type_len) == 0) {
         conditions_trigger_time_update();
         strcpy(write_buffer, "Triggered time update");
+    } else if (type_len == 4 && strncmp(type, "date", type_len) == 0) {
+        // No conditions trigger for this since it's handled internally when updating time. Functions are only exposed
+        // for debugging here
+        screen_img_handler_clear_date();
+        screen_img_handler_draw_date();
     } else if (type_len == 10 && strncmp(type, "conditions", type_len) == 0) {
         conditions_trigger_conditions_update();
         strcpy(write_buffer, "Triggered conditions update");
