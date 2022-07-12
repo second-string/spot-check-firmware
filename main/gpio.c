@@ -61,6 +61,10 @@ static void button_timer_expired_callback(void *timer_args) {
 }
 
 void gpio_init() {
+    (void)button_timer_expired_callback;
+    (void)button_isr_handler;
+
+    /*
     current_state = WAITING_FOR_PRESS;
 
     // Cheater init for LED output compared to full config for button input below
@@ -87,4 +91,5 @@ void gpio_init() {
     gpio_config(&input_config);
     ESP_ERROR_CHECK(gpio_install_isr_service(0));
     ESP_ERROR_CHECK(gpio_isr_handler_add(GPIO_BUTTON_PIN, button_isr_handler, (void *)GPIO_BUTTON_PIN));
+    */
 }
