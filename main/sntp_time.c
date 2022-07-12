@@ -31,7 +31,7 @@ void sntp_time_init() {
     // EST +5 from GMT - DST starts 3rd month, second (2) sunday (0) at 2am (/2) - DST ends 11th month first (1) sunday
     // (1) at 2am (/2)
     // https://www.gnu.org/software/libc/manual/html_node/TZ-Variable.html
-    setenv("TZ", "EST+5EDT,M3.2.0/2,M11.1.0/2", 1);
+    setenv("TZ", "PST+8EDT,M3.2.0/2,M11.1.0/2", 1);
     tzset();
 }
 
