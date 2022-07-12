@@ -253,7 +253,7 @@ void conditions_trigger_both_charts_update() {
 void conditions_update_task_start() {
     xTaskCreate(&conditions_update_task,
                 "conditions-update",
-                SPOT_CHECK_MINIMAL_STACK_SIZE_BYTES * 3,
+                SPOT_CHECK_MINIMAL_STACK_SIZE_BYTES * 4,
                 NULL,
                 tskIDLE_PRIORITY,
                 &conditions_update_task_handle);
