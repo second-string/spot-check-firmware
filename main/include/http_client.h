@@ -9,8 +9,8 @@
 #include "nvs.h"
 
 // Needs trailing slash!
-// #define URL_BASE "https://spotcheck.brianteam.dev/"
-#define URL_BASE "http://192.168.86.31:9080/"
+#define URL_BASE "https://spotcheck.brianteam.dev/"
+// #define URL_BASE "http://192.168.86.31:9080/"
 
 typedef struct {
     char *key;
