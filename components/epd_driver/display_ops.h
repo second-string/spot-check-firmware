@@ -1,7 +1,7 @@
 #pragma once
 
-#include "esp_attr.h"
 #include "driver/gpio.h"
+#include "esp_attr.h"
 
 #if defined(CONFIG_EPD_BOARD_REVISION_V5) || defined(CONFIG_EPD_BOARD_REVISION_V6)
 #define D7 GPIO_NUM_23
@@ -29,6 +29,7 @@
 
 // This GPIO altered for custom board
 #define CFG_STR GPIO_NUM_12
+
 #endif
 #if defined(CONFIG_EPD_BOARD_REVISION_V6)
 #define CFG_SCL GPIO_NUM_33
