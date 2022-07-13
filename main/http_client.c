@@ -301,6 +301,15 @@ esp_err_t http_client_read_response_to_buffer(esp_http_client_handle_t *client,
         }
     } while (0);
 
+    esp_err_t cleanup_err = esp_http_client_cleanup(*client);
+    if (cleanup_err != ESP_OK) {
+        err = cleanup_err;
+        log_printf(LOG_LEVEL_ERROR,
+                   "Call to esp_http_client_cleanup after reading response to buffer failed with err: %s. Returning "
+                   "err to caller",
+                   esp_err_to_name(cleanup_err));
+    }
+
     *response_data_size = bytes_received;
     return err;
 }
@@ -370,6 +379,14 @@ int http_client_read_response_to_flash(esp_http_client_handle_t *client,
         return -1;
     } else {
         log_printf(LOG_LEVEL_DEBUG, "Rcvd %zu bytes total of response data and saved to flash", bytes_received);
+    }
+
+    esp_err_t cleanup_err = esp_http_client_cleanup(*client);
+    if (cleanup_err != ESP_OK) {
+        log_printf(LOG_LEVEL_ERROR,
+                   "Call to esp_http_client_cleanup after reading response to flash failed with err: %s. Malloced buff "
+                   "already freed so not altering bytes_received returned to caller",
+                   esp_err_to_name(cleanup_err));
     }
 
     return bytes_received;
