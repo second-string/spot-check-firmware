@@ -14,3 +14,6 @@ build/
 .cache/
 
 board_builds/
+
+# symlinked compile_commands in project root for YCM
+compile_commands.json
