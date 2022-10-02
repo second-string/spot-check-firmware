@@ -7,7 +7,7 @@
 
 #define LED_PIN (2)
 
-#if defined(CONFIG_ESP32_DEVBOARD) || defined(CONFIG_SPOT_CHECK_REV_3)
+#if defined(CONFIG_ESP32_DEVBOARD) || defined(CONFIG_SPOT_CHECK_REV_3_1)
 #define GPIO_BUTTON_PIN (0)
 #elif defined(CONFIG_SPOT_CHECK_REV_2)
 #define GPIO_BUTTON_PIN (27)
