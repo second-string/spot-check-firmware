@@ -17,3 +17,7 @@ board_builds/
 
 # symlinked compile_commands in project root for YCM
 compile_commands.json
+
+# New component manager for esp-idf 5.0+ will handle downloading components defined in main/idf_component.yml on build
+managed_components
+dependencies.lock
