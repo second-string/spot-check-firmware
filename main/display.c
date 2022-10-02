@@ -169,8 +169,8 @@ void display_draw_text(char                *text,
     configASSERT(x_coord < ED060SC4_WIDTH_PX);
     configASSERT(y_coord < ED060SC4_HEIGHT_PX);
 
-    int32_t x = x_coord;
-    int32_t y = y_coord;
+    int x = x_coord;
+    int y = y_coord;
 
     EpdFontProperties font_props = epd_font_properties_default();
     font_props.flags             = display_get_epd_font_flags_enum(alignment);
@@ -253,17 +253,9 @@ void display_get_text_bounds(char                *text,
     };
 
     const EpdFont *font = display_get_epd_font_enum(size);
-    int32_t        x1   = 0;
-    int32_t        y1   = 0;
-    epd_get_text_bounds(font,
-                        text,
-                        (int32_t *)&x,
-                        (int32_t *)&y,
-                        &x1,
-                        &y1,
-                        (int32_t *)width,
-                        (int32_t *)height,
-                        &font_props);
+    int            x1   = 0;
+    int            y1   = 0;
+    epd_get_text_bounds(font, text, (int *)&x, (int *)&y, &x1, &y1, (int *)width, (int *)height, &font_props);
     log_printf(LOG_LEVEL_DEBUG,
                "BOUNDS for '%s': x: %d, y: %d, x1: %d, y1: %d, width: %d, height: %d",
                text,
