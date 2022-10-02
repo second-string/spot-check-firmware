@@ -1,6 +1,7 @@
 #include "i2s_data_bus.h"
-#include "display_ops.h"
-#include "driver/periph_ctrl.h"
+
+#include "driver/rtc_io.h"
+#include "esp_system.h"
 #if ESP_IDF_VERSION < (4, 0, 0) || ARDUINO_ARCH_ESP32
 #include "rom/lldesc.h"
 #include "rom/gpio.h"
@@ -12,6 +13,13 @@
 #include "soc/i2s_reg.h"
 #include "soc/i2s_struct.h"
 #include "soc/rtc.h"
+
+#include "esp_system.h"  // for ESP_IDF_VERSION_VAL
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
+#include "esp_private/periph_ctrl.h"
+#else
+#include "driver/periph_ctrl.h"
+#endif
 
 /// DMA descriptors for front and back line buffer.
 /// We use two buffers, so one can be filled while the other
@@ -82,7 +90,7 @@ static void IRAM_ATTR i2s_int_hdl(void *arg) {
 }
 
 volatile uint8_t IRAM_ATTR *i2s_get_current_buffer() {
-  return current_buffer ? i2s_state.dma_desc_a->buf : i2s_state.dma_desc_b->buf;
+  return (volatile uint8_t*) (current_buffer ? i2s_state.dma_desc_a->buf : i2s_state.dma_desc_b->buf);
 }
 
 bool IRAM_ATTR i2s_is_busy() {
@@ -118,13 +126,13 @@ void IRAM_ATTR i2s_start_line_output() {
   dev->conf.tx_start = 1;
 }
 
-void i2s_gpio_attach() {
-  gpio_num_t I2S_GPIO_BUS[] = {D6, D7, D4,
-                               D5, D2, D3,
-                               D0, D1};
+void i2s_gpio_attach(i2s_bus_config *cfg) {
+  gpio_num_t I2S_GPIO_BUS[] = {cfg->data_6, cfg->data_7, cfg->data_4,
+                               cfg->data_5, cfg->data_2, cfg->data_3,
+                               cfg->data_0, cfg->data_1};
 
-  gpio_set_direction(STH, GPIO_MODE_OUTPUT);
-  gpio_set_level(STH, 1);
+  gpio_set_direction(cfg->start_pulse, GPIO_MODE_OUTPUT);
+  gpio_set_level(cfg->start_pulse, 1);
   // Use I2S1 with no signal offset (for some reason the offset seems to be
   // needed in 16-bit mode, but not in 8 bit mode.
   int signal_base = I2S1O_DATA_OUT0_IDX;
@@ -133,29 +141,34 @@ void i2s_gpio_attach() {
   for (int x = 0; x < 8; x++) {
     gpio_setup_out(I2S_GPIO_BUS[x], signal_base + x, false);
   }
+
+  // Free CKH after wakeup
+  gpio_hold_dis(cfg->clock);
   // Invert word select signal
-  gpio_setup_out(CKH, I2S1O_WS_OUT_IDX, true);
-
+  gpio_setup_out(cfg->clock, I2S1O_WS_OUT_IDX, true);
 }
 
-void i2s_gpio_detach() {
-  gpio_set_direction(D0, GPIO_MODE_INPUT);
-  gpio_set_direction(D1, GPIO_MODE_INPUT);
-  gpio_set_direction(D2, GPIO_MODE_INPUT);
-  gpio_set_direction(D3, GPIO_MODE_INPUT);
-  gpio_set_direction(D4, GPIO_MODE_INPUT);
-  gpio_set_direction(D5, GPIO_MODE_INPUT);
-  gpio_set_direction(D6, GPIO_MODE_INPUT);
-  gpio_set_direction(D7, GPIO_MODE_INPUT);
-  gpio_set_direction(STH, GPIO_MODE_INPUT);
-  gpio_set_direction(CKH, GPIO_MODE_INPUT);
+void i2s_gpio_detach(i2s_bus_config *cfg) {
+  gpio_set_direction(cfg->data_0, GPIO_MODE_INPUT);
+  gpio_set_direction(cfg->data_1, GPIO_MODE_INPUT);
+  gpio_set_direction(cfg->data_2, GPIO_MODE_INPUT);
+  gpio_set_direction(cfg->data_3, GPIO_MODE_INPUT);
+  gpio_set_direction(cfg->data_4, GPIO_MODE_INPUT);
+  gpio_set_direction(cfg->data_5, GPIO_MODE_INPUT);
+  gpio_set_direction(cfg->data_6, GPIO_MODE_INPUT);
+  gpio_set_direction(cfg->data_7, GPIO_MODE_INPUT);
+  gpio_set_direction(cfg->start_pulse, GPIO_MODE_INPUT);
+  gpio_set_direction(cfg->clock, GPIO_MODE_INPUT);
+
+  gpio_reset_pin(cfg->clock);
+  rtc_gpio_isolate(cfg->clock);
 }
 
-void i2s_bus_init(uint32_t epd_row_width) {
-  i2s_gpio_attach();
+void i2s_bus_init(i2s_bus_config *cfg, uint32_t epd_row_width) {
+  i2s_gpio_attach(cfg);
 
   // store pin in global variable for use in interrupt.
-  start_pulse_pin = STH;
+  start_pulse_pin = cfg->start_pulse;
 
   periph_module_enable(PERIPH_I2S1_MODULE);
 
@@ -188,14 +201,12 @@ void i2s_bus_init(uint32_t epd_row_width) {
   // (Smallest possible divider according to the spec).
   dev->sample_rate_conf.tx_bck_div_num = 2;
 
-#if defined(CONFIG_EPD_DISPLAY_TYPE_ED097OC4_LQ)
-  // Initialize Audio Clock (APLL) for 120 Mhz.
+  // Initialize Audio Clock (APLL)
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
   rtc_clk_apll_enable(true);
   rtc_clk_apll_coeff_set(0, 0, 0, 8);
 #else
-  // Initialize Audio Clock (APLL) for 100 Mhz.
-  rtc_clk_apll_enable(true);
-  rtc_clk_apll_coeff_set(0, 0, 0, 8);
+  rtc_clk_apll_enable(1, 0, 0, 8, 0);
 #endif
 
   // Set Audio Clock Dividers
@@ -279,7 +290,12 @@ void i2s_deinit() {
   free((void *)i2s_state.dma_desc_a);
   free((void *)i2s_state.dma_desc_b);
 
+#if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
   rtc_clk_apll_coeff_set(0, 0, 0, 8);
   rtc_clk_apll_enable(true);
+#else
+  rtc_clk_apll_enable(0, 0, 0, 8, 0);
+#endif
+
   periph_module_disable(PERIPH_I2S1_MODULE);
 }

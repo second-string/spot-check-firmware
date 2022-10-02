@@ -93,7 +93,7 @@ const EpdGlyph* epd_get_glyph(const EpdFont *font, uint32_t code_point) {
   return NULL;
 }
 
-static int uncompress(uint8_t *dest, uint32_t uncompressed_size, const uint8_t *source, uint32_t source_size) {
+static int uncompress(uint8_t *dest, size_t uncompressed_size, const uint8_t *source, size_t source_size) {
     if (uncompressed_size == 0 || dest == NULL || source_size == 0 || source == NULL) {
         return -1;
     }
@@ -132,7 +132,7 @@ static enum EpdDrawError IRAM_ATTR draw_char(const EpdFont *font, uint8_t *buffe
   int byte_width = (width / 2 + width % 2);
   unsigned long bitmap_size = byte_width * height;
   const uint8_t *bitmap = NULL;
-  if (bitmap_size > 0 && font->compressed) {
+  if (font->compressed) {
     uint8_t* tmp_bitmap = (uint8_t *)malloc(bitmap_size);
     if (tmp_bitmap == NULL && bitmap_size) {
       ESP_LOGE("font", "malloc failed.");
@@ -175,7 +175,7 @@ static enum EpdDrawError IRAM_ATTR draw_char(const EpdFont *font, uint8_t *buffe
       x++;
     }
   }
-  if (bitmap_size > 0 && font->compressed) {
+  if (font->compressed) {
     free((uint8_t*)bitmap);
   }
   *cursor_x += glyph->advance_x;
