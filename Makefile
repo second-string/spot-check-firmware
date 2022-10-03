@@ -5,7 +5,7 @@
 
 PROJECT_NAME := spot-check-embedded
 
-include $(IDF_PATH)/make/project.mk
+# include $(IDF_PATH)/make/project.mk
 
 debug:
 	idf.py openocd gdb --gdbinit .gdbinit --gdb-tui 1
@@ -24,4 +24,4 @@ font:
 
 # Just saving rough command for the future, not really needed as a target
 provision:
-python3 ~/Developer/esp/esp-idf/tools/esp_prov/esp_prov.py --transport softap --ssid OceanBreeze211 --passphrase OceanBreeze211
+	python3 ~/Developer/esp/esp-idf/tools/esp_prov/esp_prov.py --transport softap --ssid OceanBreeze211 --passphrase OceanBreeze211
