@@ -193,7 +193,7 @@ void app_main(void) {
         screen_img_handler_draw_conditions(config->spot_name, NULL);
         screen_img_handler_draw_screen_img(SCREEN_IMG_TIDE_CHART);
         screen_img_handler_draw_screen_img(SCREEN_IMG_SWELL_CHART);
-        // conditions_trigger_conditions_update();
+        conditions_trigger_conditions_update();
         // conditions_trigger_both_charts_update();
         screen_img_handler_render();
 
