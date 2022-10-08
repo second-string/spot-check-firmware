@@ -13,6 +13,8 @@
 #include "lwip/err.h"
 #include "lwip/sys.h"
 
+#include "mdns_local.h"
+
 #include "http_server.h"
 #include "wifi.h"
 
@@ -67,7 +69,7 @@ void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id
                 ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
                 log_printf(LOG_LEVEL_INFO, "Setting CONNECTED bit, got ip:" IPSTR, IP2STR(&event->ip_info.ip));
                 sta_connect_attempts = 0;
-                // mdns_advertise_tcp_service();
+                mdns_advertise_tcp_service();
 
                 // Signal to any tasks blocking on an internet connection that they're good to go
                 xEventGroupSetBits(wifi_event_group, WIFI_EVENT_GROUP_NETWORK_CONNECTED_BIT);
