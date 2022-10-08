@@ -1,4 +1,5 @@
 #include "freertos/FreeRTOS.h"
+#include "freertos/semphr.h"
 
 #include "display.h"
 #include "epd_driver.h"
@@ -24,6 +25,7 @@
 static EpdiyHighlevelState hl;
 static uint32_t            display_height;
 static uint32_t            display_width;
+static SemaphoreHandle_t   render_lock;
 
 static enum EpdFontFlags display_get_epd_font_flags_enum(display_font_align_t alignment) {
     configASSERT(alignment < DISPLAY_FONT_ALIGN_COUNT);
@@ -93,10 +95,13 @@ static const char *display_get_epd_font_enum_string(display_font_size_t size) {
 
 void display_init() {
     epd_init(EPD_LUT_1K);
-    hl             = epd_hl_init(EPD_BUILTIN_WAVEFORM);
+    hl = epd_hl_init(EPD_BUILTIN_WAVEFORM);
+
+    render_lock = xSemaphoreCreateMutex();
+
     display_width  = epd_rotated_display_width();
     display_height = epd_rotated_display_height();
-    log_printf(LOG_LEVEL_INFO, "Display dimensions,  width: %dpx height: %dpx", display_width, display_height);
+    log_printf(LOG_LEVEL_DEBUG, "Display dimensions,  width: %dpx height: %dpx", display_width, display_height);
 }
 
 void display_start() {
@@ -105,21 +110,33 @@ void display_start() {
 }
 
 void display_render() {
+    BaseType_t success = xSemaphoreTake(render_lock, pdMS_TO_TICKS(500));
+    if (!success) {
+        log_printf(LOG_LEVEL_ERROR, "Couldn't acquire render lock even after 500ms!");
+        return;
+    }
+
     epd_poweron();
     enum EpdDrawError err = epd_hl_update_screen(&hl, MODE_GL16, 25);
     (void)err;
     // TODO :: error check
-    // TODO :: do we need this delay?
-    vTaskDelay(pdMS_TO_TICKS(100));
     epd_poweroff();
+
+    xSemaphoreGive(render_lock);
 }
 
 void display_full_clear() {
+    BaseType_t success = xSemaphoreTake(render_lock, pdMS_TO_TICKS(500));
+    if (!success) {
+        log_printf(LOG_LEVEL_ERROR, "Couldn't acquire render lock even after 500ms!");
+        return;
+    }
+
     epd_poweron();
     epd_fullclear(&hl, 25);
-    // TODO :: delay needed?
-    vTaskDelay(pdMS_TO_TICKS(100));
     epd_poweroff();
+
+    xSemaphoreGive(render_lock);
 }
 
 void display_clear_area(uint32_t x, uint32_t y, uint32_t width, uint32_t height) {
@@ -137,12 +154,19 @@ void display_clear_area(uint32_t x, uint32_t y, uint32_t width, uint32_t height)
     uint8_t *fb = epd_hl_get_framebuffer(&hl);
     epd_fill_rect(rect, 0xFF, fb);
 
+    BaseType_t success = xSemaphoreTake(render_lock, pdMS_TO_TICKS(500));
+    if (!success) {
+        log_printf(LOG_LEVEL_ERROR, "Couldn't acquire render lock even after 500ms!");
+        return;
+    }
+
     epd_poweron();
     epd_hl_update_area(&hl, MODE_GL16, 25, rect);
     epd_clear_area(rect);
-    // TODO :: delay needed?
-    vTaskDelay(pdMS_TO_TICKS(100));
     epd_poweroff();
+
+    xSemaphoreGive(render_lock);
+
     log_printf(LOG_LEVEL_DEBUG, "Cleared %uw %uh rect at (%u, %u)", width, height, x, y);
 }
 
