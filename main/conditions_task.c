@@ -66,7 +66,17 @@ static bool conditions_refresh() {
     char                    *server_response    = NULL;
     size_t                   response_data_size = 0;
     esp_http_client_handle_t client;
-    http_client_perform_request(&request, &client);
+    bool                     success = http_client_perform_request(&request, &client);
+
+    // This MUST be here to short circuit execution. If http_client_read_response_to_* is called after a failure of
+    // http_client_perform_request, the inner call to client cleanup function will assert and crash and there's nothing
+    // we can do to wrap or error check it
+    if (!success) {
+        log_printf(LOG_LEVEL_ERROR,
+                   "Received false success trying to perform req before reading response, bailing out of process");
+        return false;
+    }
+
     esp_err_t http_err = http_client_read_response_to_buffer(&client, &server_response, &response_data_size);
 
     if (http_err == ESP_OK && response_data_size != 0) {

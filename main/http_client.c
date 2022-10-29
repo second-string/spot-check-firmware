@@ -104,7 +104,7 @@ bool http_client_perform_request(request *request_obj, esp_http_client_handle_t 
 
     if (!wifi_is_network_connected()) {
         log_printf(LOG_LEVEL_INFO, "Attempted to make GET request, not connected to internet yet so bailing");
-        return 0;
+        return false;
     }
 
     // assume we won't have that many query params. Could calc this too
@@ -137,7 +137,7 @@ bool http_client_perform_request(request *request_obj, esp_http_client_handle_t 
     *client = esp_http_client_init(&http_config);
     if (!client) {
         log_printf(LOG_LEVEL_INFO, "Error initing http client, returning without sending request");
-        return 0;
+        return false;
     }
 
     ESP_ERROR_CHECK(esp_http_client_set_method(*client, HTTP_METHOD_GET));
@@ -264,9 +264,10 @@ esp_err_t http_client_read_response_to_buffer(esp_http_client_handle_t *client,
     esp_err_t err = ESP_FAIL;
 
     size_t bytes_received = 0;
+    bool   success        = false;
     do {
-        int  content_length = 0;
-        bool success        = http_client_check_response(client, &content_length);
+        int content_length = 0;
+        success            = http_client_check_response(client, &content_length);
         if (!success || content_length == 0) {
             break;
         }

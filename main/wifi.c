@@ -52,6 +52,12 @@ void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id
                 } else {
                     log_printf(LOG_LEVEL_INFO,
                                "Got STA_DISCON and max retries, setting FAIL bit and kicking provision process");
+                    esp_err_t err = esp_wifi_stop();
+                    if (err != ESP_OK) {
+                        log_printf(LOG_LEVEL_ERROR,
+                                   "Error stopping wifi before starting prov process: %s",
+                                   esp_err_to_name(err));
+                    }
                     wifi_init_provisioning();
                     wifi_start_provisioning(true);
                 }
