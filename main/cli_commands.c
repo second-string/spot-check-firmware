@@ -397,7 +397,7 @@ static BaseType_t cli_command_partition(char *write_buffer, size_t write_buffer_
                         state = PARTITION_STATE_END;
                     } else {
                         char part_str[100];
-                        sprintf(part_str, "%10s, %5d, %5d, 0x%5X", part->label, part->type, part->subtype, part->size);
+                        sprintf(part_str, "%10s, %5d, %5d, 0x%5lX", part->label, part->type, part->subtype, part->size);
                         strcpy(write_buffer, part_str);
 
                         iter   = esp_partition_next(iter);
@@ -509,7 +509,7 @@ static BaseType_t cli_command_nvs(char *write_buffer, size_t write_buffer_size, 
         bool     success = nvs_get_uint32(key, &val);
         if (success) {
             char msg[50];
-            sprintf(msg, "%s: %u", key, val);
+            sprintf(msg, "%s: %lu", key, val);
             strcpy(write_buffer, msg);
         } else {
             strcpy(write_buffer, "Failed to get value from NVS");
@@ -526,7 +526,7 @@ static BaseType_t cli_command_nvs(char *write_buffer, size_t write_buffer_size, 
         bool     success = nvs_set_uint32(key, val);
         if (success) {
             char msg[50];
-            sprintf(msg, "SET %s: %u", key, val);
+            sprintf(msg, "SET %s: %lu", key, val);
             strcpy(write_buffer, msg);
         } else {
             strcpy(write_buffer, "Failed to write value to NVS");
