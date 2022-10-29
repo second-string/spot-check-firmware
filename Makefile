@@ -10,9 +10,9 @@ PROJECT_NAME := spot-check-embedded
 debug:
 	idf.py openocd gdb --gdbinit .gdbinit --gdb-tui 1
 
-# Run this manually - you want the second cert, the root CA one
+# Run this manually - you want the second cert, the LetsEncrypt root CA one
 server_cert:
-	echo -n | openssl s_client -connect spotcheck.brianteam.dev:443 -verify 5
+	echo -n | openssl s_client -showcerts -connect spotcheck.brianteam.dev:443
 
 # Assumes current commit is the one to be released and is tagged with correct version
 release:
