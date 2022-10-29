@@ -20,6 +20,10 @@ void uart_init(uart_port_t       port,
     handle->config.stop_bits = UART_STOP_BITS_1;
     handle->config.flow_ctrl = UART_HW_FLOWCTRL_DISABLE;
 
+    // Undocumented but esp-idf 5.0 release broke uart init without including this. In the past it just used the zero
+    // enum value when initing which worked but that apparently doesn't work anymore so we force it to choose default
+    handle->config.source_clk = UART_SCLK_DEFAULT;
+
     ESP_ERROR_CHECK(uart_param_config(port, &handle->config));
 
     // Probably unnecessary but ¯\_(ツ)_/¯
