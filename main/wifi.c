@@ -45,8 +45,18 @@ void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id
                 log_printf(LOG_LEVEL_INFO, "Got STA_CONN event");
                 break;
             case WIFI_EVENT_STA_DISCONNECTED: {
+                // This case occurs both when we can't connect to previously provisioned network on startup (because it
+                // no longer exists) or temporary discons from network that is still present. Retry logic will kick back
+                // to provisioning mode in former case, while latter should be handled with a reconnect.
+                // TODO :: edge case where it's the latter but we still don't reconnect in max retries, in which user is
+                // forced to reprovision even though they're on the same network. Not sure the best way to handle this
                 if (sta_connect_attempts < PROVISIONED_NETWORK_CONNECTION_MAXIMUM_RETRY) {
                     log_printf(LOG_LEVEL_INFO, "Got STA_DISCON, retrying to connect to the AP");
+
+                    // Clear connected bit in case we have repetitive task waiting on network connection in the future
+                    // (right now all checks only happen at startup)
+                    xEventGroupClearBits(wifi_event_group, WIFI_EVENT_GROUP_NETWORK_CONNECTED_BIT);
+
                     esp_wifi_connect();
                     sta_connect_attempts++;
                 } else {
