@@ -9,7 +9,11 @@
 
 static char *hostname = "spot-check";
 
+static bool mdns_inited = false;
+
 void mdns_local_init() {
+    configASSERT(!mdns_inited);
+
     // initialize mDNS service
     ESP_ERROR_CHECK(mdns_init());
 
@@ -24,7 +28,13 @@ void mdns_local_init() {
 }
 
 void mdns_advertise_tcp_service() {
-    unsigned int port = 5207;
-    ESP_ERROR_CHECK(mdns_service_add(NULL, "_spot-check", "_tcp", port, NULL, 0));
-    log_printf(LOG_LEVEL_INFO, "Advertising _spot-check mDNS service on port %d with hostname %s", port, hostname);
+    if (mdns_inited) {
+        log_printf(LOG_LEVEL_INFO,
+                   "mdns_advertise_tcp_service re-called after reconnection to wifi, skipping call to add new service "
+                   "since previous should still exist");
+    } else {
+        unsigned int port = 5207;
+        ESP_ERROR_CHECK(mdns_service_add(NULL, "_spot-check", "_tcp", port, NULL, 0));
+        log_printf(LOG_LEVEL_INFO, "Advertising _spot-check mDNS service on port %d with hostname %s", port, hostname);
+    }
 }
