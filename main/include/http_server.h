@@ -15,5 +15,6 @@
 #define MAX_NUM_FORECAST_TYPES 5
 
 void http_server_start();
+void http_server_stop();
 
 #endif

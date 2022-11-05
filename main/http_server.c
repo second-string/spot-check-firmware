@@ -11,7 +11,7 @@
 
 #define TAG "sc-http-server"
 
-static httpd_handle_t server_handle;
+static httpd_handle_t server_handle = NULL;
 
 static esp_err_t health_get_handler(httpd_req_t *req);
 static esp_err_t configure_post_handler(httpd_req_t *req);
@@ -282,6 +282,11 @@ static esp_err_t clear_nvs_post_handler(httpd_req_t *req) {
 }
 
 void http_server_start() {
+    if (server_handle) {
+        log_printf(LOG_LEVEL_WARN, "http_server already started and http_server_start called, ignoring and bailing");
+        return;
+    }
+
     httpd_handle_t server = NULL;
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
 
@@ -304,4 +309,14 @@ void http_server_start() {
     httpd_register_uri_handler(server, &clear_nvs_uri);
 
     server_handle = server;
+}
+
+void http_server_stop() {
+    if (server_handle == NULL) {
+        log_printf(LOG_LEVEL_WARN, "http_server not running and http_server_stop called, ignoring and bailing");
+        return;
+    }
+
+    ESP_ERROR_CHECK(httpd_stop(server_handle));
+    server_handle = NULL;
 }

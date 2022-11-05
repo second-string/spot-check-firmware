@@ -4,9 +4,11 @@
 #include "freertos/FreeRTOS.h"
 
 #include "driver/gpio.h"
+#include "esp_event.h"
 #include "esp_ota_ops.h"
 #include "esp_partition.h"
 #include "esp_system.h"
+#include "esp_wifi.h"
 
 #include "bq24196.h"
 #include "cd54hc4094.h"
@@ -642,7 +644,7 @@ BaseType_t cli_command_sleep(char *write_buffer, size_t write_buffer_size, const
     BaseType_t  action_len;
     const char *action = FreeRTOS_CLIGetParameter(cmd_str, 1, &action_len);
     if (action == NULL) {
-        strcpy(write_buffer, "Error: usage is 'log <action> <arg>' where action is 'level'");
+        strcpy(write_buffer, "Error: usage is 'sleep <action>' where action is 'idle' or 'busy'");
         return pdFALSE;
     }
 
@@ -653,6 +655,24 @@ BaseType_t cli_command_sleep(char *write_buffer, size_t write_buffer_size, const
         sleep_handler_set_idle(SYSTEM_IDLE_CLI_BIT);
     } else {
         strcpy(write_buffer, "Unknown sleep command");
+    }
+
+    return pdFALSE;
+}
+
+BaseType_t cli_command_event(char *write_buffer, size_t write_buffer_size, const char *cmd_str) {
+    BaseType_t  action_len;
+    const char *action = FreeRTOS_CLIGetParameter(cmd_str, 1, &action_len);
+    if (action == NULL) {
+        strcpy(write_buffer, "Error: usage is 'event <action>' where action is 'sta_discon'");
+        return pdFALSE;
+    }
+
+    memset(write_buffer, 0x0, write_buffer_size);
+    if (action_len == 10 && strncmp(action, "sta_discon", action_len) == 0) {
+        esp_event_post(WIFI_EVENT, WIFI_EVENT_STA_DISCONNECTED, NULL, 0, pdMS_TO_TICKS(100));
+    } else {
+        strcpy(write_buffer, "Unknown event command");
     }
 
     return pdFALSE;
@@ -767,6 +787,13 @@ void cli_command_register_all() {
         .cExpectedNumberOfParameters = 1,
     };
 
+    static const CLI_Command_Definition_t event_cmd = {
+        .pcCommand                   = "event",
+        .pcHelpString                = "event <sta_discon>: Post selected event to the default event group",
+        .pxCommandInterpreter        = cli_command_event,
+        .cExpectedNumberOfParameters = 1,
+    };
+
     FreeRTOS_CLIRegisterCommand(&info_cmd);
     FreeRTOS_CLIRegisterCommand(&reset_cmd);
     FreeRTOS_CLIRegisterCommand(&bq_cmd);
@@ -780,4 +807,5 @@ void cli_command_register_all() {
     FreeRTOS_CLIRegisterCommand(&sntp_cmd);
     FreeRTOS_CLIRegisterCommand(&log_cmd);
     FreeRTOS_CLIRegisterCommand(&sleep_cmd);
+    FreeRTOS_CLIRegisterCommand(&event_cmd);
 }

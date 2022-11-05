@@ -68,6 +68,7 @@ void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id
                                    "Error stopping wifi before starting prov process: %s",
                                    esp_err_to_name(err));
                     }
+
                     wifi_init_provisioning();
                     wifi_start_provisioning(true);
                 }
@@ -200,6 +201,11 @@ void wifi_start_provisioning(bool force_reprovision) {
 
         // Network password (only used for softap prov)
         const char *service_key = NULL;
+
+        // MUST be manually stopped before trying to start prov mgr, otherwise call to
+        // wifi_prov_mgr_start_provisioning will return ESP_FAIL and fail error check since it needs it's
+        // own http_server for softap provisioning
+        http_server_stop();
 
         ESP_ERROR_CHECK(wifi_prov_mgr_start_provisioning(security, proof_of_poss, service_name, service_key));
 
