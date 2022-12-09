@@ -3,6 +3,7 @@
 #include <sys/time.h>
 #include <time.h>
 
+#include "esp_ota_ops.h"
 #include "esp_system.h"
 #include "esp_task_wdt.h"
 #include "esp_wifi.h"
@@ -117,7 +118,10 @@ void app_main(void) {
 
     app_start();
 
-    display_render_splash_screen();
+    const esp_partition_t *current_partition = esp_ota_get_running_partition();
+    esp_app_desc_t         current_image_info;
+    esp_ota_get_partition_description(current_partition, &current_image_info);
+    display_render_splash_screen(current_image_info.version);
 
     // Wait for network settings that are necessary for operation to finish its startup sequence (including retries
     // internal to things like wifi and provisioning). If all are successful, proceed to wait for sntp time sync. If any
@@ -162,7 +166,7 @@ void app_main(void) {
 
         display_draw_text("Please wait, fetching latest conditions...",
                           400,
-                          400,
+                          350,
                           DISPLAY_FONT_SIZE_SMALL,
                           DISPLAY_FONT_ALIGN_CENTER);
         screen_img_handler_render();
@@ -175,7 +179,7 @@ void app_main(void) {
         start_ticks        = xTaskGetTickCount();
         now_ticks          = start_ticks;
         while (!sntp_time_set && (now_ticks - start_ticks < pdMS_TO_TICKS(10 * 1000))) {
-            log_printf(LOG_LEVEL_INFO, "Waiting for successful boot criteria");
+            log_printf(LOG_LEVEL_INFO, "Waiting for sntp time");
             sntp_time_set = sntp_time_is_synced();
 
             vTaskDelay(pdMS_TO_TICKS(1000));
@@ -193,8 +197,8 @@ void app_main(void) {
         screen_img_handler_draw_conditions(config->spot_name, NULL);
         screen_img_handler_draw_screen_img(SCREEN_IMG_TIDE_CHART);
         screen_img_handler_draw_screen_img(SCREEN_IMG_SWELL_CHART);
-        conditions_trigger_conditions_update();
-        conditions_trigger_both_charts_update();
+        // conditions_trigger_conditions_update();
+        // conditions_trigger_both_charts_update();
         screen_img_handler_render();
 
         log_printf(LOG_LEVEL_INFO,
@@ -205,6 +209,6 @@ void app_main(void) {
     // update, etc) before entering deep sleep
     sleep_handler_block_until_system_idle();
 
-    // yeet the default task, everything run from conditions task, ota task, and timers
+    // yeet the default task, everything runs from conditions task, ota task, and timers
     vTaskDelete(NULL);
 }

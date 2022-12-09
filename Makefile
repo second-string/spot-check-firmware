@@ -25,3 +25,11 @@ font:
 # Just saving rough command for the future, not really needed as a target
 provision:
 	python3 ~/Developer/esp/esp-idf/tools/esp_prov/esp_prov.py --transport softap --ssid OceanBreeze211 --passphrase OceanBreeze211
+
+# 
+# Can't execute as make target, saving command list. More details for testing mdns broadcast
+# https://apple.stackexchange.com/a/239039
+mdns:
+	dns-sd  -B  _services._dns-sd._udp
+	dns-sd  -L  "Spot Check"  _tcp
+	dns-sd -Gv4v6 spot-check.local

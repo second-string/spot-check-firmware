@@ -24,7 +24,7 @@ void display_start();
 void display_render();
 void display_full_clear();
 void display_clear_area(uint32_t x, uint32_t y, uint32_t width, uint32_t height);
-void display_render_splash_screen();
+void display_render_splash_screen(char *fw_version);
 void display_draw_text(char                *text,
                        uint32_t             x_coord,
                        uint32_t             y_coord,

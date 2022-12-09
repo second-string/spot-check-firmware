@@ -10,7 +10,6 @@
 #include "firasans_40.h"
 #include "flash_partition.h"
 #include "log.h"
-#include "timer.h"
 
 #define TAG "sc-display"
 
@@ -95,7 +94,9 @@ static const char *display_get_epd_font_enum_string(display_font_size_t size) {
 
 void display_init() {
     epd_init(EPD_LUT_1K);
-    hl = epd_hl_init(EPD_BUILTIN_WAVEFORM);
+    hl          = epd_hl_init(EPD_BUILTIN_WAVEFORM);
+    uint8_t *fb = epd_hl_get_framebuffer(&hl);
+    memset(fb, 0x00, EPD_WIDTH / 2 * EPD_HEIGHT);
 
     render_lock = xSemaphoreCreateMutex();
 
@@ -106,7 +107,25 @@ void display_init() {
 
 void display_start() {
     configASSERT(hl.front_fb && hl.back_fb);
-    display_full_clear();
+
+    BaseType_t success = xSemaphoreTake(render_lock, pdMS_TO_TICKS(500));
+    if (!success) {
+        log_printf(LOG_LEVEL_ERROR, "Couldn't acquire render lock even after 500ms!");
+        return;
+    }
+
+    // Don't use display_full_clear because that's hardcoded to 1 screen flash. We need at least 3 because there is no
+    // memory of what is displayed on screen from last run, so the diffing internal to epdiy won't run to help the
+    // clearing process.
+    epd_poweron();
+    epd_hl_set_all_white(&hl);
+    enum EpdDrawError err = epd_hl_update_screen(&hl, MODE_GC16, 20);
+    (void)err;
+    vTaskDelay(pdMS_TO_TICKS(20));
+    epd_clear_area_cycles(epd_full_screen(), 3, 12);
+    epd_poweroff();
+
+    xSemaphoreGive(render_lock);
 }
 
 void display_render() {
@@ -117,6 +136,7 @@ void display_render() {
     }
 
     epd_poweron();
+    vTaskDelay(pdMS_TO_TICKS(20));
     enum EpdDrawError err = epd_hl_update_screen(&hl, MODE_GL16, 25);
     (void)err;
     // TODO :: error check
@@ -133,7 +153,11 @@ void display_full_clear() {
     }
 
     epd_poweron();
-    epd_fullclear(&hl, 25);
+    epd_hl_set_all_white(&hl);
+    enum EpdDrawError err = epd_hl_update_screen(&hl, MODE_GC16, 20);
+    (void)err;
+    vTaskDelay(pdMS_TO_TICKS(20));
+    epd_clear_area_cycles(epd_full_screen(), 1, 12);
     epd_poweroff();
 
     xSemaphoreGive(render_lock);
@@ -151,18 +175,29 @@ void display_clear_area(uint32_t x, uint32_t y, uint32_t width, uint32_t height)
         .height = height,
     };
 
+    // Fill framebuffer with white to ovewrite any drawn data in epd_hl_update_area
     uint8_t *fb = epd_hl_get_framebuffer(&hl);
     epd_fill_rect(rect, 0xFF, fb);
 
-    BaseType_t success = xSemaphoreTake(render_lock, pdMS_TO_TICKS(500));
-    if (!success) {
-        log_printf(LOG_LEVEL_ERROR, "Couldn't acquire render lock even after 500ms!");
-        return;
+    // Add in 1-pixel padding to erase area to make sure a gray outline isn't left from bleedover
+    if (rect.x > 0) {
+        rect.x -= 1;
+    }
+    if (rect.y > 0) {
+        rect.y -= 1;
+    }
+    if (rect.x + width < ED060SC4_WIDTH_PX) {
+        rect.width += 2;
+    }
+    if (rect.y + height < ED060SC4_HEIGHT_PX) {
+        rect.height += 2;
     }
 
     epd_poweron();
-    epd_hl_update_area(&hl, MODE_GL16, 25, rect);
-    epd_clear_area(rect);
+    epd_hl_update_area(&hl, MODE_GC16, 18, rect);
+    vTaskDelay(pdMS_TO_TICKS(40));
+    epd_clear_area_cycles(rect, 1, 12);
+    vTaskDelay(pdMS_TO_TICKS(40));
     epd_poweroff();
 
     xSemaphoreGive(render_lock);
@@ -170,14 +205,27 @@ void display_clear_area(uint32_t x, uint32_t y, uint32_t width, uint32_t height)
     log_printf(LOG_LEVEL_DEBUG, "Cleared %uw %uh rect at (%u, %u)", width, height, x, y);
 }
 
-void display_render_splash_screen() {
+void display_render_splash_screen(char *fw_version) {
     configASSERT(hl.front_fb && hl.back_fb);
 
+    const uint8_t version_str_len = 50;
+    char          version_str[version_str_len];
+    char         *hw_version_str = "HW: rev. 3.1";
+    char          fw_version_str[25];
+    sprintf(fw_version_str, "FW: %s", fw_version);
+
+    configASSERT(strlen(hw_version_str) + strlen(fw_version_str) < version_str_len);
+    sprintf(version_str, "%s    %s", hw_version_str, fw_version_str);
+
     display_draw_text("Spot Check", ED060SC4_WIDTH_PX / 2, 250, DISPLAY_FONT_SIZE_MEDIUM, DISPLAY_FONT_ALIGN_CENTER);
-    display_draw_text("rev. 3.1", ED060SC4_WIDTH_PX / 2, 300, DISPLAY_FONT_SIZE_SHMEDIUM, DISPLAY_FONT_ALIGN_CENTER);
     display_draw_text("Second String Studios",
                       ED060SC4_WIDTH_PX / 2,
-                      epd_rotated_display_height() - 50,
+                      epd_rotated_display_height() - 60,
+                      DISPLAY_FONT_SIZE_SMALL,
+                      DISPLAY_FONT_ALIGN_CENTER);
+    display_draw_text(version_str,
+                      ED060SC4_WIDTH_PX / 2,
+                      epd_rotated_display_height() - 30,
                       DISPLAY_FONT_SIZE_SMALL,
                       DISPLAY_FONT_ALIGN_CENTER);
 
@@ -252,7 +300,7 @@ void display_draw_rect(uint32_t x, uint32_t y, uint32_t width_px, uint32_t heigh
     };
 
     uint8_t *fb = epd_hl_get_framebuffer(&hl);
-    epd_draw_rect(rect, 0x0, fb);
+    epd_fill_rect(rect, 0x0, fb);
 
     log_printf(LOG_LEVEL_DEBUG, "Rendering %uw %uh rect at (%u, %u)", width_px, height_px, x, y);
 }
