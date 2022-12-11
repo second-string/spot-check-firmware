@@ -266,13 +266,13 @@ bool screen_img_handler_draw_time() {
 }
 
 void screen_img_handler_clear_time() {
-    // TODO :: HACK - make this cli command behavior
-    // struct timeval  tv = {0};
-    // struct timezone tz = {0};
-    // gettimeofday(&tv, &tz);
-    // tv.tv_sec = tv.tv_sec + 60;
-    // settimeofday(&tv, &tz);
+    char time_string[6];
+    sntp_time_get_time_str(&last_time_displayed, time_string, NULL);
+    display_invert_text(time_string, TIME_DRAW_X_PX, TIME_DRAW_Y_PX, DISPLAY_FONT_SIZE_LARGE, DISPLAY_FONT_ALIGN_LEFT);
+    return;
 
+    // TODO :: separate full timebox clear into different function than invert
+    /*
     char     time_string[6];
     uint32_t previous_time_width_px;
     uint32_t previous_time_height_px;
@@ -346,6 +346,7 @@ void screen_img_handler_clear_time() {
                    erase_width,
                    erase_height);
     }
+    */
 }
 
 void screen_img_handler_clear_conditions(bool clear_spot_name,
