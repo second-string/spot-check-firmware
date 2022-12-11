@@ -254,9 +254,9 @@ static BaseType_t cli_command_api(char *write_buffer, size_t write_buffer_size, 
         }
 
         screen_img_t screen_img = SCREEN_IMG_COUNT;
-        if (strcmp(screen_img_str, "test_tide_chart.raw") == 0 || strcmp(screen_img_str, "tides_chart") == 0) {
+        if (screen_img_str_len == 4 && strcmp(screen_img_str, "tide") == 0) {
             screen_img = SCREEN_IMG_TIDE_CHART;
-        } else if (strcmp(screen_img_str, "test_swell_chart.raw") == 0 || strcmp(screen_img_str, "swell_chart") == 0) {
+        } else if (screen_img_str_len == 5 && strcmp(screen_img_str, "swell") == 0) {
             screen_img = SCREEN_IMG_SWELL_CHART;
         } else {
             char msg[80];
@@ -441,9 +441,9 @@ static BaseType_t cli_command_display(char *write_buffer, size_t write_buffer_si
         }
 
         screen_img_t screen_img = SCREEN_IMG_COUNT;
-        if (screen_len == 4 && strncmp(screen, "tides_chart", screen_len) == 0) {
+        if (screen_len == 4 && strncmp(screen, "tide", screen_len) == 0) {
             screen_img = SCREEN_IMG_TIDE_CHART;
-        } else if (screen_len == 5 && strncmp(screen, "swell_chart", screen_len) == 0) {
+        } else if (screen_len == 5 && strncmp(screen, "swell", screen_len) == 0) {
             screen_img = SCREEN_IMG_SWELL_CHART;
         } else {
             char msg[80];
@@ -694,8 +694,9 @@ void cli_command_register_all() {
     };
 
     static const CLI_Command_Definition_t bq_cmd = {
-        .pcCommand                   = "bq",
-        .pcHelpString                = "bq: Perform actions on the BQ24196 IC",
+        .pcCommand = "bq",
+        .pcHelpString =
+            "bq:\n\twritereg <reg hex>\n\treadreg <reg hex>\n\tdwdg: disable watchdog\n\tdchg: disable charging",
         .pxCommandInterpreter        = cli_command_bq,
         .cExpectedNumberOfParameters = -1,
     };
@@ -718,7 +719,7 @@ void cli_command_register_all() {
     static const CLI_Command_Definition_t api_cmd = {
         .pcCommand = "api",
         .pcHelpString =
-            "api:\n\timg <tides_chart|swell_chart>: download and save image to flash\n\t<endpoint>: send request "
+            "api:\n\timg <tide|swell>: download and save image to flash\n\t<endpoint>: send request "
             "to "
             "API endpoint with base URL set in menuconfig",
         .pxCommandInterpreter        = cli_command_api,
@@ -737,7 +738,7 @@ void cli_command_register_all() {
     static const CLI_Command_Definition_t display_cmd = {
         .pcCommand = "display",
         .pcHelpString =
-            "display:\n\tclear: clear full display\n\timg <tides_chart|swell_chart> [<x> <y>]: render an image "
+            "display:\n\tclear: clear full display\n\timg <tide|swell> [<x> <y>]: render an image "
             "currently in flash at the specified coordinates",
         .pxCommandInterpreter        = cli_command_display,
         .cExpectedNumberOfParameters = -1,
