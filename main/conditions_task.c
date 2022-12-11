@@ -25,6 +25,7 @@
 #define UPDATE_TIDE_CHART_BIT (1 << 1)
 #define UPDATE_SWELL_CHART_BIT (1 << 2)
 #define UPDATE_TIME_BIT (1 << 3)
+#define UPDATE_SPOT_NAME_BIT (1 << 4)
 
 static TaskHandle_t conditions_update_task_handle;
 
@@ -198,16 +199,27 @@ static void conditions_update_task(void *args) {
             sleep_handler_set_idle(SYSTEM_IDLE_TIME_BIT);
         }
 
+        if (update_bits & UPDATE_SPOT_NAME_BIT) {
+            // Slightly unique case as in it requires no network update, just used as a display update trigger
+            sleep_handler_set_busy(SYSTEM_IDLE_CONDITIONS_BIT);
+            spot_check_config *config = nvs_get_config();
+
+            // TODO :: would be nice to have a 'previous_spot_name' key in config so we could pass to clear function
+            // to smart erase with text inverse instead of block erasing max spot name width
+            screen_img_handler_clear_spot_name();
+            screen_img_handler_draw_spot_name(config->spot_name);
+            sleep_handler_set_idle(SYSTEM_IDLE_CONDITIONS_BIT);
+        }
+
         if (update_bits & UPDATE_CONDITIONS_BIT) {
             sleep_handler_set_busy(SYSTEM_IDLE_CONDITIONS_BIT);
-            bool               success = conditions_refresh();
-            spot_check_config *config  = nvs_get_config();
+            bool success = conditions_refresh();
             // TODO :: don't support clearing spot name logic when changing location yet. Need a way to pass more info
             // to this case if we're clearing for a regular update or becase location changed and spot name will need to
             // be cleared too.
-            screen_img_handler_clear_conditions(false, true, true, true);
+            screen_img_handler_clear_conditions(true, true, true);
             if (success) {
-                screen_img_handler_draw_conditions(config->spot_name, &last_retrieved_conditions);
+                screen_img_handler_draw_conditions(&last_retrieved_conditions);
             } else {
                 screen_img_handler_draw_conditions_error();
             }
@@ -235,13 +247,17 @@ static void conditions_update_task(void *args) {
 
         // Render after we've made all changes
         if (update_bits) {
-            screen_img_handler_render();
+            screen_img_handler_render(__func__, __LINE__);
         }
     }
 }
 
 void conditions_trigger_time_update() {
     xTaskNotify(conditions_update_task_handle, UPDATE_TIME_BIT, eSetBits);
+}
+
+void conditions_trigger_spot_name_update() {
+    xTaskNotify(conditions_update_task_handle, UPDATE_SPOT_NAME_BIT, eSetBits);
 }
 
 void conditions_trigger_conditions_update() {

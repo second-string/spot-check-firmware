@@ -11,6 +11,7 @@ typedef struct {
 } conditions_t;
 
 void conditions_trigger_time_update();
+void conditions_trigger_spot_name_update();
 void conditions_trigger_conditions_update();
 void conditions_trigger_tide_chart_update();
 void conditions_trigger_swell_chart_update();

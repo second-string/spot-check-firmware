@@ -37,10 +37,9 @@ void screen_img_handler_clear_date();
 bool screen_img_handler_draw_date();
 void screen_img_handler_clear_time();
 bool screen_img_handler_draw_time();
-void screen_img_handler_clear_conditions(bool clear_spot_name,
-                                         bool clear_temperature,
-                                         bool clear_wind,
-                                         bool clear_tide);
-bool screen_img_handler_draw_conditions(char *spot_name, conditions_t *conditions);
+void screen_img_handler_clear_spot_name();
+bool screen_img_handler_draw_spot_name(char *spot_name);
+void screen_img_handler_clear_conditions(bool clear_temperature, bool clear_wind, bool clear_tide);
+bool screen_img_handler_draw_conditions(conditions_t *conditions);
 bool screen_img_handler_draw_conditions_error();
-void screen_img_handler_render();
+void screen_img_handler_render(const char *calling_func, uint32_t line);

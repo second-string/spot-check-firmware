@@ -207,64 +207,6 @@ bool screen_img_handler_download_and_save(screen_img_t screen_img) {
     return success;
 }
 
-/*
- * Clears the date string. Dumb-clear, clears full rect every time instead of determining single digit, month, day of
- * week, etc specific clear area..
- * */
-void screen_img_handler_clear_date() {
-    char     date_string[64];
-    uint32_t previous_date_width_px;
-    uint32_t previous_date_height_px;
-    sntp_time_get_time_str(&last_time_displayed, NULL, date_string);
-    display_get_text_bounds(date_string,
-                            DATE_DRAW_X_PX,
-                            DATE_DRAW_Y_PX,
-                            DISPLAY_FONT_SIZE_SHMEDIUM,
-                            DISPLAY_FONT_ALIGN_LEFT,
-                            &previous_date_width_px,
-                            &previous_date_height_px);
-
-    if (previous_date_width_px > 0 && previous_date_height_px > 0) {
-        // Add 5px buffer for lowercase letters
-        display_clear_area(DATE_DRAW_X_PX - 5,
-                           DATE_DRAW_Y_PX - previous_date_height_px - 5,
-                           previous_date_width_px + 10,
-                           previous_date_height_px + 10);
-    }
-}
-
-/*
- * Draw the date string at the correct location.
- */
-bool screen_img_handler_draw_date() {
-    struct tm now_local = {0};
-    char      date_string[64];
-    sntp_time_get_local_time(&now_local);
-    sntp_time_get_time_str(&now_local, NULL, date_string);
-
-    display_draw_text(date_string, DATE_DRAW_X_PX, DATE_DRAW_Y_PX, DISPLAY_FONT_SIZE_SHMEDIUM, DISPLAY_FONT_ALIGN_LEFT);
-    return true;
-}
-
-bool screen_img_handler_draw_time() {
-    struct tm now_local = {0};
-    char      time_string[6];
-    sntp_time_get_local_time(&now_local);
-    sntp_time_get_time_str(&now_local, time_string, NULL);
-
-    display_draw_text(time_string, TIME_DRAW_X_PX, TIME_DRAW_Y_PX, DISPLAY_FONT_SIZE_LARGE, DISPLAY_FONT_ALIGN_LEFT);
-
-    // If the day has advanced, update date text too
-    if (now_local.tm_mday != last_time_displayed.tm_mday) {
-        log_printf(LOG_LEVEL_INFO, "Date has advanced, clearing and re-rendering date as well");
-        screen_img_handler_clear_date();
-        screen_img_handler_draw_date();
-    }
-
-    memcpy(&last_time_displayed, &now_local, sizeof(struct tm));
-    return true;
-}
-
 void screen_img_handler_clear_time() {
     char time_string[6];
     sntp_time_get_time_str(&last_time_displayed, time_string, NULL);
@@ -349,12 +291,119 @@ void screen_img_handler_clear_time() {
     */
 }
 
-void screen_img_handler_clear_conditions(bool clear_spot_name,
-                                         bool clear_temperature,
-                                         bool clear_wind,
-                                         bool clear_tide) {
-    // Hardcoding in separate variable for clarity
-    const uint32_t max_conditions_width_px = 300;
+bool screen_img_handler_draw_time() {
+    struct tm now_local = {0};
+    char      time_string[6];
+    sntp_time_get_local_time(&now_local);
+    sntp_time_get_time_str(&now_local, time_string, NULL);
+
+    display_draw_text(time_string, TIME_DRAW_X_PX, TIME_DRAW_Y_PX, DISPLAY_FONT_SIZE_LARGE, DISPLAY_FONT_ALIGN_LEFT);
+
+    // If the day has advanced, update date text too
+    if (now_local.tm_mday != last_time_displayed.tm_mday) {
+        log_printf(LOG_LEVEL_INFO, "Date has advanced, clearing and re-rendering date as well");
+        screen_img_handler_clear_date();
+        screen_img_handler_draw_date();
+    }
+
+    memcpy(&last_time_displayed, &now_local, sizeof(struct tm));
+    return true;
+}
+
+/*
+ * Clears the date string. Dumb-clear, clears full rect every time instead of determining single digit, month, day of
+ * week, etc specific clear area..
+ * */
+void screen_img_handler_clear_date() {
+    char     date_string[64];
+    uint32_t previous_date_width_px;
+    uint32_t previous_date_height_px;
+    sntp_time_get_time_str(&last_time_displayed, NULL, date_string);
+    display_get_text_bounds(date_string,
+                            DATE_DRAW_X_PX,
+                            DATE_DRAW_Y_PX,
+                            DISPLAY_FONT_SIZE_SHMEDIUM,
+                            DISPLAY_FONT_ALIGN_LEFT,
+                            &previous_date_width_px,
+                            &previous_date_height_px);
+
+    if (previous_date_width_px > 0 && previous_date_height_px > 0) {
+        // Add 5px buffer for lowercase letters
+        display_clear_area(DATE_DRAW_X_PX - 5,
+                           DATE_DRAW_Y_PX - previous_date_height_px - 5,
+                           previous_date_width_px + 10,
+                           previous_date_height_px + 10);
+    }
+}
+
+/*
+ * Draw the date string at the correct location.
+ */
+bool screen_img_handler_draw_date() {
+    struct tm now_local = {0};
+    char      date_string[64];
+    sntp_time_get_local_time(&now_local);
+    sntp_time_get_time_str(&now_local, NULL, date_string);
+
+    display_draw_text(date_string, DATE_DRAW_X_PX, DATE_DRAW_Y_PX, DISPLAY_FONT_SIZE_SHMEDIUM, DISPLAY_FONT_ALIGN_LEFT);
+    return true;
+}
+
+void screen_img_handler_clear_spot_name() {
+    // TODO :: would be nicer to pass currently displayed spot name here so we can smart invert erase instead of block
+    // erasing based on max width. See todo in conditions task for same point
+    const uint32_t max_spot_name_width_px = 300;
+
+    uint32_t spot_name_width  = 0;
+    uint32_t spot_name_height = 0;
+    display_get_text_bounds("O",
+                            CONDITIONS_DRAW_X_PX,
+                            CONDITIONS_SPOT_NAME_DRAW_Y_PX,
+                            DISPLAY_FONT_SIZE_SHMEDIUM,
+                            DISPLAY_FONT_ALIGN_RIGHT,
+                            &spot_name_width,
+                            &spot_name_height);
+    display_clear_area(CONDITIONS_DRAW_X_PX - max_spot_name_width_px - 5,
+                       CONDITIONS_SPOT_NAME_DRAW_Y_PX - spot_name_height - 5,
+                       max_spot_name_width_px + 10,
+                       spot_name_height + 10);
+
+    // Underline
+    display_draw_rect(CONDITIONS_DRAW_X_PX - spot_name_width, CONDITIONS_SPOT_NAME_DRAW_Y_PX + 5, spot_name_width, 2);
+}
+
+bool screen_img_handler_draw_spot_name(char *spot_name) {
+    uint32_t spot_name_width  = 0;
+    uint32_t spot_name_height = 0;
+    display_get_text_bounds(spot_name,
+                            CONDITIONS_DRAW_X_PX,
+                            CONDITIONS_SPOT_NAME_DRAW_Y_PX,
+                            DISPLAY_FONT_SIZE_SHMEDIUM,
+                            DISPLAY_FONT_ALIGN_RIGHT,
+                            &spot_name_width,
+                            &spot_name_height);
+    display_draw_text(spot_name,
+                      CONDITIONS_DRAW_X_PX,
+                      CONDITIONS_SPOT_NAME_DRAW_Y_PX,
+                      DISPLAY_FONT_SIZE_SHMEDIUM,
+                      DISPLAY_FONT_ALIGN_RIGHT);
+
+    // Underline
+    display_draw_rect(CONDITIONS_DRAW_X_PX - spot_name_width, CONDITIONS_SPOT_NAME_DRAW_Y_PX + 5, spot_name_width, 2);
+    return true;
+}
+
+void screen_img_handler_clear_conditions(bool clear_temperature, bool clear_wind, bool clear_tide) {
+    const char *max_conditions_string = "Fetching latest conditions...";
+    uint32_t    max_conditions_width_px;
+    uint32_t    max_conditions_height_px;
+    display_get_text_bounds((char *)max_conditions_string,
+                            0,
+                            0,
+                            DISPLAY_FONT_SIZE_SMALL,
+                            DISPLAY_FONT_ALIGN_RIGHT,
+                            &max_conditions_width_px,
+                            &max_conditions_height_px);
 
     // If one of the condition lines is false, erase individual lines. Otherwise erase as large box
     if (clear_temperature && clear_wind && clear_tide) {
@@ -371,39 +420,19 @@ void screen_img_handler_clear_conditions(bool clear_spot_name,
                                 &font_width_px,
                                 &font_height_px);
 
-        // Erase from top left of conditions (top left of highest row either spot name or temp depending on params,
-        // hardcoded max width of conditions block, down to bottom right of conditions (bottom right of tide text) plus
-        // a little buffer)
-        uint32_t top_row_y = clear_spot_name ? CONDITIONS_SPOT_NAME_DRAW_Y_PX : CONDITIONS_TEMPERATURE_DRAW_Y_PX;
+        // Erase from top left of conditions  hardcoded max width of conditions block, down to bottom right of
+        // conditions (bottom right of tide text) plus a little buffer
         display_clear_area(CONDITIONS_DRAW_X_PX - max_conditions_width_px,
-                           top_row_y - font_height_px,
+                           CONDITIONS_TEMPERATURE_DRAW_Y_PX - font_height_px,
                            max_conditions_width_px,
-                           CONDITIONS_TIDE_DRAW_Y_PX - (top_row_y - font_height_px) + 10);
+                           CONDITIONS_TIDE_DRAW_Y_PX - (CONDITIONS_TEMPERATURE_DRAW_Y_PX - font_height_px) + 10);
     } else {
         log_printf(LOG_LEVEL_ERROR, "CLEARINING INDIVIDUAL CONDITION LINES NOT YET SUPPORTED");
         configASSERT(0);
     }
 }
 
-bool screen_img_handler_draw_conditions(char *spot_name, conditions_t *conditions) {
-    // Draw spot name and underline no matter what
-    uint32_t spot_name_width  = 0;
-    uint32_t spot_name_height = 0;
-    display_get_text_bounds(spot_name,
-                            CONDITIONS_DRAW_X_PX,
-                            CONDITIONS_SPOT_NAME_DRAW_Y_PX,
-                            DISPLAY_FONT_SIZE_SHMEDIUM,
-                            DISPLAY_FONT_ALIGN_RIGHT,
-                            &spot_name_width,
-                            &spot_name_height);
-    display_draw_text(spot_name,
-                      CONDITIONS_DRAW_X_PX,
-                      CONDITIONS_SPOT_NAME_DRAW_Y_PX,
-                      DISPLAY_FONT_SIZE_SHMEDIUM,
-                      DISPLAY_FONT_ALIGN_RIGHT);
-    vTaskDelay(pdMS_TO_TICKS(1000));
-    display_draw_rect(CONDITIONS_DRAW_X_PX - spot_name_width, CONDITIONS_SPOT_NAME_DRAW_Y_PX + 5, spot_name_width, 2);
-
+bool screen_img_handler_draw_conditions(conditions_t *conditions) {
     if (conditions == NULL) {
         display_draw_text("Fetching latest conditions...",
                           CONDITIONS_DRAW_X_PX,
@@ -453,6 +482,6 @@ bool screen_img_handler_draw_conditions_error() {
 /*
  * Wrapper for display_render so our logic modules don't have a dependency on display driver
  */
-void screen_img_handler_render() {
-    display_render();
+void screen_img_handler_render(const char *calling_func, uint32_t line) {
+    display_render(calling_func, line);
 }

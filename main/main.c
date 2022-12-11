@@ -159,7 +159,7 @@ void app_main(void) {
             DISPLAY_FONT_SIZE_SHMEDIUM,
             DISPLAY_FONT_ALIGN_CENTER);
 
-        screen_img_handler_render();
+        screen_img_handler_render(__func__, __LINE__);
     } else {
         log_printf(LOG_LEVEL_INFO,
                    "Connection successful, showing 'fetching data' screen while waiting for time to sync");
@@ -169,7 +169,7 @@ void app_main(void) {
                           350,
                           DISPLAY_FONT_SIZE_SMALL,
                           DISPLAY_FONT_ALIGN_CENTER);
-        screen_img_handler_render();
+        screen_img_handler_render(__func__, __LINE__);
 
         // TODO :: This is still really hacky. Sometimes SNTP gets a new value within a second, sometimes it takes 45
         // seconds. I don't know enough about ntp to know if the SNTP init code actively sends a sync packet or just
@@ -194,12 +194,14 @@ void app_main(void) {
         spot_check_config *config = nvs_get_config();
         display_full_clear();
         screen_img_handler_draw_time();
-        screen_img_handler_draw_conditions(config->spot_name, NULL);
+        screen_img_handler_draw_spot_name(config->spot_name);
+        screen_img_handler_draw_conditions(NULL);
         screen_img_handler_draw_screen_img(SCREEN_IMG_TIDE_CHART);
         screen_img_handler_draw_screen_img(SCREEN_IMG_SWELL_CHART);
+        screen_img_handler_render(__func__, __LINE__);
+        conditions_trigger_spot_name_update();
         conditions_trigger_conditions_update();
         conditions_trigger_both_charts_update();
-        screen_img_handler_render();
 
         log_printf(LOG_LEVEL_INFO,
                    "Boot successful, showing time + last saved conditions / charts and kicking off update");

@@ -92,6 +92,20 @@ static const char *display_get_epd_font_enum_string(display_font_size_t size) {
     }
 }
 
+static bool render_acquire_lock(const char *calling_func, uint32_t line) {
+    log_printf(LOG_LEVEL_DEBUG, "trying to acquire lock from %s:%d", calling_func, line);
+    BaseType_t success = xSemaphoreTake(render_lock, pdMS_TO_TICKS(500));
+    if (!success) {
+        log_printf(LOG_LEVEL_ERROR, "Couldn't acquire render lock even after 500ms!");
+        return success;
+    }
+}
+
+static void render_release_lock() {
+    xSemaphoreGive(render_lock);
+    log_printf(LOG_LEVEL_DEBUG, "released lock");
+}
+
 void display_init() {
     epd_init(EPD_LUT_1K);
     hl          = epd_hl_init(EPD_BUILTIN_WAVEFORM);
@@ -108,9 +122,7 @@ void display_init() {
 void display_start() {
     configASSERT(hl.front_fb && hl.back_fb);
 
-    BaseType_t success = xSemaphoreTake(render_lock, pdMS_TO_TICKS(500));
-    if (!success) {
-        log_printf(LOG_LEVEL_ERROR, "Couldn't acquire render lock even after 500ms!");
+    if (!render_acquire_lock(__func__, __LINE__)) {
         return;
     }
 
@@ -125,13 +137,11 @@ void display_start() {
     epd_clear_area_cycles(epd_full_screen(), 3, 12);
     epd_poweroff();
 
-    xSemaphoreGive(render_lock);
+    render_release_lock();
 }
 
-void display_render() {
-    BaseType_t success = xSemaphoreTake(render_lock, pdMS_TO_TICKS(500));
-    if (!success) {
-        log_printf(LOG_LEVEL_ERROR, "Couldn't acquire render lock even after 500ms!");
+void display_render(const char *calling_func, uint32_t line) {
+    if (!render_acquire_lock(__func__, __LINE__)) {
         return;
     }
 
@@ -142,13 +152,11 @@ void display_render() {
     // TODO :: error check
     epd_poweroff();
 
-    xSemaphoreGive(render_lock);
+    render_release_lock();
 }
 
 void display_full_clear() {
-    BaseType_t success = xSemaphoreTake(render_lock, pdMS_TO_TICKS(500));
-    if (!success) {
-        log_printf(LOG_LEVEL_ERROR, "Couldn't acquire render lock even after 500ms!");
+    if (!render_acquire_lock(__func__, __LINE__)) {
         return;
     }
 
@@ -160,10 +168,14 @@ void display_full_clear() {
     epd_clear_area_cycles(epd_full_screen(), 1, 12);
     epd_poweroff();
 
-    xSemaphoreGive(render_lock);
+    render_release_lock();
 }
 
 void display_clear_area(uint32_t x, uint32_t y, uint32_t width, uint32_t height) {
+    if (!render_acquire_lock(__func__, __LINE__)) {
+        return;
+    }
+
     // Limit these bounds to be w/in the framebuffer, epdiy will happily buffer overflow it
     configASSERT(x + width <= ED060SC4_WIDTH_PX);
     configASSERT(y + height <= ED060SC4_HEIGHT_PX);
@@ -200,7 +212,7 @@ void display_clear_area(uint32_t x, uint32_t y, uint32_t width, uint32_t height)
     vTaskDelay(pdMS_TO_TICKS(40));
     epd_poweroff();
 
-    xSemaphoreGive(render_lock);
+    render_release_lock();
 
     log_printf(LOG_LEVEL_DEBUG, "Cleared %uw %uh rect at (%u, %u)", width, height, x, y);
 }
@@ -230,7 +242,7 @@ void display_render_splash_screen(char *fw_version) {
                       DISPLAY_FONT_ALIGN_CENTER);
 
     log_printf(LOG_LEVEL_DEBUG, "Rendering splash screen on display");
-    display_render();
+    display_render(__func__, __LINE__);
 }
 
 void display_draw_text(char                *text,
