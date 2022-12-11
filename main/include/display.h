@@ -30,6 +30,11 @@ void display_draw_text(char                *text,
                        uint32_t             y_coord,
                        display_font_size_t  size,
                        display_font_align_t alignment);
+void display_invert_text(char                *text,
+                         uint32_t             x_coord,
+                         uint32_t             y_coord,
+                         display_font_size_t  size,
+                         display_font_align_t alignment);
 void display_draw_image(uint8_t *image_buffer,
                         size_t   width_px,
                         size_t   height_px,

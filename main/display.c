@@ -217,7 +217,7 @@ void display_render_splash_screen(char *fw_version) {
     configASSERT(strlen(hw_version_str) + strlen(fw_version_str) < version_str_len);
     sprintf(version_str, "%s    %s", hw_version_str, fw_version_str);
 
-    display_draw_text("Spot Check", ED060SC4_WIDTH_PX / 2, 250, DISPLAY_FONT_SIZE_MEDIUM, DISPLAY_FONT_ALIGN_CENTER);
+    display_draw_text("Spot Check", ED060SC4_WIDTH_PX / 2, 300, DISPLAY_FONT_SIZE_MEDIUM, DISPLAY_FONT_ALIGN_CENTER);
     display_draw_text("Second String Studios",
                       ED060SC4_WIDTH_PX / 2,
                       epd_rotated_display_height() - 60,
@@ -251,6 +251,34 @@ void display_draw_text(char                *text,
 
     log_printf(LOG_LEVEL_DEBUG,
                "Rendering %s, %s-aligned text at (%u, %u): '%s'",
+               display_get_epd_font_enum_string(size),
+               display_get_epd_font_flags_enum_string(alignment),
+               x,
+               y,
+               text);
+
+    epd_write_string(font, text, &x, &y, fb, &font_props);
+}
+
+void display_invert_text(char                *text,
+                         uint32_t             x_coord,
+                         uint32_t             y_coord,
+                         display_font_size_t  size,
+                         display_font_align_t alignment) {
+    configASSERT(x_coord < ED060SC4_WIDTH_PX);
+    configASSERT(y_coord < ED060SC4_HEIGHT_PX);
+
+    int x = x_coord;
+    int y = y_coord;
+
+    EpdFontProperties font_props = epd_font_properties_default();
+    font_props.flags             = display_get_epd_font_flags_enum(alignment);
+    font_props.fg_color          = 0xF;
+    const EpdFont *font          = display_get_epd_font_enum(size);
+    uint8_t       *fb            = epd_hl_get_framebuffer(&hl);
+
+    log_printf(LOG_LEVEL_DEBUG,
+               "Inverting %s, %s-aligned text at (%u, %u): '%s'",
                display_get_epd_font_enum_string(size),
                display_get_epd_font_flags_enum_string(alignment),
                x,
