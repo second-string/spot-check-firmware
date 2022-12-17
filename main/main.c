@@ -68,6 +68,7 @@ static void app_init() {
     cd54hc4094_init(SHIFTREG_CLK_PIN, SHIFTREG_DATA_PIN, SHIFTREG_STROBE_PIN);
     display_init();
     sleep_handler_init();
+    screen_img_handler_init();
 
     ESP_ERROR_CHECK(esp_event_loop_create_default());
     mdns_local_init();
@@ -194,11 +195,14 @@ void app_main(void) {
         spot_check_config *config = nvs_get_config();
         display_full_clear();
         screen_img_handler_draw_time();
+        screen_img_handler_draw_date();
         screen_img_handler_draw_spot_name(config->spot_name);
         screen_img_handler_draw_conditions(NULL);
         screen_img_handler_draw_screen_img(SCREEN_IMG_TIDE_CHART);
         screen_img_handler_draw_screen_img(SCREEN_IMG_SWELL_CHART);
+        screen_img_handler_mark_all_lines_dirty();
         screen_img_handler_render(__func__, __LINE__);
+        conditions_trigger_time_update();
         conditions_trigger_spot_name_update();
         conditions_trigger_conditions_update();
         conditions_trigger_both_charts_update();

@@ -181,7 +181,9 @@ static void conditions_update_task(void *args) {
     // Wait forever until connected
     wifi_block_until_connected();
 
-    uint32_t update_bits = 0;
+    uint32_t update_bits        = 0;
+    bool     full_clear         = false;
+    bool     conditions_success = false;
     while (1) {
         // Wait forever until a notification received. Clears all bits on exit since we'll handle every set bit in one
         // go
@@ -191,10 +193,50 @@ static void conditions_update_task(void *args) {
                    "update-conditions task received task notification of value 0x%02X, updating accordingly",
                    update_bits);
 
+        // If we're doing all of them, it means this is the first time we're refreshing after boot, and it should wait
+        // and do a full clear before redrawing everything. Otherwise it's very piecemeal and slow
+        full_clear = (update_bits & UPDATE_SPOT_NAME_BIT) && (update_bits & UPDATE_SPOT_NAME_BIT) &&
+                     (update_bits & UPDATE_CONDITIONS_BIT) && (update_bits & UPDATE_TIDE_CHART_BIT) &&
+                     (update_bits & UPDATE_SWELL_CHART_BIT);
+
+        /***************************************
+         * Network update section
+         **************************************/
+        if (update_bits & UPDATE_CONDITIONS_BIT) {
+            sleep_handler_set_busy(SYSTEM_IDLE_CONDITIONS_BIT);
+            conditions_success = conditions_refresh();
+            sleep_handler_set_idle(SYSTEM_IDLE_CONDITIONS_BIT);
+        }
+
+        if (update_bits & UPDATE_TIDE_CHART_BIT) {
+            sleep_handler_set_busy(SYSTEM_IDLE_TIDE_CHART_BIT);
+            screen_img_handler_download_and_save(SCREEN_IMG_TIDE_CHART);
+            sleep_handler_set_idle(SYSTEM_IDLE_TIDE_CHART_BIT);
+        }
+
+        if (update_bits & UPDATE_SWELL_CHART_BIT) {
+            sleep_handler_set_busy(SYSTEM_IDLE_SWELL_CHART_BIT);
+            screen_img_handler_download_and_save(SCREEN_IMG_SWELL_CHART);
+            sleep_handler_set_idle(SYSTEM_IDLE_SWELL_CHART_BIT);
+        }
+
+        /***************************************
+         * Framebuffer update section
+         **************************************/
+        if (full_clear) {
+            log_printf(LOG_LEVEL_DEBUG,
+                       "Performing full screen clear from conditions_task since every piece was updated");
+            screen_img_handler_full_clear();
+        }
+
         if (update_bits & UPDATE_TIME_BIT) {
             sleep_handler_set_busy(SYSTEM_IDLE_TIME_BIT);
-            screen_img_handler_clear_time();
+            if (!full_clear) {
+                screen_img_handler_clear_time();
+                screen_img_handler_clear_date(false);
+            }
             screen_img_handler_draw_time();
+            screen_img_handler_draw_date();
             log_printf(LOG_LEVEL_INFO, "update-conditions task updated time");
             sleep_handler_set_idle(SYSTEM_IDLE_TIME_BIT);
         }
@@ -206,19 +248,22 @@ static void conditions_update_task(void *args) {
 
             // TODO :: would be nice to have a 'previous_spot_name' key in config so we could pass to clear function
             // to smart erase with text inverse instead of block erasing max spot name width
-            screen_img_handler_clear_spot_name();
+            if (!full_clear) {
+                screen_img_handler_clear_spot_name();
+            }
             screen_img_handler_draw_spot_name(config->spot_name);
             sleep_handler_set_idle(SYSTEM_IDLE_CONDITIONS_BIT);
         }
 
         if (update_bits & UPDATE_CONDITIONS_BIT) {
             sleep_handler_set_busy(SYSTEM_IDLE_CONDITIONS_BIT);
-            bool success = conditions_refresh();
             // TODO :: don't support clearing spot name logic when changing location yet. Need a way to pass more info
             // to this case if we're clearing for a regular update or becase location changed and spot name will need to
             // be cleared too.
-            screen_img_handler_clear_conditions(true, true, true);
-            if (success) {
+            if (!full_clear) {
+                screen_img_handler_clear_conditions(true, true, true);
+            }
+            if (conditions_success) {
                 screen_img_handler_draw_conditions(&last_retrieved_conditions);
             } else {
                 screen_img_handler_draw_conditions_error();
@@ -229,8 +274,9 @@ static void conditions_update_task(void *args) {
 
         if (update_bits & UPDATE_TIDE_CHART_BIT) {
             sleep_handler_set_busy(SYSTEM_IDLE_TIDE_CHART_BIT);
-            screen_img_handler_download_and_save(SCREEN_IMG_TIDE_CHART);
-            screen_img_handler_clear_screen_img(SCREEN_IMG_TIDE_CHART);
+            if (!full_clear) {
+                screen_img_handler_clear_screen_img(SCREEN_IMG_TIDE_CHART);
+            }
             screen_img_handler_draw_screen_img(SCREEN_IMG_TIDE_CHART);
             log_printf(LOG_LEVEL_INFO, "update-conditions task updated tide chart");
             sleep_handler_set_idle(SYSTEM_IDLE_TIDE_CHART_BIT);
@@ -238,15 +284,23 @@ static void conditions_update_task(void *args) {
 
         if (update_bits & UPDATE_SWELL_CHART_BIT) {
             sleep_handler_set_busy(SYSTEM_IDLE_SWELL_CHART_BIT);
-            screen_img_handler_download_and_save(SCREEN_IMG_SWELL_CHART);
-            screen_img_handler_clear_screen_img(SCREEN_IMG_SWELL_CHART);
+            if (!full_clear) {
+                screen_img_handler_clear_screen_img(SCREEN_IMG_SWELL_CHART);
+            }
             screen_img_handler_draw_screen_img(SCREEN_IMG_SWELL_CHART);
             log_printf(LOG_LEVEL_INFO, "update-conditions task updated swell chart");
             sleep_handler_set_idle(SYSTEM_IDLE_SWELL_CHART_BIT);
         }
 
-        // Render after we've made all changes
+        /***************************************
+         * Render section
+         **************************************/
         if (update_bits) {
+            // If any other bits besides time are set, mark full screen as dirty so it refreshes all faded pixels
+            if (update_bits & ~(UPDATE_TIME_BIT)) {
+                screen_img_handler_mark_all_lines_dirty();
+            }
+
             screen_img_handler_render(__func__, __LINE__);
         }
     }

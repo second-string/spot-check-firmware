@@ -129,6 +129,12 @@ static int screen_img_handler_save(esp_http_client_handle_t *client,
     return bytes_saved;
 }
 
+void screen_img_handler_init() {
+    // Init last_time_display with epoch so date update logic always executes to start with
+    time_t epoch = 0;
+    memcpy(&last_time_displayed, localtime(&epoch), sizeof(struct tm));
+}
+
 bool screen_img_handler_clear_screen_img(screen_img_t screen_img) {
     screen_img_metadata_t metadata = {0};
     screen_img_handler_get_metadata(screen_img, &metadata);
@@ -299,40 +305,40 @@ bool screen_img_handler_draw_time() {
 
     display_draw_text(time_string, TIME_DRAW_X_PX, TIME_DRAW_Y_PX, DISPLAY_FONT_SIZE_LARGE, DISPLAY_FONT_ALIGN_LEFT);
 
-    // If the day has advanced, update date text too
-    if (now_local.tm_mday != last_time_displayed.tm_mday) {
-        log_printf(LOG_LEVEL_INFO, "Date has advanced, clearing and re-rendering date as well");
-        screen_img_handler_clear_date();
-        screen_img_handler_draw_date();
-    }
-
     memcpy(&last_time_displayed, &now_local, sizeof(struct tm));
     return true;
 }
 
 /*
  * Clears the date string. Dumb-clear, clears full rect every time instead of determining single digit, month, day of
- * week, etc specific clear area..
+ * week, etc specific clear area. By default only clears if date has changed since last re-draw, which allows us to call
+ * this every time update in conditions_task and not worry about redrawing every time.
  * */
-void screen_img_handler_clear_date() {
-    char     date_string[64];
-    uint32_t previous_date_width_px;
-    uint32_t previous_date_height_px;
-    sntp_time_get_time_str(&last_time_displayed, NULL, date_string);
-    display_get_text_bounds(date_string,
-                            DATE_DRAW_X_PX,
-                            DATE_DRAW_Y_PX,
-                            DISPLAY_FONT_SIZE_SHMEDIUM,
-                            DISPLAY_FONT_ALIGN_LEFT,
-                            &previous_date_width_px,
-                            &previous_date_height_px);
+void screen_img_handler_clear_date(bool force_clear) {
+    struct tm now_local = {0};
+    sntp_time_get_local_time(&now_local);
 
-    if (previous_date_width_px > 0 && previous_date_height_px > 0) {
-        // Add 5px buffer for lowercase letters
-        display_clear_area(DATE_DRAW_X_PX - 5,
-                           DATE_DRAW_Y_PX - previous_date_height_px - 5,
-                           previous_date_width_px + 10,
-                           previous_date_height_px + 10);
+    // Only clear date if we pass force flag or the date has advanced compared to our last redraw
+    if (force_clear || (now_local.tm_mday != last_time_displayed.tm_mday)) {
+        char     date_string[64];
+        uint32_t previous_date_width_px;
+        uint32_t previous_date_height_px;
+        sntp_time_get_time_str(&last_time_displayed, NULL, date_string);
+        display_get_text_bounds(date_string,
+                                DATE_DRAW_X_PX,
+                                DATE_DRAW_Y_PX,
+                                DISPLAY_FONT_SIZE_SHMEDIUM,
+                                DISPLAY_FONT_ALIGN_LEFT,
+                                &previous_date_width_px,
+                                &previous_date_height_px);
+
+        if (previous_date_width_px > 0 && previous_date_height_px > 0) {
+            // Add 5px buffer for lowercase letters
+            display_clear_area(DATE_DRAW_X_PX - 5,
+                               DATE_DRAW_Y_PX - previous_date_height_px - 5,
+                               previous_date_width_px + 10,
+                               previous_date_height_px + 10);
+        }
     }
 }
 
@@ -350,8 +356,8 @@ bool screen_img_handler_draw_date() {
 }
 
 void screen_img_handler_clear_spot_name() {
-    // TODO :: would be nicer to pass currently displayed spot name here so we can smart invert erase instead of block
-    // erasing based on max width. See todo in conditions task for same point
+    // TODO :: would be nicer to pass currently displayed spot name here so we can smart invert erase instead of
+    // block erasing based on max width. See todo in conditions task for same point
     const uint32_t max_spot_name_width_px = 300;
 
     uint32_t spot_name_width  = 0;
@@ -407,9 +413,9 @@ void screen_img_handler_clear_conditions(bool clear_temperature, bool clear_wind
 
     // If one of the condition lines is false, erase individual lines. Otherwise erase as large box
     if (clear_temperature && clear_wind && clear_tide) {
-        // CONDITIONS_DRAW_TEMPERATURE_Y is the bottom left corner of the top row of text. Need to get bounds of text
-        // for the height so we can subtract it from the constant Y to get the top left corner, which is what the clear
-        // function expects its rect to start
+        // CONDITIONS_DRAW_TEMPERATURE_Y is the bottom left corner of the top row of text. Need to get bounds of
+        // text for the height so we can subtract it from the constant Y to get the top left corner, which is what
+        // the clear function expects its rect to start
         uint32_t font_width_px  = 0;
         uint32_t font_height_px = 0;
         display_get_text_bounds("F",
@@ -480,8 +486,16 @@ bool screen_img_handler_draw_conditions_error() {
 }
 
 /*
- * Wrapper for display_render so our logic modules don't have a dependency on display driver
+ * Wrappers for display render funcs so our logic modules don't have a dependency on display driver
  */
+void screen_img_handler_full_clear() {
+    display_full_clear_cycles(1);
+}
+
+void screen_img_handler_mark_all_lines_dirty() {
+    display_mark_all_lines_dirty();
+}
+
 void screen_img_handler_render(const char *calling_func, uint32_t line) {
     display_render(calling_func, line);
 }

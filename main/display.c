@@ -97,13 +97,29 @@ static bool render_acquire_lock(const char *calling_func, uint32_t line) {
     BaseType_t success = xSemaphoreTake(render_lock, pdMS_TO_TICKS(500));
     if (!success) {
         log_printf(LOG_LEVEL_ERROR, "Couldn't acquire render lock even after 500ms!");
-        return success;
     }
+
+    return success;
 }
 
 static void render_release_lock() {
     xSemaphoreGive(render_lock);
     log_printf(LOG_LEVEL_DEBUG, "released lock");
+}
+
+static void display_render_mode(enum EpdDrawMode mode, const char *calling_func, uint32_t line) {
+    if (!render_acquire_lock(__func__, __LINE__)) {
+        return;
+    }
+
+    epd_poweron();
+    vTaskDelay(pdMS_TO_TICKS(20));
+    enum EpdDrawError err = epd_hl_update_screen(&hl, mode, 25);
+    (void)err;
+    // TODO :: error check
+    epd_poweroff();
+
+    render_release_lock();
 }
 
 void display_init() {
@@ -122,53 +138,36 @@ void display_init() {
 void display_start() {
     configASSERT(hl.front_fb && hl.back_fb);
 
-    if (!render_acquire_lock(__func__, __LINE__)) {
-        return;
-    }
-
-    // Don't use display_full_clear because that's hardcoded to 1 screen flash. We need at least 3 because there is no
-    // memory of what is displayed on screen from last run, so the diffing internal to epdiy won't run to help the
-    // clearing process.
-    epd_poweron();
-    epd_hl_set_all_white(&hl);
-    enum EpdDrawError err = epd_hl_update_screen(&hl, MODE_GC16, 20);
-    (void)err;
-    vTaskDelay(pdMS_TO_TICKS(20));
-    epd_clear_area_cycles(epd_full_screen(), 3, 12);
-    epd_poweroff();
-
-    render_release_lock();
+    //  We need at least 3 because there is no memory of what is displayed on screen from last run, so the diffing
+    //  internal to epdiy won't run to help the  clearing process.
+    display_full_clear_cycles(3);
 }
 
 void display_render(const char *calling_func, uint32_t line) {
-    if (!render_acquire_lock(__func__, __LINE__)) {
-        return;
-    }
-
-    epd_poweron();
-    vTaskDelay(pdMS_TO_TICKS(20));
-    enum EpdDrawError err = epd_hl_update_screen(&hl, MODE_GL16, 25);
-    (void)err;
-    // TODO :: error check
-    epd_poweroff();
-
-    render_release_lock();
+    display_render_mode(MODE_GC16, calling_func, line);
 }
 
-void display_full_clear() {
+void display_full_clear_cycles(uint8_t cycles) {
     if (!render_acquire_lock(__func__, __LINE__)) {
         return;
     }
 
     epd_poweron();
     epd_hl_set_all_white(&hl);
-    enum EpdDrawError err = epd_hl_update_screen(&hl, MODE_GC16, 20);
+    enum EpdDrawError err = epd_hl_update_screen(&hl, MODE_GC16, 25);
     (void)err;
     vTaskDelay(pdMS_TO_TICKS(20));
-    epd_clear_area_cycles(epd_full_screen(), 1, 12);
+    epd_clear_area_cycles(epd_full_screen(), cycles, 12);
     epd_poweroff();
 
     render_release_lock();
+}
+
+/*
+ * Default full clear function just does single flash for simplicity. epdiy 'standard' fullclear uses 3
+ */
+void display_full_clear() {
+    display_full_clear_cycles(1);
 }
 
 void display_clear_area(uint32_t x, uint32_t y, uint32_t width, uint32_t height) {
@@ -377,4 +376,10 @@ void display_get_text_bounds(char                *text,
                y1,
                *width,
                *height);
+}
+
+void display_mark_all_lines_dirty() {
+    for (int i = 0; i < (EPD_WIDTH / 2 * EPD_HEIGHT); i++) {
+        hl.back_fb[i] = ~hl.front_fb[i];
+    }
 }

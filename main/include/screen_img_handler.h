@@ -30,10 +30,11 @@ typedef enum {
     SCREEN_IMG_COUNT,
 } screen_img_t;
 
+void screen_img_handler_init();
 bool screen_img_handler_download_and_save(screen_img_t screen_img);
 bool screen_img_handler_clear_screen_img(screen_img_t screen_img);
 bool screen_img_handler_draw_screen_img(screen_img_t screen_img);
-void screen_img_handler_clear_date();
+void screen_img_handler_clear_date(bool force_clear);
 bool screen_img_handler_draw_date();
 void screen_img_handler_clear_time();
 bool screen_img_handler_draw_time();
@@ -42,4 +43,6 @@ bool screen_img_handler_draw_spot_name(char *spot_name);
 void screen_img_handler_clear_conditions(bool clear_temperature, bool clear_wind, bool clear_tide);
 bool screen_img_handler_draw_conditions(conditions_t *conditions);
 bool screen_img_handler_draw_conditions_error();
+void screen_img_handler_full_clear();
+void screen_img_handler_mark_all_lines_dirty();
 void screen_img_handler_render(const char *calling_func, uint32_t line);

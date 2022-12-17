@@ -22,6 +22,7 @@ typedef enum {
 void display_init();
 void display_start();
 void display_render();
+void display_full_clear_cycles(uint8_t cycles);
 void display_full_clear();
 void display_clear_area(uint32_t x, uint32_t y, uint32_t width, uint32_t height);
 void display_render_splash_screen(char *fw_version);
@@ -50,3 +51,4 @@ void display_get_text_bounds(char                *text,
                              display_font_align_t alignment,
                              uint32_t            *width,
                              uint32_t            *height);
+void display_mark_all_lines_dirty();
