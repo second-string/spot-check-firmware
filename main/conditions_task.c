@@ -20,7 +20,8 @@
 
 #define TAG "sc-conditions-task"
 
-#define NUM_POLLING_DIFFERENTIAL_UPDATES 4
+#define NUM_DIFFERENTIAL_UPDATES 3
+#define NUM_DISCRETE_UPDATES 4
 
 #define TIME_UPDATE_INTERVAL_SECONDS (1 * SECS_PER_MIN)
 #define CONDITIONS_UPDATE_INTERVAL_SECONDS (20 * SECS_PER_MIN)
@@ -40,7 +41,16 @@ typedef struct {
     time_t last_executed_epoch_secs;
     bool   force_next_update;
     void (*execute)(void);
-} polling_differential_update_t;
+} differential_update_t;
+
+typedef struct {
+    char    name[14];
+    uint8_t hour;
+    uint8_t minute;
+    bool    executed_already;
+    void (*execute)(void);
+    bool force_next_update;
+} discrete_update_t;
 
 static void conditions_trigger_ota_check();
 
@@ -50,7 +60,7 @@ static volatile unsigned int seconds_elapsed;
 static conditions_t          last_retrieved_conditions;
 
 // Execute function cannot be blocking! Will execute from 1 sec timer interrupt callback
-static polling_differential_update_t polling_differential_updates[NUM_POLLING_DIFFERENTIAL_UPDATES] = {
+static differential_update_t differential_updates[NUM_DIFFERENTIAL_UPDATES] = {
     {
         .name                 = "time",
         .force_next_update    = true,
@@ -64,12 +74,6 @@ static polling_differential_update_t polling_differential_updates[NUM_POLLING_DI
         .execute              = conditions_trigger_conditions_update,
     },
     {
-        .name                 = "charts",
-        .force_next_update    = true,
-        .update_interval_secs = CHARTS_UPDATE_INTERVAL_SECONDS,
-        .execute              = conditions_trigger_both_charts_update,
-    },
-    {
         .name                 = "ota",
         .force_next_update    = true,
         .update_interval_secs = OTA_CHECK_INTERVAL_SECONDS,
@@ -77,30 +81,101 @@ static polling_differential_update_t polling_differential_updates[NUM_POLLING_DI
     },
 };
 
+static discrete_update_t discrete_updates[NUM_DISCRETE_UPDATES] = {
+    {
+        .name              = "tide",
+        .force_next_update = true,
+        .hour              = 3,
+        .minute            = 0,
+        .executed_already  = false,
+        .execute           = conditions_trigger_tide_chart_update,
+    },
+    {
+        .name              = "swell_morning",
+        .force_next_update = true,
+        .hour              = 12,
+        .minute            = 0,
+        .executed_already  = false,
+        .execute           = conditions_trigger_swell_chart_update,
+    },
+    {
+        .name              = "swell_midday",
+        .force_next_update = true,
+        .hour              = 21,
+        .minute            = 0,
+        .executed_already  = false,
+        .execute           = conditions_trigger_swell_chart_update,
+    },
+    {
+        .name              = "swell_evening",
+        .force_next_update = true,
+        .hour              = 17,
+        .minute            = 0,
+        .executed_already  = false,
+        .execute           = conditions_trigger_swell_chart_update,
+    },
+};
+
+/*
+ * Returns whether or not the two time values (hour or min) match, OR always true if value is 0xFF wildcard (similar to
+ * cron's '*')
+ */
+static inline bool discrete_time_matches(int current, uint8_t check) {
+    return (current == check) || (check == 0xFF);
+}
+
 static void conditions_timer_expired_callback(void *timer_args) {
     struct tm now_local;
     sntp_time_get_local_time(&now_local);
     time_t now_epoch_secs = mktime(&now_local);
 
     // If time differential has passed OR force execute flag set, execute and bring up to date.
-    polling_differential_update_t *check = NULL;
-    for (int i = 0; i < (NUM_POLLING_DIFFERENTIAL_UPDATES - 1); i++) {
-        check = &polling_differential_updates[i];
+    differential_update_t *diff_check = NULL;
+    for (int i = 0; i < (NUM_DIFFERENTIAL_UPDATES - 1); i++) {
+        diff_check = &differential_updates[i];
 
-        if (((now_epoch_secs - check->last_executed_epoch_secs) > check->update_interval_secs) ||
-            check->force_next_update) {
+        if (((now_epoch_secs - diff_check->last_executed_epoch_secs) > diff_check->update_interval_secs) ||
+            diff_check->force_next_update) {
             // Printing time_t is fucked, have to convert to double with difftime
             log_printf(LOG_LEVEL_DEBUG,
                        "Executing polling diff update '%s' (last: %.0f, now: %.0f, intvl: %.0f, force: %u)",
-                       check->name,
-                       difftime(check->last_executed_epoch_secs, 0),
+                       diff_check->name,
+                       difftime(diff_check->last_executed_epoch_secs, 0),
                        difftime(now_epoch_secs, 0),
-                       difftime(check->update_interval_secs, 0),
-                       check->force_next_update);
+                       difftime(diff_check->update_interval_secs, 0),
+                       diff_check->force_next_update);
 
-            check->execute();
-            check->last_executed_epoch_secs = now_epoch_secs;
-            check->force_next_update        = false;
+            diff_check->execute();
+            diff_check->last_executed_epoch_secs = now_epoch_secs;
+            diff_check->force_next_update        = false;
+        }
+    }
+
+    // If matching time has arrived OR force execute flag set, execute.
+    discrete_update_t *discrete_check = NULL;
+    for (int i = 0; i < (NUM_DISCRETE_UPDATES - 1); i++) {
+        discrete_check = &discrete_updates[i];
+
+        if ((discrete_time_matches(now_local.tm_hour, discrete_check->hour) &&
+             discrete_time_matches(now_local.tm_min, discrete_check->minute)) ||
+            discrete_check->force_next_update) {
+            if (!discrete_check->executed_already) {
+                log_printf(LOG_LEVEL_DEBUG,
+                           "Executing discrete update '%s' (curr hr: %u, curr min: %u, check hr: %u, check min: %u, "
+                           "force: %u)",
+                           discrete_check->name,
+                           now_local.tm_hour,
+                           now_local.tm_min,
+                           discrete_check->hour,
+                           discrete_check->minute,
+                           discrete_check->force_next_update);
+
+                discrete_check->execute();
+                discrete_check->force_next_update = false;
+                discrete_check->executed_already  = true;
+            }
+        } else if (discrete_check->executed_already) {
+            discrete_check->executed_already = false;
         }
     }
 }
@@ -224,11 +299,25 @@ static bool conditions_refresh() {
 }
 
 static void conditions_update_task(void *args) {
-    log_printf(LOG_LEVEL_DEBUG, "List of all polling time differential updates:");
-    polling_differential_update_t *check = NULL;
-    for (int i = 0; i < (NUM_POLLING_DIFFERENTIAL_UPDATES - 1); i++) {
-        check = &polling_differential_updates[i];
-        log_printf(LOG_LEVEL_DEBUG, "'%s' executing every %.0f seconds", check->name, check->update_interval_secs);
+    log_printf(LOG_LEVEL_DEBUG, "List of all time differential updates:");
+    differential_update_t *diff_check = NULL;
+    for (int i = 0; i < (NUM_DIFFERENTIAL_UPDATES - 1); i++) {
+        diff_check = &differential_updates[i];
+        log_printf(LOG_LEVEL_DEBUG,
+                   "'%s' executing every %.0f seconds",
+                   diff_check->name,
+                   diff_check->update_interval_secs);
+    }
+
+    log_printf(LOG_LEVEL_DEBUG, "List of all discrete updates:");
+    discrete_update_t *discrete_check = NULL;
+    for (int i = 0; i < (NUM_DISCRETE_UPDATES - 1); i++) {
+        discrete_check = &discrete_updates[i];
+        log_printf(LOG_LEVEL_DEBUG,
+                   "'%s' executing at %u:%02u",
+                   discrete_check->name,
+                   discrete_check->hour,
+                   discrete_check->minute);
     }
 
     timer_info_handle conditions_handle = timer_init("conditions", conditions_timer_expired_callback, NULL, MS_PER_SEC);
