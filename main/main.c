@@ -76,18 +76,20 @@ static void app_init() {
     wifi_init_provisioning();
     http_client_init();
 
+    conditions_update_task_init();
     cli_task_init(&cli_uart_handle);
     cli_command_register_all();
 }
 
 static void app_start() {
+    // NOTE: conditions task not started here because we want app_main to finish doing all of its time sync and other
+    // setup before we let the conditions loop start executing its polling updates for everything
     i2c_start(&bq24196_i2c_handle);
     bq24196_start();
     display_start();
     wifi_start_provisioning(false);
     sleep_handler_start();
     sntp_time_start();
-    conditions_update_task_start();
     ota_task_start();
 
     cli_task_start();
@@ -182,7 +184,8 @@ void app_main(void) {
             log_printf(LOG_LEVEL_ERROR, "Did not receive SNTP update before timing out! Showing all conditions anyway");
         }
 
-        // Render whatever we have in flash to get up and showing asap, then kick off update to all
+        // Render whatever we have in flash to get up and showing asap, then finally start conditions task to kick off
+        // forced first updates
         spot_check_config *config = nvs_get_config();
         display_full_clear();
         screen_img_handler_draw_time();
@@ -193,14 +196,13 @@ void app_main(void) {
         screen_img_handler_draw_screen_img(SCREEN_IMG_SWELL_CHART);
         screen_img_handler_mark_all_lines_dirty();
         screen_img_handler_render(__func__, __LINE__);
-        conditions_trigger_time_update();
-        conditions_trigger_spot_name_update();
-        conditions_trigger_conditions_update();
-        conditions_trigger_both_charts_update();
 
         log_printf(LOG_LEVEL_INFO,
-                   "Boot successful, showing time + last saved conditions / charts and kicking off update");
+                   "Boot successful, showing time + last saved conditions / charts and kicking off conditions task");
     }
+
+    // See note in app_start for why this isn't with the other start functions
+    conditions_update_task_start();
 
     // Wait for all running 'processes' to finish (downloading and image, saving things to flash, running a display
     // update, etc) before entering deep sleep

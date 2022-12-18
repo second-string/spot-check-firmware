@@ -1,4 +1,5 @@
 #include <string.h>
+#include <time.h>
 
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -13,10 +14,13 @@
 #include "ota_task.h"
 #include "screen_img_handler.h"
 #include "sleep_handler.h"
+#include "sntp_time.h"
 #include "timer.h"
 #include "wifi.h"
 
 #define TAG "sc-conditions-task"
+
+#define NUM_POLLING_DIFFERENTIAL_UPDATES 4
 
 #define TIME_UPDATE_INTERVAL_SECONDS (1 * SECS_PER_MIN)
 #define CONDITIONS_UPDATE_INTERVAL_SECONDS (20 * SECS_PER_MIN)
@@ -30,37 +34,74 @@
 #define UPDATE_SPOT_NAME_BIT (1 << 4)
 #define CHECK_OTA_BIT (1 << 5)
 
+typedef struct {
+    char   name[11];
+    time_t update_interval_secs;
+    time_t last_executed_epoch_secs;
+    bool   force_next_update;
+    void (*execute)(void);
+} polling_differential_update_t;
+
+static void conditions_trigger_ota_check();
+
 static TaskHandle_t conditions_update_task_handle;
 
 static volatile unsigned int seconds_elapsed;
 static conditions_t          last_retrieved_conditions;
 
-static void conditions_trigger_ota_check();
+// Execute function cannot be blocking! Will execute from 1 sec timer interrupt callback
+static polling_differential_update_t polling_differential_updates[NUM_POLLING_DIFFERENTIAL_UPDATES] = {
+    {
+        .name                 = "time",
+        .force_next_update    = true,
+        .update_interval_secs = TIME_UPDATE_INTERVAL_SECONDS,
+        .execute              = conditions_trigger_time_update,
+    },
+    {
+        .name                 = "conditions",
+        .force_next_update    = true,
+        .update_interval_secs = CONDITIONS_UPDATE_INTERVAL_SECONDS,
+        .execute              = conditions_trigger_conditions_update,
+    },
+    {
+        .name                 = "charts",
+        .force_next_update    = true,
+        .update_interval_secs = CHARTS_UPDATE_INTERVAL_SECONDS,
+        .execute              = conditions_trigger_both_charts_update,
+    },
+    {
+        .name                 = "ota",
+        .force_next_update    = true,
+        .update_interval_secs = OTA_CHECK_INTERVAL_SECONDS,
+        .execute              = conditions_trigger_ota_check,
+    },
+};
 
 static void conditions_timer_expired_callback(void *timer_args) {
-    seconds_elapsed++;
+    struct tm now_local;
+    sntp_time_get_local_time(&now_local);
+    time_t now_epoch_secs = mktime(&now_local);
 
-    if (seconds_elapsed % TIME_UPDATE_INTERVAL_SECONDS == 0) {
-        conditions_trigger_time_update();
-        log_printf(LOG_LEVEL_DEBUG, "Reached %d seconds elapsed, triggering screen time update..", seconds_elapsed);
-    }
+    // If time differential has passed OR force execute flag set, execute and bring up to date.
+    polling_differential_update_t *check = NULL;
+    for (int i = 0; i < (NUM_POLLING_DIFFERENTIAL_UPDATES - 1); i++) {
+        check = &polling_differential_updates[i];
 
-    if (seconds_elapsed % CONDITIONS_UPDATE_INTERVAL_SECONDS == 0) {
-        conditions_trigger_conditions_update();
-        log_printf(LOG_LEVEL_DEBUG,
-                   "Reached %d seconds elapsed, triggering conditions update and display...",
-                   seconds_elapsed);
-    }
+        if (((now_epoch_secs - check->last_executed_epoch_secs) > check->update_interval_secs) ||
+            check->force_next_update) {
+            // Printing time_t is fucked, have to convert to double with difftime
+            log_printf(LOG_LEVEL_DEBUG,
+                       "Executing polling diff update '%s' (last: %.0f, now: %.0f, intvl: %.0f, force: %u)",
+                       check->name,
+                       difftime(check->last_executed_epoch_secs, 0),
+                       difftime(now_epoch_secs, 0),
+                       difftime(check->update_interval_secs, 0),
+                       check->force_next_update);
 
-    if (seconds_elapsed % CHARTS_UPDATE_INTERVAL_SECONDS == 0) {
-        conditions_trigger_both_charts_update();
-        log_printf(LOG_LEVEL_DEBUG,
-                   "Reached %d seconds elapsed, triggering tide and swell charts update and display...",
-                   seconds_elapsed);
-    }
-
-    if (seconds_elapsed % OTA_CHECK_INTERVAL_SECONDS == 0) {
-        conditions_trigger_ota_check();
+            check->execute();
+            check->last_executed_epoch_secs = now_epoch_secs;
+            check->force_next_update        = false;
+        }
     }
 }
 
@@ -183,6 +224,13 @@ static bool conditions_refresh() {
 }
 
 static void conditions_update_task(void *args) {
+    log_printf(LOG_LEVEL_DEBUG, "List of all polling time differential updates:");
+    polling_differential_update_t *check = NULL;
+    for (int i = 0; i < (NUM_POLLING_DIFFERENTIAL_UPDATES - 1); i++) {
+        check = &polling_differential_updates[i];
+        log_printf(LOG_LEVEL_DEBUG, "'%s' executing every %.0f seconds", check->name, check->update_interval_secs);
+    }
+
     timer_info_handle conditions_handle = timer_init("conditions", conditions_timer_expired_callback, NULL, MS_PER_SEC);
     timer_reset(conditions_handle, true);
 
@@ -346,6 +394,9 @@ void conditions_trigger_swell_chart_update() {
 
 void conditions_trigger_both_charts_update() {
     xTaskNotify(conditions_update_task_handle, UPDATE_SWELL_CHART_BIT | UPDATE_TIDE_CHART_BIT, eSetBits);
+}
+
+void conditions_update_task_init() {
 }
 
 void conditions_update_task_start() {

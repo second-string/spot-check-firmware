@@ -19,6 +19,7 @@ void conditions_trigger_both_charts_update();
 void conditions_block_until_system_idle();
 void conditions_set_busy(uint32_t system_idle_bitmask);
 void conditions_set_idle(uint32_t system_idle_bitmask);
+void conditions_update_task_init();
 void conditions_update_task_start();
 
 #endif

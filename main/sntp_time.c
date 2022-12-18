@@ -54,11 +54,23 @@ void sntp_time_start() {
  */
 bool sntp_time_is_synced() {
     sntp_sync_status_t status = sntp_get_sync_status();
-    char               status_str[12];
+
+    if (status == SNTP_SYNC_STATUS_COMPLETED) {
+        log_printf(LOG_LEVEL_DEBUG, "SNTP fully synced");
+        return true;
+    }
+
+    time_t    now      = 0;
+    struct tm timeinfo = {0};
+    time(&now);
+    localtime_r(&now, &timeinfo);
+    char status_str[12];
     sntp_time_status_str(status_str);
 
-    log_printf(LOG_LEVEL_DEBUG, "Checking SNTP time status, currently: %s", status_str);
-    return status == SNTP_SYNC_STATUS_COMPLETED;
+    log_printf(LOG_LEVEL_DEBUG,
+               "SNTP reported %s status, returning bool of current year > 1970 for sync check",
+               status_str);
+    return timeinfo.tm_year > 1970;
 }
 
 /*
