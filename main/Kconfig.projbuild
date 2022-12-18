@@ -5,17 +5,23 @@ menu "Spot Check Configuration"
         help
             SSID of the configuration network that users connect to to provision device
 
-    config OTA_URL
-        string "OTA URL"
-        default "https://192.168.1.242:8070/blink.bin"
-        help
-            URL to check for firmware updates on startupendmenu
-
     config DISABLE_OTA
         bool "Disable OTA updates"
         default false
         help
-            Flag to indicate whether or not this FW should reach out to OTA_URL to check for FW update
+            Flag to indicate whether or not this FW should reach out to OTA_URL to check for FW update. Overrides all other OTA settings
+
+    config OTA_URL
+        string "OTA URL"
+        default "https://192.168.1.242:8070/blink.bin"
+        help
+            URL to check for firmware updates on startup
+
+    config OTA_CHECK_INTERVAL_HOURS
+        int "OTA interval"
+        default 6
+        help
+            Number of hours to wait in between checks for available OTA update
 
     choice BOARD_REVISION
         prompt "Board revision / type"
