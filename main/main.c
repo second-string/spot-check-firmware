@@ -88,16 +88,7 @@ static void app_start() {
     sleep_handler_start();
     sntp_time_start();
     conditions_update_task_start();
-
-    // minimal * 3 is the smallest we can go w/o SO
-    // TODO :: move this into an ota_task_start() func
-    TaskHandle_t ota_task_handle;
-    xTaskCreate(&check_ota_update_task,
-                "check-ota-update",
-                SPOT_CHECK_MINIMAL_STACK_SIZE_BYTES * 3,
-                NULL,
-                tskIDLE_PRIORITY,
-                &ota_task_handle);
+    ota_task_start();
 
     cli_task_start();
 }

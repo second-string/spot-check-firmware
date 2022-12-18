@@ -18,6 +18,12 @@ void wifi_init();
 /* Uses an event group internally to yield until the wifi task sets the connected bit */
 void wifi_block_until_connected();
 
+/*
+ * Uses an event group internally to yield until the wifi task sets the connected bit with a timeout in ms
+ * Returns true if connected, false if timed out.
+ */
+bool wifi_block_until_connected_timeout(uint32_t ms_to_wait);
+
 /* Used by tasks to check if connected yet in order to perform logic without having to block on event group */
 bool wifi_is_network_connected();
 

@@ -261,7 +261,25 @@ void wifi_deinit_provisioning() {
  * Does not clear the bit on exit, as that should only be done by the wifi task handler if connection is lost.
  */
 void wifi_block_until_connected() {
-    xEventGroupWaitBits(wifi_event_group, WIFI_EVENT_GROUP_NETWORK_CONNECTED_BIT, pdFALSE, pdTRUE, portMAX_DELAY);
+    wifi_block_until_connected_timeout(portMAX_DELAY);
+}
+
+/*
+ * Should be called by any task that is waiting on an internet connection but wants to give up eventually.
+ * Does not clear the bit on exit, as that should only be done by the wifi task handler if connection is lost.
+ * Returns true if connected, false if timed out.
+ */
+bool wifi_block_until_connected_timeout(uint32_t ms_to_wait) {
+    uint32_t ticks_to_wait;
+    if (ms_to_wait == portMAX_DELAY) {
+        ticks_to_wait = portMAX_DELAY;
+    } else {
+        ticks_to_wait = pdMS_TO_TICKS(ms_to_wait);
+    }
+
+    EventBits_t bits =
+        xEventGroupWaitBits(wifi_event_group, WIFI_EVENT_GROUP_NETWORK_CONNECTED_BIT, pdFALSE, pdTRUE, ticks_to_wait);
+    return bits & WIFI_EVENT_GROUP_NETWORK_CONNECTED_BIT;
 }
 
 bool wifi_is_network_connected() {

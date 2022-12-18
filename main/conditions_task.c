@@ -10,6 +10,7 @@
 #include "json.h"
 #include "log.h"
 #include "nvs.h"
+#include "ota_task.h"
 #include "screen_img_handler.h"
 #include "sleep_handler.h"
 #include "timer.h"
@@ -17,20 +18,24 @@
 
 #define TAG "sc-conditions-task"
 
-#define TIME_UPDATE_INTERVAL_SECONDS (1 * SECONDS_PER_MIN)
-#define CONDITIONS_UPDATE_INTERVAL_SECONDS (20 * SECONDS_PER_MIN)
-#define CHARTS_UPDATE_INTERVAL_SECONDS (60 * SECONDS_PER_MIN)
+#define TIME_UPDATE_INTERVAL_SECONDS (1 * SECS_PER_MIN)
+#define CONDITIONS_UPDATE_INTERVAL_SECONDS (20 * SECS_PER_MIN)
+#define CHARTS_UPDATE_INTERVAL_SECONDS (MINS_PER_HOUR * SECS_PER_MIN)
+#define OTA_CHECK_INTERVAL_SECONDS (6 * MINS_PER_HOUR * SECS_PER_MIN)
 
 #define UPDATE_CONDITIONS_BIT (1 << 0)
 #define UPDATE_TIDE_CHART_BIT (1 << 1)
 #define UPDATE_SWELL_CHART_BIT (1 << 2)
 #define UPDATE_TIME_BIT (1 << 3)
 #define UPDATE_SPOT_NAME_BIT (1 << 4)
+#define CHECK_OTA_BIT (1 << 5)
 
 static TaskHandle_t conditions_update_task_handle;
 
 static volatile unsigned int seconds_elapsed;
 static conditions_t          last_retrieved_conditions;
+
+static void conditions_trigger_ota_check();
 
 static void conditions_timer_expired_callback(void *timer_args) {
     seconds_elapsed++;
@@ -52,6 +57,10 @@ static void conditions_timer_expired_callback(void *timer_args) {
         log_printf(LOG_LEVEL_DEBUG,
                    "Reached %d seconds elapsed, triggering tide and swell charts update and display...",
                    seconds_elapsed);
+    }
+
+    if (seconds_elapsed % OTA_CHECK_INTERVAL_SECONDS == 0) {
+        conditions_trigger_ota_check();
     }
 }
 
@@ -174,8 +183,7 @@ static bool conditions_refresh() {
 }
 
 static void conditions_update_task(void *args) {
-    timer_info_handle conditions_handle =
-        timer_init("conditions", conditions_timer_expired_callback, NULL, MS_PER_SECOND);
+    timer_info_handle conditions_handle = timer_init("conditions", conditions_timer_expired_callback, NULL, MS_PER_SEC);
     timer_reset(conditions_handle, true);
 
     // Wait forever until connected
@@ -218,6 +226,12 @@ static void conditions_update_task(void *args) {
             sleep_handler_set_busy(SYSTEM_IDLE_SWELL_CHART_BIT);
             screen_img_handler_download_and_save(SCREEN_IMG_SWELL_CHART);
             sleep_handler_set_idle(SYSTEM_IDLE_SWELL_CHART_BIT);
+        }
+
+        if (update_bits & CHECK_OTA_BIT) {
+            // Just kicks off the task non-blocking so this won't actually disrupt anything with rest of conditions
+            // update loop
+            ota_task_start();
         }
 
         /***************************************
@@ -304,6 +318,10 @@ static void conditions_update_task(void *args) {
             screen_img_handler_render(__func__, __LINE__);
         }
     }
+}
+
+static void conditions_trigger_ota_check() {
+    xTaskNotify(conditions_update_task_handle, CHECK_OTA_BIT, eSetBits);
 }
 
 void conditions_trigger_time_update() {

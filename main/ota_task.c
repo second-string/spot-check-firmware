@@ -21,8 +21,9 @@
 extern const uint8_t server_cert_pem_start[] asm("_binary_ca_cert_pem_start");
 extern const uint8_t server_cert_pem_end[] asm("_binary_ca_cert_pem_end");
 
-// Gloval OTA handle
+// Global OTA and task handles
 static esp_https_ota_handle_t ota_handle;
+static TaskHandle_t           ota_task_handle = NULL;
 
 static esp_err_t http_client_init_callback(esp_http_client_handle_t http_client) {
     esp_err_t err = ESP_OK;
@@ -131,19 +132,34 @@ static bool check_forced_update(esp_app_desc_t *current_image_info, char *versio
     return force_update;
 }
 
-void check_ota_update_task(void *args) {
+/*
+ * Proper task teardown. I don't know if the call to vTaskDelete immediately deletes the executing task, so always call
+ * return up to root of callstack after calling this function.
+ */
+static void ota_task_stop() {
+    sleep_handler_set_idle(SYSTEM_IDLE_OTA_BIT);
+    ota_task_handle = NULL;
+    vTaskDelete(NULL);
+}
+
+static void check_ota_update_task(void *args) {
     sleep_handler_set_busy(SYSTEM_IDLE_OTA_BIT);
     log_printf(LOG_LEVEL_INFO, "Starting OTA task to check update status");
 
 #ifdef CONFIG_DISABLE_OTA
     log_printf(LOG_LEVEL_INFO, "FW compiled with ENABLE_OTA menuconfig option disabled, bailing out of OTA task");
-    sleep_handler_set_idle(SYSTEM_IDLE_OTA_BIT);
-    vTaskDelete(NULL);
+    ota_task_stop();
+    return;
 #endif
 
     if (!wifi_is_network_connected()) {
-        log_printf(LOG_LEVEL_INFO, "Not connected to wifi yet, OTA task will block until connection recieved");
-        wifi_block_until_connected();
+        log_printf(LOG_LEVEL_INFO, "Not connected to wifi, waiting for 30 seconds then bailing out of OTA task");
+        if (!wifi_block_until_connected_timeout(30 * MS_PER_SEC)) {
+            log_printf(LOG_LEVEL_INFO, "No connection received, bailing out of OTA task");
+            ota_task_stop();
+            return;
+        }
+        log_printf(LOG_LEVEL_INFO, "Got connection, continuing with OTA check");
     }
 
     // Start our OTA process with the default binary URL first
@@ -159,8 +175,8 @@ void check_ota_update_task(void *args) {
     esp_err_t      error = esp_https_ota_get_img_desc(ota_handle, &ota_image_desc);
     if (error != ESP_OK) {
         log_printf(LOG_LEVEL_ERROR, "OTA failed at esp_https_ota_get_img_desc: %s", esp_err_to_name(error));
-        sleep_handler_set_idle(SYSTEM_IDLE_OTA_BIT);
-        vTaskDelete(NULL);
+        ota_task_stop();
+        return;
     }
 
     // Check to see if a basic version comparison results in an update from a newer version on the server
@@ -190,8 +206,8 @@ void check_ota_update_task(void *args) {
             ota_start_ota(forced_version_url);
         } else {
             log_printf(LOG_LEVEL_INFO, "Still got no go-ahead from force OTA endpoint, deleting OTA task");
-            sleep_handler_set_idle(SYSTEM_IDLE_OTA_BIT);
-            vTaskDelete(NULL);
+            ota_task_stop();
+            return;
         }
     }
 
@@ -221,8 +237,8 @@ void check_ota_update_task(void *args) {
     bool received_full_image = esp_https_ota_is_complete_data_received(ota_handle);
     if (!received_full_image) {
         log_printf(LOG_LEVEL_ERROR, "Did not receive full image package from server, aborting.");
-        sleep_handler_set_idle(SYSTEM_IDLE_OTA_BIT);
-        vTaskDelete(NULL);
+        ota_task_stop();
+        return;
     }
 
     error = esp_https_ota_finish(ota_handle);
@@ -240,7 +256,25 @@ void check_ota_update_task(void *args) {
         }
     }
 
-    // Delete this task once we've checked
-    sleep_handler_set_idle(SYSTEM_IDLE_OTA_BIT);
-    vTaskDelete(NULL);
+    ota_task_stop();
+    return;
+}
+
+void ota_task_start() {
+    if (ota_task_handle != NULL) {
+        log_printf(LOG_LEVEL_WARN,
+                   "%s called when ota task handle not null. This means the task wasn't torn down correctly after last "
+                   "check, or it is somehow being called from somewhere it shouldn't (OTA should only run on set "
+                   "schedule far apart). This is a bug, it should never happen.",
+                   __func__);
+        return;
+    }
+
+    // minimal * 3 is the smallest we can go w/o SO
+    xTaskCreate(&check_ota_update_task,
+                "check-ota-update",
+                SPOT_CHECK_MINIMAL_STACK_SIZE_BYTES * 3,
+                NULL,
+                tskIDLE_PRIORITY,
+                &ota_task_handle);
 }

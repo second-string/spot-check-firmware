@@ -11,7 +11,8 @@
 // Define our own minimum here (esp freertos port takes stack size in BYTES not WORDS like vanilla, so stupid)
 #define SPOT_CHECK_MINIMAL_STACK_SIZE_BYTES (1024)
 
-#define MS_PER_SECOND (1000)
-#define SECONDS_PER_MIN (60)
+#define MS_PER_SEC (1000)
+#define SECS_PER_MIN (60)
+#define MINS_PER_HOUR (60)
 
 #endif
