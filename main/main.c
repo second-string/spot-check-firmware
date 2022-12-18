@@ -197,12 +197,11 @@ void app_main(void) {
         screen_img_handler_mark_all_lines_dirty();
         screen_img_handler_render(__func__, __LINE__);
 
+        // See note in app_start for why this isn't with the other start functions
+        conditions_update_task_start();
         log_printf(LOG_LEVEL_INFO,
-                   "Boot successful, showing time + last saved conditions / charts and kicking off conditions task");
+                   "Boot successful, showing time + last saved conditions / charts and kicked off conditions task");
     }
-
-    // See note in app_start for why this isn't with the other start functions
-    conditions_update_task_start();
 
     // Wait for all running 'processes' to finish (downloading and image, saving things to flash, running a display
     // update, etc) before entering deep sleep
