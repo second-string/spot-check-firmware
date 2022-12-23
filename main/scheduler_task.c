@@ -20,12 +20,9 @@
 
 #define TAG SC_TAG_SCHEDULER
 
-#define NUM_DIFFERENTIAL_UPDATES 3
-#define NUM_DISCRETE_UPDATES 4
+#define NUM_DIFFERENTIAL_UPDATES 1
+#define NUM_DISCRETE_UPDATES 6
 
-#define TIME_UPDATE_INTERVAL_SECONDS (1 * SECS_PER_MIN)
-#define CONDITIONS_UPDATE_INTERVAL_SECONDS (20 * SECS_PER_MIN)
-#define CHARTS_UPDATE_INTERVAL_SECONDS (MINS_PER_HOUR * SECS_PER_MIN)
 #define OTA_CHECK_INTERVAL_SECONDS (CONFIG_OTA_CHECK_INTERVAL_HOURS * MINS_PER_HOUR * SECS_PER_MIN)
 
 #define UPDATE_CONDITIONS_BIT (1 << 0)
@@ -47,7 +44,8 @@ typedef struct {
     char    name[14];
     uint8_t hour;
     uint8_t minute;
-    bool    executed_already;
+    uint8_t hour_last_executed;
+    uint8_t minute_last_executed;
     void (*execute)(void);
     bool force_next_update;
 } discrete_update_t;
@@ -62,18 +60,6 @@ static conditions_t          last_retrieved_conditions;
 // Execute function cannot be blocking! Will execute from 1 sec timer interrupt callback
 static differential_update_t differential_updates[NUM_DIFFERENTIAL_UPDATES] = {
     {
-        .name                 = "time",
-        .force_next_update    = true,
-        .update_interval_secs = TIME_UPDATE_INTERVAL_SECONDS,
-        .execute              = scheduler_trigger_time_update,
-    },
-    {
-        .name                 = "conditions",
-        .force_next_update    = true,
-        .update_interval_secs = CONDITIONS_UPDATE_INTERVAL_SECONDS,
-        .execute              = scheduler_trigger_conditions_update,
-    },
-    {
         .name                 = "ota",
         .force_next_update    = true,
         .update_interval_secs = OTA_CHECK_INTERVAL_SECONDS,
@@ -83,36 +69,58 @@ static differential_update_t differential_updates[NUM_DIFFERENTIAL_UPDATES] = {
 
 static discrete_update_t discrete_updates[NUM_DISCRETE_UPDATES] = {
     {
-        .name              = "tide",
-        .force_next_update = true,
-        .hour              = 3,
-        .minute            = 0,
-        .executed_already  = false,
-        .execute           = scheduler_trigger_tide_chart_update,
+        .name                 = "time",
+        .force_next_update    = true,
+        .hour                 = 0xFF,  // wildcards, should update every minute every hour
+        .minute               = 0xFF,
+        .hour_last_executed   = 0,
+        .minute_last_executed = 0,
+        .execute              = scheduler_trigger_time_update,
     },
     {
-        .name              = "swell_morning",
-        .force_next_update = true,
-        .hour              = 12,
-        .minute            = 0,
-        .executed_already  = false,
-        .execute           = scheduler_trigger_swell_chart_update,
+        .name                 = "conditions",
+        .force_next_update    = true,
+        .hour                 = 0xFF,  // wildcard, runs on 5th minute of every hours
+        .minute               = 5,
+        .hour_last_executed   = 0,
+        .minute_last_executed = 0,
+        .execute              = scheduler_trigger_conditions_update,
     },
     {
-        .name              = "swell_midday",
-        .force_next_update = true,
-        .hour              = 21,
-        .minute            = 0,
-        .executed_already  = false,
-        .execute           = scheduler_trigger_swell_chart_update,
+        .name                 = "tide",
+        .force_next_update    = true,
+        .hour                 = 3,
+        .minute               = 0,
+        .hour_last_executed   = 0,
+        .minute_last_executed = 0,
+        .execute              = scheduler_trigger_tide_chart_update,
     },
     {
-        .name              = "swell_evening",
-        .force_next_update = true,
-        .hour              = 17,
-        .minute            = 0,
-        .executed_already  = false,
-        .execute           = scheduler_trigger_swell_chart_update,
+        .name                 = "swell_morning",
+        .force_next_update    = true,
+        .hour                 = 12,
+        .minute               = 0,
+        .hour_last_executed   = 0,
+        .minute_last_executed = 0,
+        .execute              = scheduler_trigger_swell_chart_update,
+    },
+    {
+        .name                 = "swell_midday",
+        .force_next_update    = true,
+        .hour                 = 21,
+        .minute               = 0,
+        .hour_last_executed   = 0,
+        .minute_last_executed = 0,
+        .execute              = scheduler_trigger_swell_chart_update,
+    },
+    {
+        .name                 = "swell_evening",
+        .force_next_update    = true,
+        .hour                 = 17,
+        .minute               = 0,
+        .hour_last_executed   = 0,
+        .minute_last_executed = 0,
+        .execute              = scheduler_trigger_swell_chart_update,
     },
 };
 
@@ -135,11 +143,11 @@ static void scheduler_polling_timer_callback(void *timer_args) {
     sntp_time_get_local_time(&now_local);
     time_t now_epoch_secs = mktime(&now_local);
 
-    // If time differential has passed OR force execute flag set, execute and bring up to date.
     differential_update_t *diff_check = NULL;
-    for (int i = 0; i < (NUM_DIFFERENTIAL_UPDATES - 1); i++) {
+    for (int i = 0; i < NUM_DIFFERENTIAL_UPDATES; i++) {
         diff_check = &differential_updates[i];
 
+        // If time differential has passed OR force execute flag set, execute and bring up to date.
         if (((now_epoch_secs - diff_check->last_executed_epoch_secs) > diff_check->update_interval_secs) ||
             diff_check->force_next_update) {
             // Printing time_t is fucked, have to convert to double with difftime
@@ -157,31 +165,31 @@ static void scheduler_polling_timer_callback(void *timer_args) {
         }
     }
 
-    // If matching time has arrived OR force execute flag set, execute.
     discrete_update_t *discrete_check = NULL;
-    for (int i = 0; i < (NUM_DISCRETE_UPDATES - 1); i++) {
+    for (int i = 0; i < NUM_DISCRETE_UPDATES; i++) {
         discrete_check = &discrete_updates[i];
 
+        // If (matching time has arrived AND the update has not yet been executed this minute) OR force execute flag
+        // set, execute.
         if ((discrete_time_matches(now_local.tm_hour, discrete_check->hour) &&
-             discrete_time_matches(now_local.tm_min, discrete_check->minute)) ||
+             discrete_time_matches(now_local.tm_min, discrete_check->minute) &&
+             (now_local.tm_hour != discrete_check->hour_last_executed ||
+              now_local.tm_min != discrete_check->minute_last_executed)) ||
             discrete_check->force_next_update) {
-            if (!discrete_check->executed_already) {
-                log_printf(LOG_LEVEL_DEBUG,
-                           "Executing discrete update '%s' (curr hr: %u, curr min: %u, check hr: %u, check min: %u, "
-                           "force: %u)",
-                           discrete_check->name,
-                           now_local.tm_hour,
-                           now_local.tm_min,
-                           discrete_check->hour,
-                           discrete_check->minute,
-                           discrete_check->force_next_update);
+            log_printf(LOG_LEVEL_DEBUG,
+                       "Executing discrete update '%s' (curr hr: %u, curr min: %u, check hr: %u, check min: %u, "
+                       "force: %u)",
+                       discrete_check->name,
+                       now_local.tm_hour,
+                       now_local.tm_min,
+                       discrete_check->hour,
+                       discrete_check->minute,
+                       discrete_check->force_next_update);
 
-                discrete_check->execute();
-                discrete_check->force_next_update = false;
-                discrete_check->executed_already  = true;
-            }
-        } else if (discrete_check->executed_already) {
-            discrete_check->executed_already = false;
+            discrete_check->execute();
+            discrete_check->hour_last_executed   = now_local.tm_hour;
+            discrete_check->minute_last_executed = now_local.tm_min;
+            discrete_check->force_next_update    = false;
         }
     }
 }
@@ -189,7 +197,7 @@ static void scheduler_polling_timer_callback(void *timer_args) {
 static void scheduler_task(void *args) {
     log_printf(LOG_LEVEL_DEBUG, "List of all time differential updates:");
     differential_update_t *diff_check = NULL;
-    for (int i = 0; i < (NUM_DIFFERENTIAL_UPDATES - 1); i++) {
+    for (int i = 0; i < NUM_DIFFERENTIAL_UPDATES; i++) {
         diff_check = &differential_updates[i];
         log_printf(LOG_LEVEL_DEBUG,
                    "'%s' executing every %.0f seconds",
@@ -199,7 +207,7 @@ static void scheduler_task(void *args) {
 
     log_printf(LOG_LEVEL_DEBUG, "List of all discrete updates:");
     discrete_update_t *discrete_check = NULL;
-    for (int i = 0; i < (NUM_DISCRETE_UPDATES - 1); i++) {
+    for (int i = 0; i < NUM_DISCRETE_UPDATES; i++) {
         discrete_check = &discrete_updates[i];
         log_printf(LOG_LEVEL_DEBUG,
                    "'%s' executing at %u:%02u",
