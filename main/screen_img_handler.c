@@ -30,6 +30,13 @@
 #define CONDITIONS_TEMPERATURE_DRAW_Y_PX (120)
 #define CONDITIONS_WIND_DRAW_Y_PX (150)
 #define CONDITIONS_TIDE_DRAW_Y_PX (180)
+#define OTA_DRAW_X_PX (400)
+#define OTA_DRAW_Y_PX \
+    (250)  // Draw right in the middle of tide chart - since it only updates every 24hr the likelihood of it updating
+           // and re-drawing while we're firmware update is super low
+
+const char *const ota_start_text    = "Firmware update in progress, please do not unplug Spot Check device";
+const char *const ota_finished_text = "Firmware update successful! Rebooting...";
 
 static struct tm last_time_displayed = {0};
 
@@ -609,6 +616,45 @@ bool screen_img_handler_draw_conditions_error() {
                       CONDITIONS_TEMPERATURE_DRAW_Y_PX,
                       DISPLAY_FONT_SIZE_SMALL,
                       DISPLAY_FONT_ALIGN_RIGHT);
+    return true;
+}
+
+bool screen_img_handler_clear_ota_start_text() {
+    display_invert_text((char *)ota_start_text,
+                        OTA_DRAW_X_PX,
+                        OTA_DRAW_Y_PX,
+                        DISPLAY_FONT_SIZE_MEDIUM,
+                        DISPLAY_FONT_ALIGN_CENTER);
+
+    // uint32_t ota_text_width;
+    // uint32_t ota_text_height;
+    // display_get_text_bounds((char *)ota_start_text,
+    //                         &ota_text_width,
+    //                         &ota_text_height);
+
+    return true;
+}
+
+/*
+ * Give user notification that FW is updating so don't unplug
+ */
+bool screen_img_handler_draw_ota_start_text() {
+    display_draw_text((char *)ota_start_text,
+                      OTA_DRAW_X_PX,
+                      OTA_DRAW_Y_PX,
+                      DISPLAY_FONT_SIZE_MEDIUM,
+                      DISPLAY_FONT_ALIGN_CENTER);
+
+    return true;
+}
+
+bool screen_img_handler_draw_ota_finished_text() {
+    display_draw_text((char *)ota_finished_text,
+                      OTA_DRAW_X_PX,
+                      OTA_DRAW_Y_PX,
+                      DISPLAY_FONT_SIZE_MEDIUM,
+                      DISPLAY_FONT_ALIGN_CENTER);
+
     return true;
 }
 

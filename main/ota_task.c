@@ -14,6 +14,7 @@
 #include "json.h"
 #include "log.h"
 #include "ota_task.h"
+#include "screen_img_handler.h"
 #include "sleep_handler.h"
 #include "wifi.h"
 
@@ -137,7 +138,13 @@ static bool check_forced_update(esp_app_desc_t *current_image_info, char *versio
  * Proper task teardown. I don't know if the call to vTaskDelete immediately deletes the executing task, so always call
  * return up to root of callstack after calling this function.
  */
-static void ota_task_stop() {
+static void ota_task_stop(bool success) {
+    screen_img_handler_clear_ota_start_text();
+    if (success) {
+        screen_img_handler_clear_ota_start_text();
+        vTaskDelay(pdMS_TO_TICKS(5000));
+    }
+
     sleep_handler_set_idle(SYSTEM_IDLE_OTA_BIT);
     ota_task_handle = NULL;
     vTaskDelete(NULL);
@@ -149,7 +156,7 @@ static void check_ota_update_task(void *args) {
 
 #ifdef CONFIG_DISABLE_OTA
     log_printf(LOG_LEVEL_INFO, "FW compiled with ENABLE_OTA menuconfig option disabled, bailing out of OTA task");
-    ota_task_stop();
+    ota_task_stop(false);
     return;
 #endif
 
@@ -157,7 +164,7 @@ static void check_ota_update_task(void *args) {
         log_printf(LOG_LEVEL_INFO, "Not connected to wifi, waiting for 30 seconds then bailing out of OTA task");
         if (!wifi_block_until_connected_timeout(30 * MS_PER_SEC)) {
             log_printf(LOG_LEVEL_INFO, "No connection received, bailing out of OTA task");
-            ota_task_stop();
+            ota_task_stop(false);
             return;
         }
         log_printf(LOG_LEVEL_INFO, "Got connection, continuing with OTA check");
@@ -176,7 +183,7 @@ static void check_ota_update_task(void *args) {
     esp_err_t      error = esp_https_ota_get_img_desc(ota_handle, &ota_image_desc);
     if (error != ESP_OK) {
         log_printf(LOG_LEVEL_ERROR, "OTA failed at esp_https_ota_get_img_desc: %s", esp_err_to_name(error));
-        ota_task_stop();
+        ota_task_stop(false);
         return;
     }
 
@@ -207,10 +214,15 @@ static void check_ota_update_task(void *args) {
             ota_start_ota(forced_version_url);
         } else {
             log_printf(LOG_LEVEL_INFO, "Still got no go-ahead from force OTA endpoint, deleting OTA task");
-            ota_task_stop();
+            ota_task_stop(false);
             return;
         }
     }
+
+    // Notify user on screen
+    // TODO :: This timing is fine during normal hourly OTA checks, but need to see if this is going to draw before full
+    // scheduler update is done on boot, which would mean the redraw of the tide chart will erase this
+    screen_img_handler_draw_ota_start_text();
 
     uint32_t iter_counter = 0;
     uint32_t bytes_received;
@@ -238,7 +250,7 @@ static void check_ota_update_task(void *args) {
     bool received_full_image = esp_https_ota_is_complete_data_received(ota_handle);
     if (!received_full_image) {
         log_printf(LOG_LEVEL_ERROR, "Did not receive full image package from server, aborting.");
-        ota_task_stop();
+        ota_task_stop(false);
         return;
     }
 
@@ -257,7 +269,7 @@ static void check_ota_update_task(void *args) {
         }
     }
 
-    ota_task_stop();
+    ota_task_stop(true);
     return;
 }
 
