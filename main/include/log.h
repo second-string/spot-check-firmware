@@ -12,6 +12,7 @@ typedef enum {
 
 void     log_init(uart_handle_t *console_handle);
 void     log_log_line(sc_tag_t tag, log_level_t level, char *fmt, ...);
+void     log_wait_until_all_tx();
 void     log_set_max_log_level(log_level_t level);
 void     log_hide_tag(sc_tag_t tag);
 void     log_show_tag(sc_tag_t tag);

@@ -78,6 +78,14 @@ void log_log_line(sc_tag_t tag, log_level_t level, char *fmt, ...) {
     uart_write_bytes(cli_uart_handle->port, log_out_buffer, bytes_written + formatted_size + 1);
 }
 
+/*
+ * FULLY BLOCKING until all messages moved out of the uart TX buffer. Theoretically this is quick but who knows if
+ * something goes wrong
+ */
+void log_wait_until_all_tx() {
+    uart_wait_tx_done(cli_uart_handle->port, portMAX_DELAY);
+}
+
 void log_set_max_log_level(log_level_t level) {
     // I don't think we really have to worry about this since it's mostly for re-entrant log calls overwriting the
     // buffer but why not
