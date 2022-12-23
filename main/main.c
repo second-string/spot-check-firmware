@@ -27,7 +27,6 @@
 #include "mdns_local.h"
 #include "nvs.h"
 #include "ota_task.h"
-#include "raw_image.h"
 #include "scheduler_task.h"
 #include "screen_img_handler.h"
 #include "sleep_handler.h"

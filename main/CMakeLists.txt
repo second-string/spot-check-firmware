@@ -19,7 +19,6 @@ idf_component_register(
                                  "bq24196.c"
                                  "cd54hc4094.c"
                                  "display.c"
-                                 "raw_image.c"
                                  "flash_partition.c"
                                  "screen_img_handler.c"
                                  "sntp_time.c"
