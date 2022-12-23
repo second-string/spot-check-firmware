@@ -8,7 +8,7 @@
 // Must included below constants.h where we overwite the define of LOG_LOCAL_LEVEL
 #include "log.h"
 
-#define TAG "sc-http-client"
+#define TAG SC_TAG_HTTP_CLIENT
 
 #define MAX_QUERY_PARAM_LENGTH 15
 #define MAX_READ_BUFFER_SIZE 1024

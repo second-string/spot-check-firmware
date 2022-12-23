@@ -24,7 +24,7 @@
 #include "sleep_handler.h"
 #include "sntp_time.h"
 
-#define TAG "sc-cli-cmd"
+#define TAG SC_TAG_CLI_CMD
 
 typedef enum {
     INFO_STATE_BANNER,
@@ -600,16 +600,12 @@ BaseType_t cli_command_log(char *write_buffer, size_t write_buffer_size, const c
     BaseType_t  action_len;
     const char *action = FreeRTOS_CLIGetParameter(cmd_str, 1, &action_len);
     if (action == NULL) {
-        strcpy(write_buffer, "Error: usage is 'log <action> <arg>' where action is 'level'");
+        strcpy(write_buffer, "Error: usage is 'log <action> [arg]' where action is 'level|hide|show'");
         return pdFALSE;
     }
 
     BaseType_t  arg_len;
     const char *arg = FreeRTOS_CLIGetParameter(cmd_str, 2, &arg_len);
-    if (arg == NULL) {
-        strcpy(write_buffer, "Error: usage is 'log <arg> <arg>' where arg is 'level'");
-        return pdFALSE;
-    }
 
     memset(write_buffer, 0x0, write_buffer_size);
     if (action_len == 5 && strncmp(action, "level", action_len) == 0) {
@@ -633,6 +629,51 @@ BaseType_t cli_command_log(char *write_buffer, size_t write_buffer_size, const c
         }
 
         log_set_max_log_level(new_level);
+    } else if (action_len == 4 && strncmp(action, "show", action_len) == 0) {
+        if (arg == NULL) {
+            log_show_all_tags();
+            strcpy(write_buffer, "OK");
+        } else {
+            bool found = false;
+            for (int i = 0; i < SC_TAG_COUNT; i++) {
+                // double index tag_strs to skip over '[' prefix so user can just type normal tag string
+                if (strncmp(arg, &tag_strs[i][1], arg_len) == 0) {
+                    log_show_tag(i);
+                    found = true;
+                    break;
+                }
+            }
+
+            strcpy(write_buffer, found ? "OK" : "Invalid log tag, see constants.h for tag strings");
+        }
+    } else if (action_len == 4 && strncmp(action, "hide", action_len) == 0) {
+        if (arg == NULL) {
+            // Re-show cli logs when using hide all, can still disable with singular disable if full silence wanted
+            log_hide_all_tags();
+            log_show_tag(SC_TAG_CLI);
+            strcpy(write_buffer, "OK");
+        } else {
+            bool found = false;
+            for (int i = 0; i < SC_TAG_COUNT; i++) {
+                // double index tag_strs to skip over '[' prefix so user can just type normal tag string
+                if (strncmp(arg, &tag_strs[i][1], arg_len) == 0) {
+                    log_hide_tag(i);
+                    found = true;
+                    break;
+                }
+            }
+
+            strcpy(write_buffer, found ? "OK" : "Invalid log tag, see constants.h for tag strings");
+        }
+    } else if (action_len == 4 && strncmp(action, "list", action_len) == 0) {
+        char     tag_blacklist_str[33];
+        uint32_t tag_blacklist = log_get_tag_blacklist();
+        for (int i = 0; i < 32; i++) {
+            tag_blacklist_str[i] = (tag_blacklist & (1 << (31 - i)) ? '1' : '0');
+        }
+        tag_blacklist_str[32] = '\0';
+
+        strcpy(write_buffer, tag_blacklist_str);
     } else {
         strcpy(write_buffer, "Unknown log command");
     }
@@ -773,10 +814,12 @@ void cli_command_register_all() {
     };
 
     static const CLI_Command_Definition_t log_cmd = {
-        .pcCommand                   = "log",
-        .pcHelpString                = "log:\n\tlevel: set max log level output to serial",
+        .pcCommand = "log",
+        .pcHelpString =
+            "log:\n\tlevel: set max log level output\n\thide [tag]: hide tag, or all "
+            "tags if empty\n\tshow [tag]: show tag, or all tags if empty\n\tlist: log blacklist",
         .pxCommandInterpreter        = cli_command_log,
-        .cExpectedNumberOfParameters = 2,
+        .cExpectedNumberOfParameters = -1,
     };
 
     static const CLI_Command_Definition_t sleep_cmd = {

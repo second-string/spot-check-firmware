@@ -3,12 +3,13 @@
 #include "cJSON.h"
 #include "freertos/FreeRTOS.h"
 
+#include "constants.h"
 #include "json.h"
 
 // Must included below constants.h where we overwite the define of LOG_LOCAL_LEVEL
 #include "log.h"
 
-#define TAG "sc-json"
+#define TAG SC_TAG_JSON
 
 cJSON *parse_json(char *server_response) {
     cJSON *json = cJSON_Parse(server_response);

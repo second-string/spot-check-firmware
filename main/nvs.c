@@ -5,11 +5,12 @@
 #include "log.h"
 #include "nvs_flash.h"
 
+#include "constants.h"
 #include "http_server.h"
 #include "nvs.h"
 #include "scheduler_task.h"
 
-#define TAG "sc-nvs"
+#define TAG SC_TAG_NVS
 
 static nvs_handle_t handle = 0;
 

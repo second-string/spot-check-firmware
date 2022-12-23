@@ -1,11 +1,13 @@
 #include "constants.h"
 
 #include "freeRTOS/FreeRTOS.h"
+
+#include "constants.h"
 #include "log.h"
 
 #include "timer.h"
 
-#define TAG "sc-timer"
+#define TAG SC_TAG_TIMER
 
 typedef struct timer_info_t {
     esp_timer_handle_t timer_handle;

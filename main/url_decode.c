@@ -4,12 +4,13 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "constants.h"
 #include "esp_err.h"
 #include "log.h"
 
 #include "url_decode.h"
 
-#define TAG "sc-url-decode"
+#define TAG SC_TAG_URL_DECODE
 
 void urldecode2(char *dst, const char *src) {
     char a, b;

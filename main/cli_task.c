@@ -13,7 +13,7 @@
 
 #include "log.h"
 
-#define TAG "sc-cli"
+#define TAG SC_TAG_CLI
 
 // Lower number, lower priority (idle == 0)
 #define CLI_TASK_PRIORITY (tskIDLE_PRIORITY)
@@ -21,7 +21,7 @@
 
 #define CLI_CMD_PROCESS_TASK_PRIORITY (tskIDLE_PRIORITY)
 #define CLI_COMMAND_QUEUE_SIZE (12)
-#define CLI_COMMAND_PROCESS_OUT_BUFFER_BYTES (128)
+#define CLI_COMMAND_PROCESS_OUT_BUFFER_BYTES (256)
 
 typedef struct {
     char  *cmd;

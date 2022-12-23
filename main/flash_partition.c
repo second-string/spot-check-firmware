@@ -1,7 +1,8 @@
 #include "flash_partition.h"
+#include "constants.h"
 #include "screen_img_handler.h"
 
-#define TAG "sc-part"
+#define TAG SC_TAG_PART
 
 const esp_partition_t *flash_partition_get_screen_img_partition() {
     const esp_partition_t *screen_img_partition =

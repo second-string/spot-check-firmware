@@ -4,9 +4,10 @@
 #include "freertos/task.h"
 
 #include "cd54hc4094.h"
+#include "constants.h"
 #include "log.h"
 
-#define TAG "sc-cd54hc4094"
+#define TAG SC_TAG_CD54HC4094
 
 static gpio_num_t clk;
 static gpio_num_t data;

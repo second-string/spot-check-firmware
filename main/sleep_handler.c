@@ -1,10 +1,11 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
 
+#include "constants.h"
 #include "log.h"
 #include "sleep_handler.h"
 
-#define TAG "sc-sleep-handler"
+#define TAG SC_TAG_SLEEP_HANDLER
 
 static EventGroupHandle_t system_idle_event_group;
 

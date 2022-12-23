@@ -8,17 +8,17 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
 #include "freertos/task.h"
-#include "log.h"
 
 #include "lwip/err.h"
 #include "lwip/sys.h"
 
-#include "mdns_local.h"
-
+#include "constants.h"
 #include "http_server.h"
+#include "log.h"
+#include "mdns_local.h"
 #include "wifi.h"
 
-#define TAG "sc-wifi"
+#define TAG SC_TAG_WIFI
 
 // Local configuration network
 #define CONFIG_AP_SSID CONFIG_CONFIGURATION_ACCESS_POINT_SSID

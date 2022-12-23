@@ -2,10 +2,11 @@
 
 #include "freertos/FreeRTOS.h"
 
+#include "constants.h"
 #include "log.h"
 #include "uart.h"
 
-#define TAG "sc-uart"
+#define TAG SC_TAG_UART
 
 void uart_init(uart_port_t       port,
                uint16_t          rx_ring_buffer_size,

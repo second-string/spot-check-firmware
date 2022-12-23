@@ -38,7 +38,7 @@
 
 #include "log.h"
 
-#define TAG "sc-main"
+#define TAG SC_TAG_MAIN
 
 #define CLI_UART UART_NUM_0
 #define SHIFTREG_CLK_PIN GPIO_NUM_32

@@ -1,9 +1,10 @@
 #include "esp_sntp.h"
 
+#include "constants.h"
 #include "log.h"
 #include "sntp_time.h"
 
-#define TAG "sc-sntp"
+#define TAG SC_TAG_SNTP
 
 /*
  * Callback that fires every time the SNTP service syncs system time with received rmeote value. Superfluous with the

@@ -6,7 +6,7 @@
 
 #include "log.h"
 
-#define TAG "sc-gpio"
+#define TAG SC_TAG_GPIO
 
 #define GPIO_INPUT_PIN_SEL (1 << GPIO_BUTTON_PIN)
 #define BUTTON_TIMER_PERIOD_MS (20)

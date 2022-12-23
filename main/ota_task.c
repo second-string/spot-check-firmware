@@ -7,16 +7,17 @@
 #include "esp_ota_ops.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
-#include "log.h"
 #include "sdkconfig.h"
 
+#include "constants.h"
 #include "http_client.h"
 #include "json.h"
+#include "log.h"
 #include "ota_task.h"
 #include "sleep_handler.h"
 #include "wifi.h"
 
-#define TAG "sc-ota-task"
+#define TAG SC_TAG_OTA
 
 extern const uint8_t server_cert_pem_start[] asm("_binary_ca_cert_pem_start");
 extern const uint8_t server_cert_pem_end[] asm("_binary_ca_cert_pem_end");

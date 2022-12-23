@@ -1,6 +1,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 
+#include "constants.h"
 #include "display.h"
 #include "epd_driver.h"
 #include "epd_highlevel.h"
@@ -11,7 +12,7 @@
 #include "flash_partition.h"
 #include "log.h"
 
-#define TAG "sc-display"
+#define TAG SC_TAG_DISPLAY
 
 #define FONT_40 FiraSans_40
 #define FONT_20 FiraSans_20

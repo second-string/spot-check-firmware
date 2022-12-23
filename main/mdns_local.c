@@ -3,9 +3,10 @@
 #include "log.h"
 #include "mdns.h"
 
+#include "constants.h"
 #include "mdns_local.h"
 
-#define TAG "sc-mdns"
+#define TAG SC_TAG_MDNS
 
 static char *hostname = "spot-check";
 

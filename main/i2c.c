@@ -1,9 +1,10 @@
 #include "esp_err.h"
 
+#include "constants.h"
 #include "i2c.h"
 #include "log.h"
 
-#define TAG "sc-i2c"
+#define TAG SC_TAG_I2C
 
 #define I2C_MASTER_TX_BUF_DISABLE 0 /*!< I2C master doesn't need buffer */
 #define I2C_MASTER_RX_BUF_DISABLE 0 /*!< I2C master doesn't need buffer */

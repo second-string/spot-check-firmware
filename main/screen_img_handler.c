@@ -7,6 +7,7 @@
 #include "esp_sntp.h"
 #include "esp_spi_flash.h"
 
+#include "constants.h"
 #include "display.h"
 #include "flash_partition.h"
 #include "http_client.h"
@@ -16,7 +17,7 @@
 #include "screen_img_handler.h"
 #include "sntp_time.h"
 
-#define TAG "sc-screenimg"
+#define TAG SC_TAG_SCREEN_IMG_HANDLER
 
 #define TIME_DRAW_X_PX (75)
 #define TIME_DRAW_Y_PX (120)

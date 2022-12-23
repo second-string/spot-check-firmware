@@ -15,8 +15,9 @@ static char             *log_out_buffer;
 static SemaphoreHandle_t mutex_handle;
 static StaticSemaphore_t mutex_buffer;
 static log_level_t       max_log_level;
+static uint32_t          tag_blacklist;
 
-static const char *level_strs[] = {
+static const char *const level_strs[] = {
     [LOG_LEVEL_ERROR] = "[ERR]",
     [LOG_LEVEL_WARN]  = "[WRN]",
     [LOG_LEVEL_INFO]  = "[INF]",
@@ -34,11 +35,13 @@ void log_init(uart_handle_t *cli_handle) {
 
     cli_uart_handle = cli_handle;
     max_log_level   = LOG_LEVEL_DEBUG;
+    tag_blacklist   = 0x00000000;
 }
 
-void log_log_line(char *tag, log_level_t level, char *fmt, ...) {
-    // Drop log line entirely if max level set less verbose than line verbosity
-    if (level > max_log_level) {
+void log_log_line(sc_tag_t tag, log_level_t level, char *fmt, ...) {
+    // Drop log line entirely if max level set less verbose than line verbosity OR there is at least one tag blacklisted
+    // (aka don't show) and the bitmask of the tag enum val matches what's in the blacklist
+    if (level > max_log_level || (tag_blacklist > 0 && (tag_blacklist & (1 << tag)))) {
         return;
     }
 
@@ -46,11 +49,9 @@ void log_log_line(char *tag, log_level_t level, char *fmt, ...) {
     // TODO :: could handle this more elegantly
     assert(rval == pdTRUE);
 
-    char *moving_log_out_buffer = log_out_buffer;
-    char  temp_tag[20];
-    sprintf(temp_tag, "[%s]", tag);
-    size_t bytes_written = 0;
-    bytes_written += sprintf(moving_log_out_buffer, "%s ", temp_tag);
+    char  *moving_log_out_buffer = log_out_buffer;
+    size_t bytes_written         = 0;
+    bytes_written += sprintf(moving_log_out_buffer, "%s ", tag_strs[tag]);
     moving_log_out_buffer += bytes_written;
 
     const char *level_str      = level_strs[level];
@@ -86,4 +87,33 @@ void log_set_max_log_level(log_level_t level) {
     max_log_level = level;
 
     xSemaphoreGive(mutex_handle);
+}
+
+/*
+ * Hide single tag from appearing in log. Turns bit on because logic is inverted, 1s are blacklisted in bitmask
+ */
+void log_hide_tag(sc_tag_t tag) {
+    tag_blacklist |= (1 << tag);
+}
+
+/*
+ * Shows single tag in log if previously hidden. Turns bit off because logic is inverted, 0s are allowed in bitmask
+ */
+void log_show_tag(sc_tag_t tag) {
+    tag_blacklist &= ~(1 << tag);
+}
+
+void log_show_all_tags() {
+    tag_blacklist = 0x00000000;
+}
+
+void log_hide_all_tags() {
+    tag_blacklist = UINT32_MAX;
+}
+
+/*
+ * For CLI debugging only
+ */
+uint32_t log_get_tag_blacklist() {
+    return tag_blacklist;
 }

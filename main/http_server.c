@@ -5,11 +5,12 @@
 #include <log.h>
 #include <sys/param.h>
 
+#include "constants.h"
 #include "http_server.h"
 #include "json.h"
 #include "nvs.h"
 
-#define TAG "sc-http-server"
+#define TAG SC_TAG_HTTP_SERVER
 
 static httpd_handle_t server_handle = NULL;
 

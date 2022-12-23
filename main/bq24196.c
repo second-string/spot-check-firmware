@@ -1,8 +1,9 @@
 #include "bq24196.h"
+#include "constants.h"
 #include "driver/i2c.h"
 #include "log.h"
 
-#define TAG "sc-bq24196"
+#define TAG SC_TAG_BQ24196
 
 // #define BQ24196_SLAVE_ADDR (0x08)
 #define BQ24196_SLAVE_ADDR (0x6B)

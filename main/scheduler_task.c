@@ -6,6 +6,7 @@
 
 #include "scheduler_task.h"
 
+#include "constants.h"
 #include "gpio.h"
 #include "http_client.h"
 #include "log.h"
@@ -17,7 +18,7 @@
 #include "timer.h"
 #include "wifi.h"
 
-#define TAG "sc-scheduler-task"
+#define TAG SC_TAG_SCHEDULER
 
 #define NUM_DIFFERENTIAL_UPDATES 3
 #define NUM_DISCRETE_UPDATES 4
