@@ -13,13 +13,13 @@
 #include "bq24196.h"
 #include "cd54hc4094.h"
 #include "cli_commands.h"
-#include "conditions_task.h"
 #include "constants.h"
 #include "display.h"
 #include "flash_partition.h"
 #include "http_client.h"
 #include "log.h"
 #include "nvs.h"
+#include "scheduler_task.h"
 #include "screen_img_handler.h"
 #include "sleep_handler.h"
 #include "sntp_time.h"
@@ -538,37 +538,37 @@ static BaseType_t cli_command_nvs(char *write_buffer, size_t write_buffer_size, 
     return pdFALSE;
 }
 
-static BaseType_t cli_command_conditions(char *write_buffer, size_t write_buffer_size, const char *cmd_str) {
+static BaseType_t cli_command_scheduler(char *write_buffer, size_t write_buffer_size, const char *cmd_str) {
     BaseType_t  type_len;
     const char *type = FreeRTOS_CLIGetParameter(cmd_str, 1, &type_len);
     if (type == NULL) {
-        strcpy(write_buffer, "Error: usage is 'conditions <type>' where type is 'conditions|tide|swell|both'");
+        strcpy(write_buffer, "Error: usage is 'scheduler <type>' where type is 'conditions|tide|swell|both'");
         return pdFALSE;
     }
 
     memset(write_buffer, 0x0, write_buffer_size);
     if (type_len == 4 && strncmp(type, "time", type_len) == 0) {
-        conditions_trigger_time_update();
+        scheduler_trigger_time_update();
         strcpy(write_buffer, "Triggered time update");
     } else if (type_len == 4 && strncmp(type, "date", type_len) == 0) {
-        // No conditions trigger for this since it's bundled with updating time. Functions are only exposed
+        // No scheduler trigger for this since it's bundled with updating time. Functions are only exposed
         // for debugging here
         screen_img_handler_clear_date(true);
         screen_img_handler_draw_date();
     } else if (type_len == 10 && strncmp(type, "conditions", type_len) == 0) {
-        conditions_trigger_conditions_update();
+        scheduler_trigger_conditions_update();
         strcpy(write_buffer, "Triggered conditions update");
     } else if (type_len == 4 && strncmp(type, "tide", type_len) == 0) {
-        conditions_trigger_tide_chart_update();
+        scheduler_trigger_tide_chart_update();
         strcpy(write_buffer, "Triggered tide chart update");
     } else if (type_len == 5 && strncmp(type, "swell", type_len) == 0) {
-        conditions_trigger_swell_chart_update();
+        scheduler_trigger_swell_chart_update();
         strcpy(write_buffer, "Triggered swell chart update");
     } else if (type_len == 4 && strncmp(type, "both", type_len) == 0) {
-        conditions_trigger_both_charts_update();
+        scheduler_trigger_both_charts_update();
         strcpy(write_buffer, "Triggered both charts update");
     } else {
-        strcpy(write_buffer, "Invalid conditions update type, must be 'time|conditions|tide|swell|both'");
+        strcpy(write_buffer, "Invalid scheduler update type, must be 'time|conditions|tide|swell|both'");
     }
 
     return pdFALSE;
@@ -755,13 +755,13 @@ void cli_command_register_all() {
         .cExpectedNumberOfParameters = -1,
     };
 
-    static const CLI_Command_Definition_t conditions_cmd = {
-        .pcCommand = "conditions",
+    static const CLI_Command_Definition_t scheduler_cmd = {
+        .pcCommand = "scheduler",
         .pcHelpString =
-            "conditions <time|conditions|tide|swell>: Trigger an update of one of the conditions as if triggered "
+            "scheduler <time|conditions|tide|swell>: Trigger an update of one of the conditions as if triggered "
             "by "
             "normal expiration",
-        .pxCommandInterpreter        = cli_command_conditions,
+        .pxCommandInterpreter        = cli_command_scheduler,
         .cExpectedNumberOfParameters = 1,
     };
 
@@ -804,7 +804,7 @@ void cli_command_register_all() {
     FreeRTOS_CLIRegisterCommand(&partition_cmd);
     FreeRTOS_CLIRegisterCommand(&display_cmd);
     FreeRTOS_CLIRegisterCommand(&nvs_cmd);
-    FreeRTOS_CLIRegisterCommand(&conditions_cmd);
+    FreeRTOS_CLIRegisterCommand(&scheduler_cmd);
     FreeRTOS_CLIRegisterCommand(&sntp_cmd);
     FreeRTOS_CLIRegisterCommand(&log_cmd);
     FreeRTOS_CLIRegisterCommand(&sleep_cmd);

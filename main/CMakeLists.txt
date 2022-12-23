@@ -10,7 +10,7 @@ idf_component_register(
                                  "json.c"
                                  "http_server.c"
                                  "ota_task.c"
-                                 "conditions_task.c"
+                                 "scheduler_task.c"
                                  "cli_task.c"
                                  "uart.c"
                                  "log.c"

@@ -5,9 +5,9 @@
 #include "log.h"
 #include "nvs_flash.h"
 
-#include "conditions_task.h"
 #include "http_server.h"
 #include "nvs.h"
+#include "scheduler_task.h"
 
 #define TAG "sc-nvs"
 
@@ -84,8 +84,8 @@ void nvs_save_config(spot_check_config *config) {
 
     // Kick conditions & both charts update if we have a new spot
     if (current_config.spot_lat != config->spot_lat || current_config.spot_lon != config->spot_lon) {
-        conditions_trigger_conditions_update();
-        conditions_trigger_both_charts_update();
+        scheduler_trigger_conditions_update();
+        scheduler_trigger_both_charts_update();
     }
 
     ESP_ERROR_CHECK(nvs_set_str(handle, "number_of_days", config->number_of_days));

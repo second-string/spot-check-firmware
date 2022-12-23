@@ -1,7 +1,5 @@
 #pragma once
 
-#include "conditions_task.h"
-
 // Keys in NVS for the current number of bytes saved in the screen_img partition as a single image.
 // Saving the key separately in the NVS KVS avoids having to use a packed header prefix in the image data partition for
 // metadata
@@ -23,6 +21,13 @@
 // Name of the NVS partition that the screen data bytes are saved. Generic since it holds multiple images
 #define SCREEN_IMG_PARTITION_LABEL "screen_img"
 
+typedef struct {
+    int8_t  temperature;
+    uint8_t wind_speed;
+    char    wind_dir[4];     // 3 characters for dir (SSW, etc) plus null
+    char    tide_height[7];  // minus sign, two digits, decimal point, two digits, null
+} conditions_t;
+
 typedef enum {
     SCREEN_IMG_TIDE_CHART,
     SCREEN_IMG_SWELL_CHART,
@@ -32,6 +37,7 @@ typedef enum {
 
 void screen_img_handler_init();
 bool screen_img_handler_download_and_save(screen_img_t screen_img);
+bool screen_img_handler_download_and_save_conditions(conditions_t *new_conditions);
 bool screen_img_handler_clear_screen_img(screen_img_t screen_img);
 bool screen_img_handler_draw_screen_img(screen_img_t screen_img);
 void screen_img_handler_clear_date(bool force_clear);

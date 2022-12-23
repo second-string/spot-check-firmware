@@ -18,7 +18,6 @@
 #include "cd54hc4094.h"
 #include "cli_commands.h"
 #include "cli_task.h"
-#include "conditions_task.h"
 #include "display.h"
 #include "gpio.h"
 #include "http_client.h"
@@ -29,6 +28,7 @@
 #include "nvs.h"
 #include "ota_task.h"
 #include "raw_image.h"
+#include "scheduler_task.h"
 #include "screen_img_handler.h"
 #include "sleep_handler.h"
 #include "sntp_time.h"
@@ -76,14 +76,14 @@ static void app_init() {
     wifi_init_provisioning();
     http_client_init();
 
-    conditions_update_task_init();
+    scheduler_task_init();
     cli_task_init(&cli_uart_handle);
     cli_command_register_all();
 }
 
 static void app_start() {
-    // NOTE: conditions task not started here because we want app_main to finish doing all of its time sync and other
-    // setup before we let the conditions loop start executing its polling updates for everything
+    // NOTE: scheduler task not started here because we want app_main to finish doing all of its time sync and other
+    // setup before we let the scheduler loop start executing its polling updates for everything
     i2c_start(&bq24196_i2c_handle);
     bq24196_start();
     display_start();
@@ -198,7 +198,7 @@ void app_main(void) {
         screen_img_handler_render(__func__, __LINE__);
 
         // See note in app_start for why this isn't with the other start functions
-        conditions_update_task_start();
+        scheduler_task_start();
         log_printf(LOG_LEVEL_INFO,
                    "Boot successful, showing time + last saved conditions / charts and kicked off conditions task");
     }
