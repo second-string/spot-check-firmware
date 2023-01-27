@@ -85,6 +85,7 @@ void nvs_save_config(spot_check_config *config) {
 
     // Kick conditions & both charts update if we have a new spot
     if (current_config.spot_lat != config->spot_lat || current_config.spot_lon != config->spot_lon) {
+        scheduler_trigger_spot_name_update();
         scheduler_trigger_conditions_update();
         scheduler_trigger_both_charts_update();
     }
