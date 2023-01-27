@@ -8,7 +8,7 @@
 
 #define CFG_DATA GPIO_NUM_33
 #define CFG_CLK GPIO_NUM_32
-#define CFG_STR GPIO_NUM_12
+#define CFG_STR GPIO_NUM_12  // BT :: switched from epdiy default of GPIO0 to GPIO12 for shiftreg strobe pin
 #define D7 GPIO_NUM_23
 #define D6 GPIO_NUM_22
 #define D5 GPIO_NUM_21

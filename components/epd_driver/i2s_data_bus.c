@@ -161,7 +161,15 @@ void i2s_gpio_detach(i2s_bus_config *cfg) {
   gpio_set_direction(cfg->clock, GPIO_MODE_INPUT);
 
   gpio_reset_pin(cfg->clock);
-  rtc_gpio_isolate(cfg->clock);
+  if (cfg->clock != 5) {
+    rtc_gpio_isolate(cfg->clock);
+  }
+
+  // BT :: The call to rtc_gpio_isolate with gpio 12 breaks current spot check board as it switches CFG_STR pin from GPIO0 (epdiy) to GPIO12 (custom) (see board/epd_board_v5.c).
+  // This call is only to minimize current from the RTC during deep sleeps (see idf link included in fw below), so we can just comment it out and live with the slightly worse sleep current.
+
+  // https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/peripherals/gpio.html#_CPPv416rtc_gpio_isolate10gpio_num_t
+  // rtc_gpio_isolate(GPIO_NUM_12);
 }
 
 void i2s_bus_init(i2s_bus_config *cfg, uint32_t epd_row_width) {
