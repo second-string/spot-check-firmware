@@ -314,7 +314,7 @@ void http_server_start() {
 
 void http_server_stop() {
     if (server_handle == NULL) {
-        log_printf(LOG_LEVEL_WARN, "http_server not running and http_server_stop called, ignoring and bailing");
+        log_printf(LOG_LEVEL_WARN, "http_server not running and http_server_stop called, ignoring.");
         return;
     }
 

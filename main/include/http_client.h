@@ -9,9 +9,7 @@
 #include "nvs.h"
 
 // Needs trailing slash!
-// #define URL_BASE "https://spotcheck.brianteam.dev/"
-#define URL_BASE "http://192.168.0.12:9080/"
-// #define URL_BASE "http://httpbin.org/"
+#define URL_BASE "https://spotcheck.brianteam.dev/"
 
 typedef struct {
     char *key;
@@ -43,5 +41,6 @@ esp_err_t http_client_read_response_to_buffer(esp_http_client_handle_t *client,
 int       http_client_read_response_to_flash(esp_http_client_handle_t *client,
                                              esp_partition_t          *partition,
                                              uint32_t                  offset_into_partition);
+bool      http_client_check_internet();
 
 #endif

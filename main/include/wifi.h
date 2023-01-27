@@ -3,8 +3,6 @@
 
 #include "freertos/event_groups.h"
 
-#define PROVISIONED_NETWORK_CONNECTION_MAXIMUM_RETRY 3
-
 typedef struct {
     char  *ssid;
     char  *password;
@@ -25,7 +23,10 @@ void wifi_block_until_connected();
 bool wifi_block_until_connected_timeout(uint32_t ms_to_wait);
 
 /* Used by tasks to check if connected yet in order to perform logic without having to block on event group */
-bool wifi_is_network_connected();
+bool wifi_is_connected_to_network();
+
+/* Simply sets mode and starts, expects config to be done */
+void wifi_start_sta();
 
 /*
  * Inits config and event handler for provisioning. Supports being called

@@ -102,8 +102,8 @@ bool http_client_perform_request(request *request_obj, esp_http_client_handle_t 
     configASSERT(client);
     configASSERT(request_obj);
 
-    if (!wifi_is_network_connected()) {
-        log_printf(LOG_LEVEL_INFO, "Attempted to make GET request, not connected to internet yet so bailing");
+    if (!wifi_is_connected_to_network()) {
+        log_printf(LOG_LEVEL_INFO, "Attempted to make GET request, not connected to any wifi network yet so bailing");
         return false;
     }
 
@@ -167,8 +167,8 @@ int http_client_perform_post(request                  *request_obj,
                              char                     *post_data,
                              size_t                    post_data_size,
                              esp_http_client_handle_t *client) {
-    if (!wifi_is_network_connected()) {
-        log_printf(LOG_LEVEL_INFO, "Attempted to make POST request, not connected to internet yet so bailing");
+    if (!wifi_is_connected_to_network()) {
+        log_printf(LOG_LEVEL_INFO, "Attempted to make POST request, not connected to any wifi network yet so bailing");
         return 0;
     }
 
@@ -391,4 +391,34 @@ int http_client_read_response_to_flash(esp_http_client_handle_t *client,
     }
 
     return bytes_received;
+}
+
+/*
+ * Perform a test query to make sure we actually have an active internet connection. NOTE: blocking, so make sure
+ * whatever is calling can wait
+ */
+bool http_client_check_internet() {
+    char   url[80];
+    char  *res           = NULL;
+    size_t bytes_alloced = 0;
+
+    request req = http_client_build_request((char *)"health", NULL, url, NULL, 0);
+
+    esp_http_client_handle_t client;
+    bool                     success = http_client_perform_request(&req, &client);
+    if (success) {
+        esp_err_t http_err = http_client_read_response_to_buffer(&client, &res, &bytes_alloced);
+        if (http_err == ESP_OK && res && bytes_alloced > 0) {
+            // Don't care about response, just want to check network connection
+            log_printf(LOG_LEVEL_DEBUG, "http client API healthcheck successful");
+            free(res);
+            return true;
+        } else {
+            log_printf(LOG_LEVEL_DEBUG, "http client API healthcheck failed at http_client_read_response_to_buffer");
+        }
+    } else {
+        log_printf(LOG_LEVEL_DEBUG, "http client API healthcheck failed at http_client_perform_request");
+    }
+
+    return false;
 }

@@ -105,11 +105,17 @@ static bool check_forced_update(esp_app_desc_t *current_image_info, char *versio
     char                    *response_data;
     size_t                   response_data_size;
     esp_http_client_handle_t client;
-    ESP_ERROR_CHECK(http_client_perform_post(&request_obj, post_data, strlen(post_data), &client));
-    esp_err_t http_err = http_client_read_response_to_buffer(&client, &response_data, &response_data_size);
+    esp_err_t                http_err = http_client_perform_post(&request_obj, post_data, strlen(post_data), &client);
     if (http_err != ESP_OK) {
         log_printf(LOG_LEVEL_ERROR,
-                   "Error in http request checking to see if need forced update, defaulting to no update");
+                   "Error in http perform request checking to see if need forced update, defaulting to no update");
+        return false;
+    }
+
+    http_err = http_client_read_response_to_buffer(&client, &response_data, &response_data_size);
+    if (http_err != ESP_OK) {
+        log_printf(LOG_LEVEL_ERROR,
+                   "Error in http request readout checking to see if need forced update, defaulting to no update");
         return false;
     }
 
@@ -139,7 +145,6 @@ static bool check_forced_update(esp_app_desc_t *current_image_info, char *versio
  * return up to root of callstack after calling this function.
  */
 static void ota_task_stop(bool success) {
-    screen_img_handler_clear_ota_start_text();
     if (success) {
         screen_img_handler_clear_ota_start_text();
         vTaskDelay(pdMS_TO_TICKS(5000));
@@ -160,7 +165,10 @@ static void check_ota_update_task(void *args) {
     return;
 #endif
 
-    if (!wifi_is_network_connected()) {
+    // This only checks if we're connected t a wifi network, but not if there's an active internet connection beyond
+    // that. That's fine, as the status checks for http requests later in the ota process will fail out gracefully if
+    // error codes rcvd
+    if (!wifi_is_connected_to_network()) {
         log_printf(LOG_LEVEL_INFO, "Not connected to wifi, waiting for 30 seconds then bailing out of OTA task");
         if (!wifi_block_until_connected_timeout(30 * MS_PER_SEC)) {
             log_printf(LOG_LEVEL_INFO, "No connection received, bailing out of OTA task");
@@ -286,7 +294,7 @@ void ota_task_start() {
     // minimal * 3 is the smallest we can go w/o SO
     xTaskCreate(&check_ota_update_task,
                 "check-ota-update",
-                SPOT_CHECK_MINIMAL_STACK_SIZE_BYTES * 3,
+                SPOT_CHECK_MINIMAL_STACK_SIZE_BYTES * 4,
                 NULL,
                 tskIDLE_PRIORITY,
                 &ota_task_handle);

@@ -81,17 +81,88 @@ static void app_init() {
 }
 
 static void app_start() {
-    // NOTE: scheduler task not started here because we want app_main to finish doing all of its time sync and other
-    // setup before we let the scheduler loop start executing its polling updates for everything
     i2c_start(&bq24196_i2c_handle);
     bq24196_start();
     display_start();
-    wifi_start_provisioning(false);
     sleep_handler_start();
     sntp_time_start();
     ota_task_start();
+    scheduler_task_start();
 
     cli_task_start();
+}
+
+// TODO :: all of these screens need to go
+// https://www.notion.so/pull-application-logic-out-into-spot_check-c-file-for-rendering-info-screens-conditions-network-par-2c21e6156eac437893a11a3925d60add
+void spot_check_show_unprovisioned_screen() {
+    log_printf(LOG_LEVEL_ERROR, "No prov info saved, showing provisioning screen without network checks.");
+    display_full_clear();
+    display_draw_text(
+        "Download the Spot Check app and follow\nthe configuration steps to connect\n your device to a wifi "
+        "network",
+        400,
+        300,
+        DISPLAY_FONT_SIZE_SHMEDIUM,
+        DISPLAY_FONT_ALIGN_CENTER);
+
+    screen_img_handler_render(__func__, __LINE__);
+}
+
+void spot_check_show_no_network_screen() {
+    log_printf(LOG_LEVEL_ERROR, "Prov info is saved, but could not find or connect to saved network.");
+    display_full_clear();
+    display_draw_text("Network not found", 400, 250, DISPLAY_FONT_SIZE_SHMEDIUM, DISPLAY_FONT_ALIGN_CENTER);
+    display_draw_text(
+        "Spot Check could not find or connect to the network used previously.\nVerify network is "
+        "available or use the Spot Check app to connect to a new network",
+        400,
+        300,
+        DISPLAY_FONT_SIZE_SMALL,
+        DISPLAY_FONT_ALIGN_CENTER);
+
+    screen_img_handler_render(__func__, __LINE__);
+}
+
+void spot_check_clear_checking_connection_screen() {
+    display_invert_text("Connecting to network...", 400, 350, DISPLAY_FONT_SIZE_SMALL, DISPLAY_FONT_ALIGN_CENTER);
+    screen_img_handler_render(__func__, __LINE__);
+}
+
+void spot_check_show_checking_connection_screen() {
+    log_printf(
+        LOG_LEVEL_INFO,
+        "Connection to network successful, showing 'connecting to network' screen while performing api healthcheck");
+    display_draw_text("Connecting to network...", 400, 350, DISPLAY_FONT_SIZE_SMALL, DISPLAY_FONT_ALIGN_CENTER);
+    screen_img_handler_render(__func__, __LINE__);
+}
+
+void spot_check_show_fetching_conditions_screen() {
+    log_printf(
+        LOG_LEVEL_INFO,
+        "Connection to network successful, showing 'fetching data' screen while waiting for scheduler to full update");
+    display_draw_text("Fetching latest conditions...", 400, 350, DISPLAY_FONT_SIZE_SMALL, DISPLAY_FONT_ALIGN_CENTER);
+    screen_img_handler_render(__func__, __LINE__);
+}
+
+void spot_check_show_no_internet_screen() {
+    log_printf(LOG_LEVEL_ERROR, "Connection to network successful and assigned IP, but no internet connection");
+    display_full_clear();
+    display_draw_text("No internet connection", 400, 250, DISPLAY_FONT_SIZE_SHMEDIUM, DISPLAY_FONT_ALIGN_CENTER);
+    display_draw_text("Spot Check is connected to the the WiFi\nnetwork but cannot reach the internet.",
+                      400,
+                      325,
+                      DISPLAY_FONT_SIZE_SMALL,
+                      DISPLAY_FONT_ALIGN_CENTER);
+
+    display_draw_text(
+        "Verify local network is "
+        "connected to the internet or\nuse the Spot Check app to connect to a new network",
+        400,
+        400,
+        DISPLAY_FONT_SIZE_SMALL,
+        DISPLAY_FONT_ALIGN_CENTER);
+
+    screen_img_handler_render(__func__, __LINE__);
 }
 
 void app_main(void) {
@@ -116,58 +187,63 @@ void app_main(void) {
     esp_ota_get_partition_description(current_partition, &current_image_info);
     display_render_splash_screen(current_image_info.version);
 
-    // Wait for network settings that are necessary for operation to finish its startup sequence (including retries
-    // internal to things like wifi and provisioning). If all are successful, proceed to wait for sntp time sync. If any
-    // unsuccessful, show provisioning screen. Technically this could be error prone since it just makes sure all things
-    // have completed (like STA connection retries -> forcing re-provisioning) by making sure the timeout is long enough
-    // that all things have occurred
-    bool     wifi_connected_to_network = false;
-    bool     wifi_provisioned          = false;
-    bool     connection_successful     = false;
-    uint32_t start_ticks               = xTaskGetTickCount();
-    uint32_t now_ticks                 = start_ticks;
-    while (!connection_successful && (now_ticks - start_ticks < pdMS_TO_TICKS(10 * 1000))) {
-        log_printf(LOG_LEVEL_INFO, "Waiting for successful boot criteria");
-        wifi_connected_to_network = wifi_is_network_connected();
-        wifi_provisioned          = wifi_is_provisioned();
-        connection_successful     = wifi_connected_to_network && wifi_provisioned;
+    // Enable breakout at each connectivity check of boot
+    do {
+        // If we're not even provisioned, give a little time for splash screen then start prov mgr and go straight to
+        // displaying provisioning text. No need to waste time trying to connect to network.
+        if (!wifi_is_provisioned()) {
+            spot_check_show_unprovisioned_screen();
+            wifi_init_provisioning();
+            wifi_start_provisioning(false);
+            break;
+        }
 
-        vTaskDelay(pdMS_TO_TICKS(1000));
-        now_ticks = xTaskGetTickCount();
-    }
+        // De-init prov and kick off wifi to attempt to connect to STA network. Event loop will handle kicking scheduler
+        // to offline mode if it can't connect to network, and below check will re-init prov mgr and kick us out of
+        // startup logic
+        wifi_deinit_provisioning();
+        wifi_start_sta();
 
-    if (!connection_successful) {
-        log_printf(
-            LOG_LEVEL_ERROR,
-            "Connection unsuccessful, showing provisioning screen. wifi_connected_to_network: 0x%X - wifi_provisioned: "
-            "0x%X",
-            wifi_connected_to_network,
-            wifi_provisioned);
-        display_full_clear();
-        display_draw_text(
-            "Download the Spot Check app and follow\nthe configuration steps to connect\n your device to a wifi "
-            "network",
-            400,
-            300,
-            DISPLAY_FONT_SIZE_SHMEDIUM,
-            DISPLAY_FONT_ALIGN_CENTER);
+        // Wait for all network and wifi  event loops to settle after startup sequence (including retries internal to
+        // those modules). If scheduler transitions out of init mode it either successfully got network conn or executed
+        // STA_DISCON event and kicked scheduler to offline mode to poll, no reason to keep spinning here.
+        uint32_t start_ticks = xTaskGetTickCount();
+        uint32_t now_ticks   = start_ticks;
+        while (!wifi_is_connected_to_network() && scheduler_get_mode() == SCHEDULER_MODE_INIT &&
+               (now_ticks - start_ticks < pdMS_TO_TICKS(10 * 1000))) {
+            log_printf(LOG_LEVEL_INFO, "Waiting for connection to wifi network and IP assignment");
+            vTaskDelay(pdMS_TO_TICKS(1000));
+            now_ticks = xTaskGetTickCount();
+        }
 
-        screen_img_handler_render(__func__, __LINE__);
-    } else {
-        log_printf(LOG_LEVEL_INFO,
-                   "Connection successful, showing 'fetching data' screen while waiting for time to sync");
+        // If this is still false, it means we either couldn't find the provisioned network or just couldn't connect to
+        // it. Regardless, event loop will kick scheduler to offline mode to continue trying to connect, and restart
+        // provisioning here. This way, if it's just a network issue, the scheduler should keep retrying until it's
+        // connected. If the old provisioned network actually isn't available anymore, prov mgr is running for user to
+        // reprovision.
+        if (!wifi_is_connected_to_network()) {
+            spot_check_show_no_network_screen();
 
-        display_draw_text("Please wait, fetching latest conditions...",
-                          400,
-                          350,
-                          DISPLAY_FONT_SIZE_SMALL,
-                          DISPLAY_FONT_ALIGN_CENTER);
-        screen_img_handler_render(__func__, __LINE__);
+            // Have to re-init and restart since it would have been stopped and de-inited on initial startup due to
+            // finding already provisioned network
+            wifi_init_provisioning();
+            wifi_start_provisioning(true);
+            break;
+        }
 
-        // TODO :: This is still really hacky. Sometimes SNTP gets a new value within a second, sometimes it takes 45
-        // seconds. I don't know enough about ntp to know if the SNTP init code actively sends a sync packet or just
-        // passively waits for the next UDP broadcast. If the latter, need to figure out how to force it. If the former,
-        // we're kind of at the whim of the slow update time.
+        // Update splash screen with fetching data text, then check actual internet connection. Start scheduler in
+        // offline mode if failed
+        spot_check_show_checking_connection_screen();
+        if (!http_client_check_internet()) {
+            spot_check_show_no_internet_screen();
+            scheduler_set_offline_mode();
+            break;
+        }
+
+        // SNTP check doesn't change our boot process, we just block here a bit to make the experience better to make it
+        // less likely we render the epoch before it syncs correctly. Sometimes SNTP gets a new value within a second,
+        // sometimes it takes 45 seconds. If sntp doesn't report fully synced,  we also check the date and as long as
+        // it's not 1970 we call it synced to help speed up the process.
         bool sntp_time_set = false;
         start_ticks        = xTaskGetTickCount();
         now_ticks          = start_ticks;
@@ -180,27 +256,22 @@ void app_main(void) {
         }
 
         if (!sntp_time_set) {
-            log_printf(LOG_LEVEL_ERROR, "Did not receive SNTP update before timing out! Showing all conditions anyway");
+            log_printf(LOG_LEVEL_ERROR,
+                       "Did not receive SNTP update before timing out! Non-blocking to rest of startup since we've "
+                       "validated internet connection with healthcheck");
         }
 
-        // Render whatever we have in flash to get up and showing asap, then finally start conditions task to kick off
-        // forced first updates
-        spot_check_config *config = nvs_get_config();
-        display_full_clear();
-        screen_img_handler_draw_time();
-        screen_img_handler_draw_date();
-        screen_img_handler_draw_spot_name(config->spot_name);
-        screen_img_handler_draw_conditions(NULL);
-        screen_img_handler_draw_screen_img(SCREEN_IMG_TIDE_CHART);
-        screen_img_handler_draw_screen_img(SCREEN_IMG_SWELL_CHART);
-        screen_img_handler_mark_all_lines_dirty();
-        screen_img_handler_render(__func__, __LINE__);
+        // TODO ::show time date and spot name here while other network stuff is fetched
+        // All checks passed for full boot. Show fetching conditions screen then switching scheduler to online mode.
+        // This will force update everything and thendo one big render.
+        // TODO :: erase checking connection text
+        spot_check_clear_checking_connection_screen();
+        spot_check_show_fetching_conditions_screen();
+        scheduler_set_online_mode();
 
-        // See note in app_start for why this isn't with the other start functions
-        scheduler_task_start();
         log_printf(LOG_LEVEL_INFO,
                    "Boot successful, showing time + last saved conditions / charts and kicked off conditions task");
-    }
+    } while (0);
 
     // Wait for all running 'processes' to finish (downloading and image, saving things to flash, running a display
     // update, etc) before entering deep sleep

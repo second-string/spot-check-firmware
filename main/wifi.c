@@ -16,6 +16,7 @@
 #include "http_server.h"
 #include "log.h"
 #include "mdns_local.h"
+#include "scheduler_task.h"
 #include "wifi.h"
 
 #define TAG SC_TAG_WIFI
@@ -23,7 +24,10 @@
 // Local configuration network
 #define CONFIG_AP_SSID CONFIG_CONFIGURATION_ACCESS_POINT_SSID
 
-#define WIFI_EVENT_GROUP_NETWORK_CONNECTED_BIT (1 << 0)
+// Set when connected to STA and recieved IP, does NOT indicate actual connection to the internet
+#define WIFI_EVENT_GROUP_CONNECTED_TO_NETWORK_BIT (1 << 0)
+
+#define PROVISIONED_NETWORK_CONNECTION_MAXIMUM_RETRY 3
 
 static bool wifi_is_provisioning_inited = false;
 
@@ -46,31 +50,22 @@ void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id
                 break;
             case WIFI_EVENT_STA_DISCONNECTED: {
                 // This case occurs both when we can't connect to previously provisioned network on startup (because it
-                // no longer exists) or temporary discons from network that is still present. Retry logic will kick back
-                // to provisioning mode in former case, while latter should be handled with a reconnect.
-                // TODO :: edge case where it's the latter but we still don't reconnect in max retries, in which user is
-                // forced to reprovision even though they're on the same network. Not sure the best way to handle this
+                // no longer exists) or temporary discons from network that is still present. Hand off to scheduler to
+                // poll.
                 if (sta_connect_attempts < PROVISIONED_NETWORK_CONNECTION_MAXIMUM_RETRY) {
-                    log_printf(LOG_LEVEL_INFO, "Got STA_DISCON, retrying to connect to the AP");
-
-                    // Clear connected bit in case we have repetitive task waiting on network connection in the future
-                    // (right now all checks only happen at startup)
-                    xEventGroupClearBits(wifi_event_group, WIFI_EVENT_GROUP_NETWORK_CONNECTED_BIT);
-
                     esp_wifi_connect();
                     sta_connect_attempts++;
                 } else {
                     log_printf(LOG_LEVEL_INFO,
-                               "Got STA_DISCON and max retries, setting FAIL bit and kicking provision process");
-                    esp_err_t err = esp_wifi_stop();
-                    if (err != ESP_OK) {
-                        log_printf(LOG_LEVEL_ERROR,
-                                   "Error stopping wifi before starting prov process: %s",
-                                   esp_err_to_name(err));
-                    }
+                               "Got STA_DISCON and max quick retries, kickng scheduler into offline mode to poll until "
+                               "network is found / comes back");
 
-                    wifi_init_provisioning();
-                    wifi_start_provisioning(true);
+                    xEventGroupClearBits(wifi_event_group, WIFI_EVENT_GROUP_CONNECTED_TO_NETWORK_BIT);
+
+                    // TODO :: check if provd network saved, don't kick offline mode if not (case when user gives wrong
+                    // provisioning pw). Need to make sure the prov deinit onfail and reinit is working, seems to be in
+                    // a weird state
+                    scheduler_set_offline_mode();
                 }
                 break;
             }
@@ -89,7 +84,7 @@ void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id
                 mdns_advertise_tcp_service();
 
                 // Signal to any tasks blocking on an internet connection that they're good to go
-                xEventGroupSetBits(wifi_event_group, WIFI_EVENT_GROUP_NETWORK_CONNECTED_BIT);
+                xEventGroupSetBits(wifi_event_group, WIFI_EVENT_GROUP_CONNECTED_TO_NETWORK_BIT);
 
                 // We only start our http server upon IP assignment if this is a normal startup
                 // in STA mode where we already have creds. If we're in this state after connecting
@@ -151,8 +146,7 @@ void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id
     }
 }
 
-/* Simply sets mode and starts, expects config to be done */
-static void wifi_start_sta() {
+void wifi_start_sta() {
     ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_STA));
     ESP_ERROR_CHECK(esp_wifi_start());
 }
@@ -175,6 +169,9 @@ void wifi_init(void *event_handler) {
     ESP_ERROR_CHECK(esp_wifi_init(&default_config));
 }
 
+/*
+ * Returns true if prov starting successfully, false if already provisioned
+ */
 void wifi_start_provisioning(bool force_reprovision) {
     if (wifi_event_group == NULL) {
         log_printf(
@@ -215,9 +212,8 @@ void wifi_start_provisioning(bool force_reprovision) {
 
     } else {
         // Start STA mode and connect to known existing network
-        log_printf(LOG_LEVEL_INFO, "Already provisioned, starting Wi-Fi STA");
+        log_printf(LOG_LEVEL_INFO, "Already provisioned, de-initing prov mgr and doing nothing");
         wifi_deinit_provisioning();
-        wifi_start_sta();
     }
 }
 
@@ -248,6 +244,7 @@ void wifi_init_provisioning() {
 
     ESP_ERROR_CHECK(wifi_prov_mgr_init(config));
     wifi_is_provisioning_inited = true;
+    log_printf(LOG_LEVEL_DEBUG, "Provisioning manager inited");
 }
 
 void wifi_deinit_provisioning() {
@@ -257,17 +254,18 @@ void wifi_deinit_provisioning() {
 }
 
 /*
- * Should be called by any task that needs to wait forever until the device has an internet connection.
- * Does not clear the bit on exit, as that should only be done by the wifi task handler if connection is lost.
+ * Should be called by any task that needs to wait forever until the device is connected to a wifi network. Does NOT
+ * necessarily mnean  there is an available inernet connection. Does not clear the bit on exit, as that should only be
+ * done by the wifi task handler if connection is lost.
  */
 void wifi_block_until_connected() {
     wifi_block_until_connected_timeout(portMAX_DELAY);
 }
 
 /*
- * Should be called by any task that is waiting on an internet connection but wants to give up eventually.
- * Does not clear the bit on exit, as that should only be done by the wifi task handler if connection is lost.
- * Returns true if connected, false if timed out.
+ * Should be called by any task that is waiting on a connection to a newtork but wants to give up eventually. Does NOT
+ * necessarily mnean  there is an available inernet connection. Does not clear the bit on exit, as that should only be
+ * done by the wifi task handler if connection is lost. Returns true if connected, false if timed out.
  */
 bool wifi_block_until_connected_timeout(uint32_t ms_to_wait) {
     uint32_t ticks_to_wait;
@@ -277,14 +275,21 @@ bool wifi_block_until_connected_timeout(uint32_t ms_to_wait) {
         ticks_to_wait = pdMS_TO_TICKS(ms_to_wait);
     }
 
-    EventBits_t bits =
-        xEventGroupWaitBits(wifi_event_group, WIFI_EVENT_GROUP_NETWORK_CONNECTED_BIT, pdFALSE, pdTRUE, ticks_to_wait);
-    return bits & WIFI_EVENT_GROUP_NETWORK_CONNECTED_BIT;
+    EventBits_t bits = xEventGroupWaitBits(wifi_event_group,
+                                           WIFI_EVENT_GROUP_CONNECTED_TO_NETWORK_BIT,
+                                           pdFALSE,
+                                           pdTRUE,
+                                           ticks_to_wait);
+    return bits & WIFI_EVENT_GROUP_CONNECTED_TO_NETWORK_BIT;
 }
 
-bool wifi_is_network_connected() {
-    return WIFI_EVENT_GROUP_NETWORK_CONNECTED_BIT &
-           xEventGroupWaitBits(wifi_event_group, WIFI_EVENT_GROUP_NETWORK_CONNECTED_BIT, pdFALSE, pdTRUE, 0);
+/*
+ * Returns true if esp is actively connected to a wifi network and has been assigned an IP.
+ * Does NOT necessarily mean there is an available internet connection.
+ */
+bool wifi_is_connected_to_network() {
+    return WIFI_EVENT_GROUP_CONNECTED_TO_NETWORK_BIT &
+           xEventGroupWaitBits(wifi_event_group, WIFI_EVENT_GROUP_CONNECTED_TO_NETWORK_BIT, pdFALSE, pdTRUE, 0);
 }
 
 /*
