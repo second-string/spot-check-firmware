@@ -86,7 +86,6 @@ static void app_start() {
     display_start();
     sleep_handler_start();
     sntp_time_start();
-    ota_task_start();
     scheduler_task_start();
 
     cli_task_start();
@@ -272,6 +271,37 @@ void app_main(void) {
         log_printf(LOG_LEVEL_INFO,
                    "Boot successful, showing time + last saved conditions / charts and kicked off conditions task");
     } while (0);
+
+    // Delay a few minutes before we run the on-boot OTA check. This is because the esp ota version header check for the
+    // server image uses its own internal http_client, so we can't force it to obey our http_client module request lock.
+    // For a normal boot, waiting a few minutes ensures no further network connections will be running. There's still
+    // the risk of edge cases for a late internet connection or provisioning that would force http errors from reqs
+    // stommping each other, so this is just a dirtyish fix for now.
+    uint8_t       initial_ota_delay_min = 3;
+    TimerHandle_t initial_ota_timer     = xTimerCreate("initial-ota-timer",
+                                                   pdMS_TO_TICKS(initial_ota_delay_min * SECS_PER_MIN * MS_PER_SEC),
+                                                   pdFALSE,
+                                                   NULL,
+                                                   ota_task_start);
+    if (initial_ota_timer == NULL) {
+        log_printf(LOG_LEVEL_ERROR,
+                   "Initial OTA timer kickoff could not be created!! OTA will eventually start checking when scheduler "
+                   "in online mode, but this is a very bad sign about the memory levels!");
+    } else {
+        BaseType_t timer_success = xTimerStart(initial_ota_timer, 0);
+        if (timer_success) {
+            log_printf(LOG_LEVEL_INFO,
+                       "Started timer to run initial boot OTA after %u minutes (%ums)",
+                       initial_ota_delay_min,
+                       initial_ota_delay_min * SECS_PER_MIN * MS_PER_SEC);
+        } else {
+            log_printf(LOG_LEVEL_ERROR,
+                       "Failed to start initial OTA timer! OTA will eventually start checking when scheduler "
+                       "in online mode, but this is a very bad sign about the memory levels",
+                       initial_ota_delay_min,
+                       initial_ota_delay_min * SECS_PER_MIN * MS_PER_SEC);
+        }
+    }
 
     // Wait for all running 'processes' to finish (downloading and image, saving things to flash, running a display
     // update, etc) before entering deep sleep
