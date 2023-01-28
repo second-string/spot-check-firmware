@@ -267,6 +267,42 @@ static BaseType_t cli_command_api(char *write_buffer, size_t write_buffer_size, 
 
         screen_img_handler_download_and_save(screen_img);
         memset(write_buffer, 0x0, write_buffer_size);
+    } else if (endpoint_len == 3 && strncmp(endpoint, "ota", endpoint_len) == 0) {
+        char post_data[60];
+        int  err = sprintf(post_data, "{\"current_version\": \"%s\"}", "0.0.7");
+        if (err < 0) {
+            strcpy(write_buffer, "Error sprintfing version string into version_info endpoint post body");
+            return pdFALSE;
+        }
+
+        char   version_info_path[] = "ota/version_info";
+        size_t base_len            = strlen(URL_BASE);
+        size_t path_len            = strlen(version_info_path);
+
+        // Build our url with memcpy (no null term) then strcpy (null term)
+        char url[base_len + path_len + 1];
+        memcpy(url, URL_BASE, base_len);
+        strcpy(url + base_len, version_info_path);
+        request request_obj = {.num_params = 0, .params = NULL, .url = url};
+
+        char                    *response_data;
+        size_t                   response_data_size;
+        esp_http_client_handle_t client;
+        bool http_success = http_client_perform_post(&request_obj, post_data, strlen(post_data), &client);
+        if (!http_success) {
+            strcpy(write_buffer,
+                   "Error in http perform request checking to see if need forced update, defaulting to no update");
+            return pdFALSE;
+        }
+
+        esp_err_t http_err = http_client_read_response_to_buffer(&client, &response_data, &response_data_size);
+        if (http_err != ESP_OK) {
+            strcpy(write_buffer,
+                   "Error in http request readout checking to see if need forced update, defaulting to no update");
+            return pdFALSE;
+        }
+
+        memcpy(write_buffer, response_data, response_data_size);
     } else {
         const char *const endpoints_with_query_params[] = {
             "conditions",

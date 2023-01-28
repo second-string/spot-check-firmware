@@ -202,6 +202,16 @@ static void check_ota_update_task(void *args) {
                    "Image validation resulted in no go-ahead for update. Now checking custom endpoint for forced "
                    "upgrades/downgrades...");
 
+        error = esp_https_ota_abort(ota_handle);
+        if (error != ESP_OK) {
+            log_printf(LOG_LEVEL_ERROR,
+                       "Error cleaning up OTA handle to manually check our force endpoint. Giving up on OTA right now "
+                       "and deleting task, but socket lock from ota internal http_client in unknown state, rest of app "
+                       "might be broken.");
+            ota_task_stop(false);
+            return;
+        }
+
         // If we get anything other than success, we don't do our basic upgrade. Check our force upgrade/downgrade
         // endpoint for us to manually apply a specific version
         char version_to_download[10];

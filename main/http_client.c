@@ -160,7 +160,7 @@ bool http_client_perform_request(request *request_obj, esp_http_client_handle_t 
         }
 
         ESP_ERROR_CHECK(esp_http_client_set_method(*client, HTTP_METHOD_GET));
-        ESP_ERROR_CHECK(esp_http_client_set_header(*client, "Content-type", "text/html"));
+        ESP_ERROR_CHECK(esp_http_client_set_header(*client, "Content-Type", "text/html"));
 
         esp_err_t err = esp_http_client_open(*client, 0);
         // Opens and sends the request since we have no data
@@ -197,8 +197,7 @@ int http_client_perform_post(request                  *request_obj,
     }
 
     esp_http_client_config_t http_config = {
-        .host           = "spotcheck.brianteam.dev",
-        .path           = "/",
+        .url            = request_obj->url,
         .event_handler  = http_event_handler,
         .buffer_size    = MAX_READ_BUFFER_SIZE,
         .cert_pem       = (char *)&server_cert_pem_start,
@@ -215,10 +214,7 @@ int http_client_perform_post(request                  *request_obj,
             break;
         }
 
-        log_printf(LOG_LEVEL_INFO,
-                   "Initing http client for post request with url '%s'...",
-                   http_config.url,
-                   http_config.port);
+        log_printf(LOG_LEVEL_INFO, "Initing http client for post request...");
         *client = esp_http_client_init(&http_config);
         if (!client) {
             req_start_success = false;
@@ -227,18 +223,24 @@ int http_client_perform_post(request                  *request_obj,
         }
 
         // TODO :: these shouldn't assert, fail gracefully
-        ESP_ERROR_CHECK(esp_http_client_set_url(*client, request_obj->url));
         ESP_ERROR_CHECK(esp_http_client_set_method(*client, HTTP_METHOD_POST));
-        ESP_ERROR_CHECK(esp_http_client_set_header(*client, "Content-type", "application/json"));
+        ESP_ERROR_CHECK(esp_http_client_set_header(*client, "Content-Type", "application/json"));
         ESP_ERROR_CHECK(esp_http_client_set_post_field(*client, post_data, post_data_size));
 
         log_printf(LOG_LEVEL_INFO, "Performing POST to %s with data size %u", request_obj->url, post_data_size);
-        esp_err_t err = esp_http_client_perform(*client);
+        esp_err_t err = esp_http_client_open(*client, post_data_size);
         if (err != ESP_OK) {
             log_printf(LOG_LEVEL_ERROR, "Error performing POST, error: %s", esp_err_to_name(err));
             req_start_success = false;
             break;
         } else {
+            int write_err = esp_http_client_write(*client, post_data, post_data_size);
+            if (write_err < 0) {
+                log_printf(LOG_LEVEL_ERROR, "Error performing POST in call to esp_http_client_write");
+                req_start_success = false;
+                break;
+            }
+
             uint16_t status   = esp_http_client_get_status_code(*client);
             req_start_success = status <= 200 || status > 299;
         }
