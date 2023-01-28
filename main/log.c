@@ -17,13 +17,6 @@ static StaticSemaphore_t mutex_buffer;
 static log_level_t       max_log_level;
 static uint32_t          tag_blacklist;
 
-static const char *const level_strs[] = {
-    [LOG_LEVEL_ERROR] = "[ERR]",
-    [LOG_LEVEL_WARN]  = "[WRN]",
-    [LOG_LEVEL_INFO]  = "[INF]",
-    [LOG_LEVEL_DEBUG] = "[DBG]",
-};
-
 void log_init(uart_handle_t *cli_handle) {
     assert(cli_handle);
 
@@ -49,33 +42,35 @@ void log_log_line(sc_tag_t tag, log_level_t level, char *fmt, ...) {
     // TODO :: could handle this more elegantly
     assert(rval == pdTRUE);
 
-    char  *moving_log_out_buffer = log_out_buffer;
-    size_t bytes_written         = 0;
-    bytes_written += sprintf(moving_log_out_buffer, "%s ", tag_strs[tag]);
-    moving_log_out_buffer += bytes_written;
+    // Uncomment following block to printf the literal format string for format specifier debugging
+    /*
+    char     dbg_buffer[LOG_OUT_BUFFER_BYTES];
+    char    *p   = fmt;
+    uint16_t idx = 0;
+    while (*p && idx < LOG_OUT_BUFFER_BYTES) {
+        dbg_buffer[idx++] = *p;
+        if (*p == '%') {
+            dbg_buffer[idx++] = '%';
+        }
 
-    const char *level_str      = level_strs[level];
-    size_t      level_str_size = strlen(level_str);
-    memcpy(moving_log_out_buffer, level_str, strlen(level_str));
-    bytes_written += level_str_size;
-    moving_log_out_buffer += level_str_size;
+        p++;
+    }
 
-    *moving_log_out_buffer = ' ';
-    bytes_written++;
-    moving_log_out_buffer++;
+    printf("%s\n", dbg_buffer);
+    */
 
     va_list args;
     va_start(args, fmt);
-    // Leave 1 char for the \n on the end (don't care about null term since we're sending to uart with byte count)
-    size_t formatted_size = vsnprintf(moving_log_out_buffer, LOG_OUT_BUFFER_BYTES - bytes_written - 1, fmt, args);
+
+    // vsnprintf subtracts 1 from the max length passed to leave room for the null term
+    size_t formatted_size = vsnprintf(log_out_buffer, LOG_OUT_BUFFER_BYTES, fmt, args);
     va_end(args);
 
-    log_out_buffer[bytes_written + formatted_size] = '\n';
     xSemaphoreGive(mutex_handle);
 
     // Let go of the mutex before sending to serial, it'll handle re-entrancy with it's own internal queueing
     // (maybe?)
-    uart_write_bytes(cli_uart_handle->port, log_out_buffer, bytes_written + formatted_size + 1);
+    uart_write_bytes(cli_uart_handle->port, log_out_buffer, formatted_size + 1);
 }
 
 /*

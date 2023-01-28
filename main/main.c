@@ -173,7 +173,7 @@ void app_main(void) {
     log_printf(LOG_LEVEL_INFO, "");
     log_printf(LOG_LEVEL_INFO, "");
     while (cli_command_info(info_buffer, info_buffer_size, NULL) == pdTRUE) {
-        log_printf(LOG_LEVEL_INFO, info_buffer);
+        log_printf(LOG_LEVEL_INFO, "%s", info_buffer);
     }
     log_printf(LOG_LEVEL_INFO, "");
     log_printf(LOG_LEVEL_INFO, "");
