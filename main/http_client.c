@@ -1,5 +1,6 @@
 #include <string.h>
 #include "freertos/FreeRTOS.h"
+#include "freertos/semphr.h"
 
 #include "constants.h"
 #include "http_client.h"
@@ -14,6 +15,8 @@
 #define MAX_READ_BUFFER_SIZE 1024
 
 extern const uint8_t server_cert_pem_start[] asm("_binary_ca_cert_pem_start");
+
+static SemaphoreHandle_t request_lock;
 
 /* Technically unnecessary, should be stubbed out for non-debug build */
 esp_err_t http_event_handler(esp_http_client_event_t *event) {
@@ -50,6 +53,8 @@ esp_err_t http_event_handler(esp_http_client_event_t *event) {
 }
 
 void http_client_init() {
+    request_lock = xSemaphoreCreateMutex();
+    configASSERT(request_lock);
 }
 
 // Caller passes in endpoint (tides/swell) the values for the 2 query params,
@@ -133,31 +138,50 @@ bool http_client_perform_request(request *request_obj, esp_http_client_handle_t 
         .transport_type = HTTP_TRANSPORT_OVER_SSL,
     };
 
-    log_printf(LOG_LEVEL_INFO, "Initing http client for request with url '%s'...", http_config.url, http_config.port);
-    *client = esp_http_client_init(&http_config);
-    if (!client) {
-        log_printf(LOG_LEVEL_INFO, "Error initing http client, returning without sending request");
-        return false;
-    }
-
-    ESP_ERROR_CHECK(esp_http_client_set_method(*client, HTTP_METHOD_GET));
-    ESP_ERROR_CHECK(esp_http_client_set_header(*client, "Content-type", "text/html"));
-
-    esp_err_t err = esp_http_client_open(*client, 0);
-    // Opens and sends the request since we have no data
-    if (err != ESP_OK) {
-        log_printf(LOG_LEVEL_ERROR, "Error opening http client, error: %s", esp_err_to_name(err));
-
-        // clean up and return no space allocated
-        err = esp_http_client_cleanup(*client);
-        if (err != ESP_OK) {
-            log_printf(LOG_LEVEL_INFO, "Error cleaning up  http client connection");
+    bool req_start_success = true;
+    do {
+        BaseType_t lock_success = xSemaphoreTake(request_lock, pdMS_TO_TICKS(5000));
+        if (lock_success == pdFALSE) {
+            req_start_success = false;
+            log_printf(LOG_LEVEL_ERROR,
+                       "Failed to take http req lock in timeout, returning failure for the request status");
+            break;
         }
 
-        return false;
-    }
+        log_printf(LOG_LEVEL_INFO,
+                   "Initing http client for GET request with url '%s'...",
+                   http_config.url,
+                   http_config.port);
+        *client = esp_http_client_init(&http_config);
+        if (!client) {
+            log_printf(LOG_LEVEL_INFO, "Error initing http client, returning without sending request");
+            req_start_success = false;
+            break;
+        }
 
-    return true;
+        ESP_ERROR_CHECK(esp_http_client_set_method(*client, HTTP_METHOD_GET));
+        ESP_ERROR_CHECK(esp_http_client_set_header(*client, "Content-type", "text/html"));
+
+        esp_err_t err = esp_http_client_open(*client, 0);
+        // Opens and sends the request since we have no data
+        if (err != ESP_OK) {
+            log_printf(LOG_LEVEL_ERROR, "Error opening http client, error: %s", esp_err_to_name(err));
+
+            // clean up and return no space allocated
+            err = esp_http_client_cleanup(*client);
+            if (err != ESP_OK) {
+                log_printf(LOG_LEVEL_INFO, "Error cleaning up  http client connection");
+            }
+
+            req_start_success = false;
+            break;
+        }
+    } while (0);
+
+    // Always give back no matter what happened with the req
+    xSemaphoreGive(request_lock);
+
+    return req_start_success;
 }
 
 // TODO :: refactor the perform functions to be one func with arg for post or get. Almost identical now, just have to
@@ -172,8 +196,6 @@ int http_client_perform_post(request                  *request_obj,
         return 0;
     }
 
-    log_printf(LOG_LEVEL_INFO, "Initing http client for post...");
-
     esp_http_client_config_t http_config = {
         .host           = "spotcheck.brianteam.dev",
         .path           = "/",
@@ -183,30 +205,49 @@ int http_client_perform_post(request                  *request_obj,
         .transport_type = HTTP_TRANSPORT_OVER_SSL,
     };
 
-    *client = esp_http_client_init(&http_config);
-    if (!client) {
-        log_printf(LOG_LEVEL_INFO, "Error initing http client, returning without sending request");
-        return 0;
-    }
+    bool req_start_success = true;
+    do {
+        BaseType_t lock_success = xSemaphoreTake(request_lock, pdMS_TO_TICKS(5000));
+        if (lock_success == pdFALSE) {
+            req_start_success = false;
+            log_printf(LOG_LEVEL_ERROR,
+                       "Failed to take http req lock in timeout, returning failure for the request status");
+            break;
+        }
 
-    int retval = 0;
+        log_printf(LOG_LEVEL_INFO,
+                   "Initing http client for post request with url '%s'...",
+                   http_config.url,
+                   http_config.port);
+        *client = esp_http_client_init(&http_config);
+        if (!client) {
+            req_start_success = false;
+            log_printf(LOG_LEVEL_INFO, "Error initing http client, returning without sending request");
+            break;
+        }
 
-    ESP_ERROR_CHECK(esp_http_client_set_url(*client, request_obj->url));
-    ESP_ERROR_CHECK(esp_http_client_set_method(*client, HTTP_METHOD_POST));
-    ESP_ERROR_CHECK(esp_http_client_set_header(*client, "Content-type", "application/json"));
-    ESP_ERROR_CHECK(esp_http_client_set_post_field(*client, post_data, post_data_size));
+        // TODO :: these shouldn't assert, fail gracefully
+        ESP_ERROR_CHECK(esp_http_client_set_url(*client, request_obj->url));
+        ESP_ERROR_CHECK(esp_http_client_set_method(*client, HTTP_METHOD_POST));
+        ESP_ERROR_CHECK(esp_http_client_set_header(*client, "Content-type", "application/json"));
+        ESP_ERROR_CHECK(esp_http_client_set_post_field(*client, post_data, post_data_size));
 
-    log_printf(LOG_LEVEL_INFO, "Performing POST to %s with data size %u", request_obj->url, post_data_size);
-    esp_err_t err = esp_http_client_perform(*client);
-    if (err != ESP_OK) {
-        log_printf(LOG_LEVEL_ERROR, "Error performing POST, error: %s", esp_err_to_name(err));
-        retval = -1;
-    } else {
-        uint16_t status = esp_http_client_get_status_code(*client);
-        retval          = status <= 200 || status > 299;
-    }
+        log_printf(LOG_LEVEL_INFO, "Performing POST to %s with data size %u", request_obj->url, post_data_size);
+        esp_err_t err = esp_http_client_perform(*client);
+        if (err != ESP_OK) {
+            log_printf(LOG_LEVEL_ERROR, "Error performing POST, error: %s", esp_err_to_name(err));
+            req_start_success = false;
+            break;
+        } else {
+            uint16_t status   = esp_http_client_get_status_code(*client);
+            req_start_success = status <= 200 || status > 299;
+        }
+    } while (0);
 
-    return retval;
+    // Always give back no matter what happened with the req
+    xSemaphoreGive(request_lock);
+
+    return req_start_success;
 }
 
 /*
@@ -250,8 +291,8 @@ static bool http_client_check_response(esp_http_client_handle_t *client, int *co
 }
 
 /*
- * Read response from http requeste into caller-supplied buffer. Caller responsible for freeing malloced buffer saved in
- * response_data pointer if return value > 0. Request must have been sent through client using
+ * Read response from http requeste into caller-supplied buffer. Caller responsible for freeing malloced buffer
+ * saved in response_data pointer if return value > 0. Request must have been sent through client using
  * http_client_perform_request.
  * Returns -1 for error, otherwise number of bytes malloced.
  */
@@ -281,8 +322,8 @@ esp_err_t http_client_read_response_to_buffer(esp_http_client_handle_t *client,
 
             int length_received = esp_http_client_read(*client, *response_data, content_length);
             if (length_received < 0) {
-                // Don't bother making the caller free anything since we have nothing to give them. Free here and return
-                // -1 for error
+                // Don't bother making the caller free anything since we have nothing to give them. Free here and
+                // return -1 for error
                 free(*response_data);
                 log_printf(LOG_LEVEL_ERROR, "Error reading response after successful http client request");
                 break;

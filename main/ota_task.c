@@ -105,14 +105,14 @@ static bool check_forced_update(esp_app_desc_t *current_image_info, char *versio
     char                    *response_data;
     size_t                   response_data_size;
     esp_http_client_handle_t client;
-    esp_err_t                http_err = http_client_perform_post(&request_obj, post_data, strlen(post_data), &client);
-    if (http_err != ESP_OK) {
+    bool http_success = http_client_perform_post(&request_obj, post_data, strlen(post_data), &client);
+    if (!http_success) {
         log_printf(LOG_LEVEL_ERROR,
                    "Error in http perform request checking to see if need forced update, defaulting to no update");
         return false;
     }
 
-    http_err = http_client_read_response_to_buffer(&client, &response_data, &response_data_size);
+    esp_err_t http_err = http_client_read_response_to_buffer(&client, &response_data, &response_data_size);
     if (http_err != ESP_OK) {
         log_printf(LOG_LEVEL_ERROR,
                    "Error in http request readout checking to see if need forced update, defaulting to no update");
