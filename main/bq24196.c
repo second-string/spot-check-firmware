@@ -21,7 +21,7 @@ void bq24196_init(i2c_handle_t *handle) {
 void bq24196_start() {
     esp_err_t err = bq24196_disable_watchdog();
     if (err != ESP_OK) {
-        log_printf(LOG_LEVEL_ERROR, "Received error reading from BQ register, aborting BQ init code");
+        log_printf(LOG_LEVEL_WARN, "Received error reading from BQ register, aborting BQ init code");
         return;
     }
 
