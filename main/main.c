@@ -209,7 +209,7 @@ void app_main(void) {
         uint32_t start_ticks = xTaskGetTickCount();
         uint32_t now_ticks   = start_ticks;
         while (!wifi_is_connected_to_network() && scheduler_get_mode() == SCHEDULER_MODE_INIT &&
-               (now_ticks - start_ticks < pdMS_TO_TICKS(10 * 1000))) {
+               (now_ticks - start_ticks < pdMS_TO_TICKS(30 * 1000))) {
             log_printf(LOG_LEVEL_INFO, "Waiting for connection to wifi network and IP assignment");
             vTaskDelay(pdMS_TO_TICKS(1000));
             now_ticks = xTaskGetTickCount();
@@ -246,7 +246,7 @@ void app_main(void) {
         bool sntp_time_set = false;
         start_ticks        = xTaskGetTickCount();
         now_ticks          = start_ticks;
-        while (!sntp_time_set && (now_ticks - start_ticks < pdMS_TO_TICKS(10 * 1000))) {
+        while (!sntp_time_set && (now_ticks - start_ticks < pdMS_TO_TICKS(30 * 1000))) {
             log_printf(LOG_LEVEL_INFO, "Waiting for sntp time");
             sntp_time_set = sntp_time_is_synced();
 
@@ -255,7 +255,7 @@ void app_main(void) {
         }
 
         if (!sntp_time_set) {
-            log_printf(LOG_LEVEL_ERROR,
+            log_printf(LOG_LEVEL_WARN,
                        "Did not receive SNTP update before timing out! Non-blocking to rest of startup since we've "
                        "validated internet connection with healthcheck");
         }

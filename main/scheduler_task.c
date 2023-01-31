@@ -53,6 +53,7 @@ typedef struct {
     bool    active;
     void (*execute)(void);
     bool force_next_update;
+    bool force_on_transition_to_online;
 } discrete_update_t;
 
 static void scheduler_trigger_ota_check();
@@ -95,64 +96,70 @@ static differential_update_t differential_updates[NUM_DIFFERENTIAL_UPDATES] = {
 // Execute function cannot be blocking! Will execute from 1 sec timer interrupt callback
 static discrete_update_t discrete_updates[NUM_DISCRETE_UPDATES] = {
     {
-        .name                 = "time",
-        .force_next_update    = false,
-        .hour                 = 0xFF,  // wildcards, should update every minute every hour
-        .minute               = 0xFF,
-        .hour_last_executed   = 0,
-        .minute_last_executed = 0,
-        .active               = false,
-        .execute              = scheduler_trigger_time_update,
+        .name                          = "time",
+        .force_next_update             = false,
+        .force_on_transition_to_online = false,
+        .hour                          = 0xFF,  // wildcards, should update every minute every hour
+        .minute                        = 0xFF,
+        .hour_last_executed            = 0,
+        .minute_last_executed          = 0,
+        .active                        = false,
+        .execute                       = scheduler_trigger_time_update,
     },
     {
-        .name                 = "conditions",
-        .force_next_update    = false,
-        .hour                 = 0xFF,  // wildcard, runs on 5th minute of every hours
-        .minute               = 5,
-        .hour_last_executed   = 0,
-        .minute_last_executed = 0,
-        .active               = false,
-        .execute              = scheduler_trigger_conditions_update,
+        .name                          = "conditions",
+        .force_next_update             = false,
+        .force_on_transition_to_online = true,
+        .hour                          = 0xFF,  // wildcard, runs on 5th minute of every hours
+        .minute                        = 5,
+        .hour_last_executed            = 0,
+        .minute_last_executed          = 0,
+        .active                        = false,
+        .execute                       = scheduler_trigger_conditions_update,
     },
     {
-        .name                 = "tide",
-        .force_next_update    = false,
-        .hour                 = 3,
-        .minute               = 0,
-        .hour_last_executed   = 0,
-        .minute_last_executed = 0,
-        .active               = false,
-        .execute              = scheduler_trigger_tide_chart_update,
+        .name                          = "tide",
+        .force_next_update             = false,
+        .force_on_transition_to_online = true,
+        .hour                          = 3,
+        .minute                        = 0,
+        .hour_last_executed            = 0,
+        .minute_last_executed          = 0,
+        .active                        = false,
+        .execute                       = scheduler_trigger_tide_chart_update,
     },
     {
-        .name                 = "swell_morning",
-        .force_next_update    = false,
-        .hour                 = 12,
-        .minute               = 0,
-        .hour_last_executed   = 0,
-        .minute_last_executed = 0,
-        .active               = false,
-        .execute              = scheduler_trigger_swell_chart_update,
+        .name                          = "swell_morning",
+        .force_next_update             = false,
+        .force_on_transition_to_online = true,
+        .hour                          = 12,
+        .minute                        = 0,
+        .hour_last_executed            = 0,
+        .minute_last_executed          = 0,
+        .active                        = false,
+        .execute                       = scheduler_trigger_swell_chart_update,
     },
     {
-        .name                 = "swell_midday",
-        .force_next_update    = false,
-        .hour                 = 21,
-        .minute               = 0,
-        .hour_last_executed   = 0,
-        .minute_last_executed = 0,
-        .active               = false,
-        .execute              = scheduler_trigger_swell_chart_update,
+        .name                          = "swell_midday",
+        .force_next_update             = false,
+        .force_on_transition_to_online = false,
+        .hour                          = 21,
+        .minute                        = 0,
+        .hour_last_executed            = 0,
+        .minute_last_executed          = 0,
+        .active                        = false,
+        .execute                       = scheduler_trigger_swell_chart_update,
     },
     {
-        .name                 = "swell_evening",
-        .force_next_update    = true,
-        .hour                 = 17,
-        .minute               = 0,
-        .hour_last_executed   = 0,
-        .minute_last_executed = 0,
-        .active               = false,
-        .execute              = scheduler_trigger_swell_chart_update,
+        .name                          = "swell_evening",
+        .force_next_update             = true,
+        .force_on_transition_to_online = false,
+        .hour                          = 17,
+        .minute                        = 0,
+        .hour_last_executed            = 0,
+        .minute_last_executed          = 0,
+        .active                        = false,
+        .execute                       = scheduler_trigger_swell_chart_update,
     },
 };
 
@@ -493,25 +500,41 @@ void scheduler_set_online_mode() {
     // Only have one update struct that shouldn't run in online mode so just hardcode it
     char *offline_only_update_name = "network_check";
 
+    struct tm now_local;
+    sntp_time_get_local_time(&now_local);
+    time_t now_epoch_secs = mktime(&now_local);
+
     for (int i = 0; i < NUM_DIFFERENTIAL_UPDATES; i++) {
         if (strcmp(offline_only_update_name, differential_updates[i].name) == 0) {
             differential_updates[i].active = false;
-            log_printf(LOG_LEVEL_DEBUG, "Deactivated update struct '%s'", differential_updates[i].name);
+            log_printf(LOG_LEVEL_DEBUG, "Deactivated diff update struct '%s'", differential_updates[i].name);
         } else {
-            differential_updates[i].active            = true;
-            differential_updates[i].force_next_update = true;
-            log_printf(LOG_LEVEL_DEBUG, "Activated update struct '%s'", differential_updates[i].name);
+            // Set 'last execd' time to now. Diff updates are fundamentally low prio, so we always want to reset timer
+            // to when we come online. Edge case bug here if device keeps losing and regaining connection before the
+            // full period of each diff update has happened at least once. If we didn't do this, every one of these
+            // would trigger when coming online for the first time because of the massive time delta. That results in
+            // OTA triggering and fucking with the other network requests since it's not gated by lock.
+            differential_updates[i].active                   = true;
+            differential_updates[i].force_next_update        = false;
+            differential_updates[i].last_executed_epoch_secs = now_epoch_secs;
+            log_printf(LOG_LEVEL_DEBUG, "Activated diff update struct '%s'", differential_updates[i].name);
         }
     }
 
     for (int i = 0; i < NUM_DISCRETE_UPDATES; i++) {
         if (strcmp(offline_only_update_name, discrete_updates[i].name) == 0) {
             discrete_updates[i].active = false;
-            log_printf(LOG_LEVEL_DEBUG, "Deactivated update struct '%s'", discrete_updates[i].name);
+            log_printf(LOG_LEVEL_DEBUG, "Deactivated discrete update struct '%s'", discrete_updates[i].name);
         } else {
-            discrete_updates[i].active            = true;
-            discrete_updates[i].force_next_update = true;
-            log_printf(LOG_LEVEL_DEBUG, "Activated update struct '%s'", discrete_updates[i].name);
+            discrete_updates[i].active = true;
+
+            // Don't force specific discrete updates on activation. Otherwise we'd trigger things like all three swell
+            // updates back to back (and an unnecessary time update but that's a bit less intrusive)
+            discrete_updates[i].force_next_update = discrete_updates[i].force_on_transition_to_online;
+            log_printf(LOG_LEVEL_DEBUG,
+                       "Activated %s discrete update struct '%s'",
+                       discrete_updates[i].force_on_transition_to_online ? "and forced" : "but did not force",
+                       discrete_updates[i].name);
         }
     }
 
@@ -520,7 +543,9 @@ void scheduler_set_online_mode() {
 
 void scheduler_task_init() {
     mode = SCHEDULER_MODE_INIT;
+}
 
+void scheduler_task_start() {
     // Print out all update structs and set them all to inactive. This lets the main.c boot process run unfettered
     // without the scheduler in offline mode testing a healthcheck before the main code is ready for it an mucking
     // everything up. main.c init function responsible for setting scheduler into offline or online mode no matter what,
@@ -552,9 +577,7 @@ void scheduler_task_init() {
                    discrete_check->hour,
                    discrete_check->minute);
     }
-}
 
-void scheduler_task_start() {
     xTaskCreate(&scheduler_task,
                 "scheduler-update",
                 SPOT_CHECK_MINIMAL_STACK_SIZE_BYTES * 4,
