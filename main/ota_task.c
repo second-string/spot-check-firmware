@@ -144,10 +144,10 @@ static bool check_forced_update(esp_app_desc_t *current_image_info, char *versio
  * Proper task teardown. I don't know if the call to vTaskDelete immediately deletes the executing task, so always call
  * return up to root of callstack after calling this function.
  */
-static void ota_task_stop(bool success) {
-    if (success) {
+static void ota_task_stop(bool clear_ota_text) {
+    if (clear_ota_text) {
         screen_img_handler_clear_ota_start_text();
-        vTaskDelay(pdMS_TO_TICKS(5000));
+        screen_img_handler_render(__func__, __LINE__);
     }
 
     sleep_handler_set_idle(SYSTEM_IDLE_OTA_BIT);
@@ -165,7 +165,7 @@ static void check_ota_update_task(void *args) {
     return;
 #endif
 
-    // This only checks if we're connected t a wifi network, but not if there's an active internet connection beyond
+    // This only checks if we're connected to a wifi network, but not if there's an active internet connection beyond
     // that. That's fine, as the status checks for http requests later in the ota process will fail out gracefully if
     // error codes rcvd
     if (!wifi_is_connected_to_network()) {
@@ -238,9 +238,8 @@ static void check_ota_update_task(void *args) {
     }
 
     // Notify user on screen
-    // TODO :: This timing is fine during normal hourly OTA checks, but need to see if this is going to draw before full
-    // scheduler update is done on boot, which would mean the redraw of the tide chart will erase this
     screen_img_handler_draw_ota_start_text();
+    screen_img_handler_render(__func__, __LINE__);
 
     uint32_t iter_counter = 0;
     uint32_t bytes_received;
@@ -268,12 +267,13 @@ static void check_ota_update_task(void *args) {
     bool received_full_image = esp_https_ota_is_complete_data_received(ota_handle);
     if (!received_full_image) {
         log_printf(LOG_LEVEL_ERROR, "Did not receive full image package from server, aborting.");
-        ota_task_stop(false);
+        ota_task_stop(true);
         return;
     }
 
     error = esp_https_ota_finish(ota_handle);
     if (error == ESP_OK) {
+        // TODO :: success text briefly
         log_printf(LOG_LEVEL_INFO, "OTA update successful, rebooting in 3 seconds...");
         vTaskDelay(3000 / portTICK_PERIOD_MS);
         esp_restart();
@@ -287,8 +287,8 @@ static void check_ota_update_task(void *args) {
         }
     }
 
+    // Catch-all to clear OTA text and clean up task
     ota_task_stop(true);
-    return;
 }
 
 void ota_task_start() {

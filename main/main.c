@@ -258,6 +258,10 @@ void app_main(void) {
             log_printf(LOG_LEVEL_WARN,
                        "Did not receive SNTP update before timing out! Non-blocking to rest of startup since we've "
                        "validated internet connection with healthcheck");
+        } else {
+            log_printf(LOG_LEVEL_INFO,
+                       "Successfully synced SNTP time after %lu seconds",
+                       (now_ticks - start_ticks) / configTICK_RATE_HZ);
         }
 
         // TODO ::show time date and spot name here while other network stuff is fetched
@@ -277,7 +281,7 @@ void app_main(void) {
     // For a normal boot, waiting a few minutes ensures no further network connections will be running. There's still
     // the risk of edge cases for a late internet connection or provisioning that would force http errors from reqs
     // stommping each other, so this is just a dirtyish fix for now.
-    uint8_t       initial_ota_delay_min = 3;
+    uint8_t       initial_ota_delay_min = 1;
     TimerHandle_t initial_ota_timer     = xTimerCreate("initial-ota-timer",
                                                    pdMS_TO_TICKS(initial_ota_delay_min * SECS_PER_MIN * MS_PER_SEC),
                                                    pdFALSE,

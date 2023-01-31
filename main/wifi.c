@@ -27,7 +27,8 @@
 // Set when connected to STA and recieved IP, does NOT indicate actual connection to the internet
 #define WIFI_EVENT_GROUP_CONNECTED_TO_NETWORK_BIT (1 << 0)
 
-#define PROVISIONED_NETWORK_CONNECTION_MAXIMUM_RETRY 3
+// This can be really bad on boot sometimes
+#define PROVISIONED_NETWORK_CONNECTION_MAXIMUM_RETRY 6
 
 static bool wifi_is_provisioning_inited = false;
 

@@ -642,7 +642,7 @@ bool screen_img_handler_draw_ota_start_text() {
     display_draw_text((char *)ota_start_text,
                       OTA_DRAW_X_PX,
                       OTA_DRAW_Y_PX,
-                      DISPLAY_FONT_SIZE_MEDIUM,
+                      DISPLAY_FONT_SIZE_SMALL,
                       DISPLAY_FONT_ALIGN_CENTER);
 
     return true;
@@ -652,7 +652,7 @@ bool screen_img_handler_draw_ota_finished_text() {
     display_draw_text((char *)ota_finished_text,
                       OTA_DRAW_X_PX,
                       OTA_DRAW_Y_PX,
-                      DISPLAY_FONT_SIZE_MEDIUM,
+                      DISPLAY_FONT_SIZE_SMALL,
                       DISPLAY_FONT_ALIGN_CENTER);
 
     return true;
