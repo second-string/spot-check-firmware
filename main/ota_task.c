@@ -35,7 +35,7 @@ static esp_err_t http_client_init_callback(esp_http_client_handle_t http_client)
 }
 
 // Sets up  OTA binary URL and queries to see if OTA image accessible (no version checking)
-static void ota_start_ota(char *binary_url) {
+static bool ota_start_ota(char *binary_url) {
     esp_http_client_config_t http_config = {
         .url        = binary_url,
         .cert_pem   = (char *)server_cert_pem_start,
@@ -50,8 +50,9 @@ static void ota_start_ota(char *binary_url) {
     esp_err_t error = esp_https_ota_begin(&ota_config, &ota_handle);
     if (error != ESP_OK) {
         log_printf(LOG_LEVEL_ERROR, "OTA failed at esp_https_ota_begin: %s", esp_err_to_name(error));
-        vTaskDelete(NULL);
     }
+
+    return error == ESP_OK;
 }
 
 static esp_err_t ota_validate_image_header(esp_app_desc_t *new_image_info, esp_app_desc_t *current_image_info) {
@@ -179,7 +180,10 @@ static void check_ota_update_task(void *args) {
     }
 
     // Start our OTA process with the default binary URL first
-    ota_start_ota(CONFIG_OTA_URL);
+    bool success = ota_start_ota(CONFIG_OTA_URL);
+    if (!success) {
+        ota_task_stop(false);
+    }
 
     // Get our current version
     const esp_partition_t *current_partition = esp_ota_get_running_partition();
