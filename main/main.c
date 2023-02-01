@@ -31,6 +31,7 @@
 #include "screen_img_handler.h"
 #include "sleep_handler.h"
 #include "sntp_time.h"
+#include "spot_check.h"
 #include "timer.h"
 #include "uart.h"
 #include "wifi.h"
@@ -68,6 +69,7 @@ static void app_init() {
     display_init();
     sleep_handler_init();
     screen_img_handler_init();
+    spot_check_init();
 
     ESP_ERROR_CHECK(esp_event_loop_create_default());
     mdns_local_init();
@@ -89,79 +91,6 @@ static void app_start() {
     scheduler_task_start();
 
     cli_task_start();
-}
-
-// TODO :: all of these screens need to go
-// https://www.notion.so/pull-application-logic-out-into-spot_check-c-file-for-rendering-info-screens-conditions-network-par-2c21e6156eac437893a11a3925d60add
-void spot_check_show_unprovisioned_screen() {
-    log_printf(LOG_LEVEL_ERROR, "No prov info saved, showing provisioning screen without network checks.");
-    display_full_clear();
-    display_draw_text(
-        "Download the Spot Check app and follow\nthe configuration steps to connect\n your device to a wifi "
-        "network",
-        400,
-        300,
-        DISPLAY_FONT_SIZE_SHMEDIUM,
-        DISPLAY_FONT_ALIGN_CENTER);
-
-    screen_img_handler_render(__func__, __LINE__);
-}
-
-void spot_check_show_no_network_screen() {
-    log_printf(LOG_LEVEL_ERROR, "Prov info is saved, but could not find or connect to saved network.");
-    display_full_clear();
-    display_draw_text("Network not found", 400, 250, DISPLAY_FONT_SIZE_SHMEDIUM, DISPLAY_FONT_ALIGN_CENTER);
-    display_draw_text(
-        "Spot Check could not find or connect to the network used previously.\nVerify network is "
-        "available or use the Spot Check app to connect to a new network",
-        400,
-        300,
-        DISPLAY_FONT_SIZE_SMALL,
-        DISPLAY_FONT_ALIGN_CENTER);
-
-    screen_img_handler_render(__func__, __LINE__);
-}
-
-void spot_check_clear_checking_connection_screen() {
-    display_invert_text("Connecting to network...", 400, 350, DISPLAY_FONT_SIZE_SMALL, DISPLAY_FONT_ALIGN_CENTER);
-    screen_img_handler_render(__func__, __LINE__);
-}
-
-void spot_check_show_checking_connection_screen() {
-    log_printf(
-        LOG_LEVEL_INFO,
-        "Connection to network successful, showing 'connecting to network' screen while performing api healthcheck");
-    display_draw_text("Connecting to network...", 400, 350, DISPLAY_FONT_SIZE_SMALL, DISPLAY_FONT_ALIGN_CENTER);
-    screen_img_handler_render(__func__, __LINE__);
-}
-
-void spot_check_show_fetching_conditions_screen() {
-    log_printf(
-        LOG_LEVEL_INFO,
-        "Connection to network successful, showing 'fetching data' screen while waiting for scheduler to full update");
-    display_draw_text("Fetching latest conditions...", 400, 350, DISPLAY_FONT_SIZE_SMALL, DISPLAY_FONT_ALIGN_CENTER);
-    screen_img_handler_render(__func__, __LINE__);
-}
-
-void spot_check_show_no_internet_screen() {
-    log_printf(LOG_LEVEL_ERROR, "Connection to network successful and assigned IP, but no internet connection");
-    display_full_clear();
-    display_draw_text("No internet connection", 400, 250, DISPLAY_FONT_SIZE_SHMEDIUM, DISPLAY_FONT_ALIGN_CENTER);
-    display_draw_text("Spot Check is connected to the the WiFi\nnetwork but cannot reach the internet.",
-                      400,
-                      325,
-                      DISPLAY_FONT_SIZE_SMALL,
-                      DISPLAY_FONT_ALIGN_CENTER);
-
-    display_draw_text(
-        "Verify local network is "
-        "connected to the internet or\nuse the Spot Check app to connect to a new network",
-        400,
-        400,
-        DISPLAY_FONT_SIZE_SMALL,
-        DISPLAY_FONT_ALIGN_CENTER);
-
-    screen_img_handler_render(__func__, __LINE__);
 }
 
 void app_main(void) {
@@ -192,6 +121,7 @@ void app_main(void) {
         // displaying provisioning text. No need to waste time trying to connect to network.
         if (!wifi_is_provisioned()) {
             spot_check_show_unprovisioned_screen();
+            screen_img_handler_render(__func__, __LINE__);
             wifi_init_provisioning();
             wifi_start_provisioning(false);
             break;
@@ -222,6 +152,7 @@ void app_main(void) {
         // reprovision.
         if (!wifi_is_connected_to_network()) {
             spot_check_show_no_network_screen();
+            screen_img_handler_render(__func__, __LINE__);
 
             // Have to re-init and restart since it would have been stopped and de-inited on initial startup due to
             // finding already provisioned network
@@ -233,8 +164,10 @@ void app_main(void) {
         // Update splash screen with fetching data text, then check actual internet connection. Start scheduler in
         // offline mode if failed
         spot_check_show_checking_connection_screen();
+        screen_img_handler_render(__func__, __LINE__);
         if (!http_client_check_internet()) {
             spot_check_show_no_internet_screen();
+            screen_img_handler_render(__func__, __LINE__);
             scheduler_set_offline_mode();
             break;
         }
@@ -269,7 +202,6 @@ void app_main(void) {
         // This will force update everything and thendo one big render.
         // TODO :: erase checking connection text
         spot_check_clear_checking_connection_screen();
-        spot_check_show_fetching_conditions_screen();
         scheduler_set_online_mode();
 
         log_printf(LOG_LEVEL_INFO,

@@ -21,13 +21,6 @@
 // Name of the NVS partition that the screen data bytes are saved. Generic since it holds multiple images
 #define SCREEN_IMG_PARTITION_LABEL "screen_img"
 
-typedef struct {
-    int8_t  temperature;
-    uint8_t wind_speed;
-    char    wind_dir[4];     // 3 characters for dir (SSW, etc) plus null
-    char    tide_height[7];  // minus sign, two digits, decimal point, two digits, null
-} conditions_t;
-
 typedef enum {
     SCREEN_IMG_TIDE_CHART,
     SCREEN_IMG_SWELL_CHART,
@@ -37,21 +30,10 @@ typedef enum {
 
 void screen_img_handler_init();
 bool screen_img_handler_download_and_save(screen_img_t screen_img);
-bool screen_img_handler_download_and_save_conditions(conditions_t *new_conditions);
+
 bool screen_img_handler_clear_screen_img(screen_img_t screen_img);
 bool screen_img_handler_draw_screen_img(screen_img_t screen_img);
-void screen_img_handler_clear_date(bool force_clear);
-bool screen_img_handler_draw_date();
-void screen_img_handler_clear_time();
-bool screen_img_handler_draw_time();
-void screen_img_handler_clear_spot_name();
-bool screen_img_handler_draw_spot_name(char *spot_name);
-void screen_img_handler_clear_conditions(bool clear_temperature, bool clear_wind, bool clear_tide);
-bool screen_img_handler_draw_conditions(conditions_t *conditions);
-bool screen_img_handler_draw_conditions_error();
-bool screen_img_handler_clear_ota_start_text();
-bool screen_img_handler_draw_ota_start_text();
-bool screen_img_handler_draw_ota_finished_text();
+
 void screen_img_handler_full_clear();
 void screen_img_handler_mark_all_lines_dirty();
 void screen_img_handler_render(const char *calling_func, uint32_t line);

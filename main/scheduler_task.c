@@ -16,6 +16,7 @@
 #include "screen_img_handler.h"
 #include "sleep_handler.h"
 #include "sntp_time.h"
+#include "spot_check.h"
 #include "timer.h"
 #include "wifi.h"
 
@@ -98,7 +99,7 @@ static discrete_update_t discrete_updates[NUM_DISCRETE_UPDATES] = {
     {
         .name                          = "time",
         .force_next_update             = false,
-        .force_on_transition_to_online = false,
+        .force_on_transition_to_online = true,
         .hour                          = 0xFF,  // wildcards, should update every minute every hour
         .minute                        = 0xFF,
         .hour_last_executed            = 0,
@@ -275,8 +276,8 @@ static void scheduler_task(void *args) {
         if (update_bits & UPDATE_CONDITIONS_BIT) {
             sleep_handler_set_busy(SYSTEM_IDLE_CONDITIONS_BIT);
             conditions_t new_conditions = {0};
-            bool         success = scheduler_success = screen_img_handler_download_and_save_conditions(&new_conditions);
-            if (success) {
+            scheduler_success           = spot_check_download_and_save_conditions(&new_conditions);
+            if (scheduler_success) {
                 memcpy(&last_retrieved_conditions, &new_conditions, sizeof(conditions_t));
             }
             sleep_handler_set_idle(SYSTEM_IDLE_CONDITIONS_BIT);
@@ -331,11 +332,11 @@ static void scheduler_task(void *args) {
         if (update_bits & UPDATE_TIME_BIT) {
             sleep_handler_set_busy(SYSTEM_IDLE_TIME_BIT);
             if (!full_clear) {
-                screen_img_handler_clear_time();
-                screen_img_handler_clear_date(false);
+                spot_check_clear_time();
+                spot_check_clear_date(false);
             }
-            screen_img_handler_draw_time();
-            screen_img_handler_draw_date();
+            spot_check_draw_time();
+            spot_check_draw_date();
             log_printf(LOG_LEVEL_INFO, "scheduler task updated time");
             sleep_handler_set_idle(SYSTEM_IDLE_TIME_BIT);
         }
@@ -348,9 +349,9 @@ static void scheduler_task(void *args) {
             // TODO :: would be nice to have a 'previous_spot_name' key in config so we could pass to clear function
             // to smart erase with text inverse instead of block erasing max spot name width
             if (!full_clear) {
-                screen_img_handler_clear_spot_name();
+                spot_check_clear_spot_name();
             }
-            screen_img_handler_draw_spot_name(config->spot_name);
+            spot_check_draw_spot_name(config->spot_name);
             sleep_handler_set_idle(SYSTEM_IDLE_CONDITIONS_BIT);
 
             // We could be in this block from a manual direct trigger call or the async diff update struct. Either way,
@@ -366,12 +367,12 @@ static void scheduler_task(void *args) {
             // to this case if we're clearing for a regular update or becase location changed and spot name will need to
             // be cleared too.
             if (!full_clear) {
-                screen_img_handler_clear_conditions(true, true, true);
+                spot_check_clear_conditions(true, true, true);
             }
             if (scheduler_success) {
-                screen_img_handler_draw_conditions(&last_retrieved_conditions);
+                spot_check_draw_conditions(&last_retrieved_conditions);
             } else {
-                screen_img_handler_draw_conditions_error();
+                spot_check_draw_conditions_error();
             }
             log_printf(LOG_LEVEL_INFO, "scheduler task updated conditions");
             sleep_handler_set_idle(SYSTEM_IDLE_CONDITIONS_BIT);
@@ -496,6 +497,12 @@ void scheduler_set_online_mode() {
     if (mode == SCHEDULER_MODE_ONLINE) {
         return;
     }
+
+    // Who knows what error, OTA, random state screen was in from offline mode. Full clear, show fetching conditions,
+    // and kick everything off.
+    screen_img_handler_full_clear();
+    spot_check_draw_fetching_conditions_text();
+    screen_img_handler_render(__func__, __LINE__);
 
     // Only have one update struct that shouldn't run in online mode so just hardcode it
     char *offline_only_update_name = "network_check";

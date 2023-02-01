@@ -16,6 +16,7 @@
 #include "ota_task.h"
 #include "screen_img_handler.h"
 #include "sleep_handler.h"
+#include "spot_check.h"
 #include "wifi.h"
 
 #define TAG SC_TAG_OTA
@@ -147,7 +148,7 @@ static bool check_forced_update(esp_app_desc_t *current_image_info, char *versio
  */
 static void ota_task_stop(bool clear_ota_text) {
     if (clear_ota_text) {
-        screen_img_handler_clear_ota_start_text();
+        spot_check_clear_ota_start_text();
         screen_img_handler_render(__func__, __LINE__);
     }
 
@@ -242,7 +243,7 @@ static void check_ota_update_task(void *args) {
     }
 
     // Notify user on screen
-    screen_img_handler_draw_ota_start_text();
+    spot_check_draw_ota_start_text();
     screen_img_handler_render(__func__, __LINE__);
 
     uint32_t iter_counter = 0;

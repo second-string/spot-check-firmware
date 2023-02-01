@@ -23,6 +23,7 @@
 #include "screen_img_handler.h"
 #include "sleep_handler.h"
 #include "sntp_time.h"
+#include "spot_check.h"
 
 #define TAG SC_TAG_CLI_CMD
 
@@ -589,8 +590,8 @@ static BaseType_t cli_command_scheduler(char *write_buffer, size_t write_buffer_
     } else if (type_len == 4 && strncmp(type, "date", type_len) == 0) {
         // No scheduler trigger for this since it's bundled with updating time. Functions are only exposed
         // for debugging here
-        screen_img_handler_clear_date(true);
-        screen_img_handler_draw_date();
+        spot_check_clear_date(true);
+        spot_check_draw_date();
     } else if (type_len == 10 && strncmp(type, "conditions", type_len) == 0) {
         scheduler_trigger_conditions_update();
         strcpy(write_buffer, "Triggered conditions update");
