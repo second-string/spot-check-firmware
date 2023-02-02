@@ -22,8 +22,8 @@
 
 #define TAG SC_TAG_SCHEDULER
 
-#define NUM_DIFFERENTIAL_UPDATES 3
-#define NUM_DISCRETE_UPDATES 6
+#define NUM_DIFFERENTIAL_UPDATES 2
+#define NUM_DISCRETE_UPDATES 7
 
 #define OTA_CHECK_INTERVAL_SECONDS (CONFIG_OTA_CHECK_INTERVAL_HOURS * MINS_PER_HOUR * SECS_PER_MIN)
 #define NETWORK_CHECK_INTERVAL_SECONDS (30)
@@ -83,14 +83,6 @@ static differential_update_t differential_updates[NUM_DIFFERENTIAL_UPDATES] = {
         .update_interval_secs = NETWORK_CHECK_INTERVAL_SECONDS,
         .active               = false,
         .execute              = scheduler_trigger_network_check,
-    },
-    {
-        .name = "spot_name",  // use an extra diff update to hack in spot name renders. Needed for drawing spot name on
-                              // first transition from boot offline mode into online mode
-        .force_next_update    = false,
-        .update_interval_secs = UINT32_MAX,  // ~136 years, will never be invoked outside of being forced
-        .active               = false,
-        .execute              = scheduler_trigger_spot_name_update,
     },
 };
 
@@ -162,11 +154,25 @@ static discrete_update_t discrete_updates[NUM_DISCRETE_UPDATES] = {
         .active                        = false,
         .execute                       = scheduler_trigger_swell_chart_update,
     },
+    {
+        .name = "spot_name",  // use an extra discrete update to hack in spot name renders. Needed for drawing spot name
+                              // on first transition from boot offline mode into online mode
+        .force_next_update             = false,
+        .force_on_transition_to_online = true,
+        .hour                          = 0xEE,  // this hour will obviously never be hit
+        .minute                        = 0xEE,  // this minute will obviously never be hit
+        .hour_last_executed            = 0,
+        .minute_last_executed          = 0,
+        .active                        = false,
+        .execute                       = scheduler_trigger_spot_name_update,
+    },
 };
 
 // The update structs that should run in offline mode
+// TODO :: time should technically be in this, as RTC is accurate enough that we want to keep rendering time even when
+// we go offline. It causes a problem on boot straight to no network or no internet, because then it draws the (usually
+// non-sntp synced) time over the no network/connection message. Figure out how to separate the two cases
 const char *const offline_mode_update_names[] = {
-    "time",
     "network_check",
 };
 
