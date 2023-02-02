@@ -35,6 +35,8 @@
 #define UPDATE_SPOT_NAME_BIT (1 << 4)
 #define CHECK_OTA_BIT (1 << 5)
 #define CHECK_NETWORK_BIT (1 << 6)
+#define BITS_NEEDING_RENDER \
+    (UPDATE_CONDITIONS_BIT | UPDATE_TIDE_CHART_BIT | UPDATE_SWELL_CHART_BIT | UPDATE_TIME_BIT | UPDATE_SPOT_NAME_BIT)
 
 typedef struct {
     char   name[14];
@@ -407,8 +409,8 @@ static void scheduler_task(void *args) {
         /***************************************
          * Render section
          **************************************/
-        if (update_bits) {
-            // If any other bits besides time are set, mark full screen as dirty so it refreshes all faded pixels
+        if (update_bits & BITS_NEEDING_RENDER) {
+            // If any other render bits besides time are set, mark full screen as dirty so it refreshes all faded pixels
             if (update_bits & ~(UPDATE_TIME_BIT)) {
                 screen_img_handler_mark_all_lines_dirty();
             }
