@@ -524,7 +524,7 @@ void spot_check_draw_fetching_conditions_text() {
     log_printf(
         LOG_LEVEL_INFO,
         "Connection to network successful, showing 'fetching data' screen while waiting for scheduler to full update");
-    display_draw_text("Fetching latest conditions...", 400, 350, DISPLAY_FONT_SIZE_SMALL, DISPLAY_FONT_ALIGN_CENTER);
+    display_draw_text("Fetching latest conditions...", 400, 300, DISPLAY_FONT_SIZE_SMALL, DISPLAY_FONT_ALIGN_CENTER);
 }
 
 void spot_check_init() {

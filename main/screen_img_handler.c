@@ -202,7 +202,7 @@ bool screen_img_handler_download_and_save(screen_img_t screen_img) {
  * Wrappers for display render funcs so our logic modules don't have a dependency on display driver
  */
 void screen_img_handler_full_clear() {
-    display_full_clear_cycles(1);
+    display_full_clear();
 }
 
 void screen_img_handler_mark_all_lines_dirty() {

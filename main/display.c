@@ -168,7 +168,7 @@ void display_full_clear_cycles(uint8_t cycles) {
  * Default full clear function just does single flash for simplicity. epdiy 'standard' fullclear uses 3
  */
 void display_full_clear() {
-    display_full_clear_cycles(1);
+    display_full_clear_cycles(3);
 }
 
 void display_clear_area(uint32_t x, uint32_t y, uint32_t width, uint32_t height) {
