@@ -25,6 +25,7 @@ idf_component_register(
                                    "sleep_handler.c"
                                    "spot_check.c"
                                    "memfault_platform_port.c"
+                                   "memfault_interface.c"
                     INCLUDE_DIRS   "include"
                                    ${MEMFAULT_FIRMWARE_SDK}/ports/include
                     EMBED_TXTFILES ${project_dir}/server_certs/ca_cert.pem)

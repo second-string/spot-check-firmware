@@ -2,6 +2,7 @@
 
 #include "FreeRTOS_CLI.h"
 #include "freertos/FreeRTOS.h"
+#include "memfault/panics/assert.h"
 
 #include "driver/gpio.h"
 #include "esp_event.h"
@@ -18,6 +19,7 @@
 #include "flash_partition.h"
 #include "http_client.h"
 #include "log.h"
+#include "memfault_interface.h"
 #include "nvs.h"
 #include "scheduler_task.h"
 #include "screen_img_handler.h"
@@ -756,6 +758,26 @@ BaseType_t cli_command_event(char *write_buffer, size_t write_buffer_size, const
     return pdFALSE;
 }
 
+BaseType_t cli_command_memfault(char *write_buffer, size_t write_buffer_size, const char *cmd_str) {
+    BaseType_t  action_len;
+    const char *action = FreeRTOS_CLIGetParameter(cmd_str, 1, &action_len);
+    if (action == NULL) {
+        strcpy(write_buffer, "Error: usage is 'memfault <action>' where action is 'assert|upload'");
+        return pdFALSE;
+    }
+
+    memset(write_buffer, 0x0, write_buffer_size);
+    if (action_len == 6 && strncmp(action, "assert", action_len) == 0) {
+        MEMFAULT_ASSERT(0);
+    } else if (action_len == 6 && strncmp(action, "upload", action_len) == 0) {
+        memfault_interface_post_data();
+    } else {
+        strcpy(write_buffer, "Unknown mflt command");
+    }
+
+    return pdFALSE;
+}
+
 void cli_command_register_all() {
     static const CLI_Command_Definition_t info_cmd = {
         .pcCommand                   = "info",
@@ -870,9 +892,19 @@ void cli_command_register_all() {
 
     static const CLI_Command_Definition_t event_cmd = {
         .pcCommand                   = "event",
-        .pcHelpString                = "event <sta_discon>: Post selected event to the default event group",
+        .pcHelpString                = "event:\n\t<sta_discon>: Post selected event to the default event group",
         .pxCommandInterpreter        = cli_command_event,
         .cExpectedNumberOfParameters = 1,
+    };
+
+    static const CLI_Command_Definition_t memfault_cmd = {
+        .pcCommand = "mflt",
+        .pcHelpString =
+            "mflt:\n\tassert: force a memfault crash and dump collection\n\tupload: posts any available data to "
+            "memfault "
+            "server",
+        .pxCommandInterpreter        = cli_command_memfault,
+        .cExpectedNumberOfParameters = -1,
     };
 
     FreeRTOS_CLIRegisterCommand(&info_cmd);
@@ -889,4 +921,5 @@ void cli_command_register_all() {
     FreeRTOS_CLIRegisterCommand(&log_cmd);
     FreeRTOS_CLIRegisterCommand(&sleep_cmd);
     FreeRTOS_CLIRegisterCommand(&event_cmd);
+    FreeRTOS_CLIRegisterCommand(&memfault_cmd);
 }
