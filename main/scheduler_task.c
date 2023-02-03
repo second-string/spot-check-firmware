@@ -258,7 +258,7 @@ static void scheduler_task(void *args) {
     // Run polling timer every second that's responsible for triggering any differential or discrete updates that have
     // reached execution time. Timer only calls trigger function, task waits indefinitely on event bits from triggers.
     timer_info_handle scheduler_polling_timer_handle =
-        timer_init("scheduler-polling", scheduler_polling_timer_callback, NULL, MS_PER_SEC);
+        timer_local_init("scheduler-polling", scheduler_polling_timer_callback, NULL, MS_PER_SEC);
     timer_reset(scheduler_polling_timer_handle, true);
 
     uint32_t update_bits       = 0;

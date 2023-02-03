@@ -10,6 +10,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
 #include "freertos/task.h"
+#include "memfault/esp_port/core.h"
 #include "sdkconfig.h"
 
 #include "driver/gpio.h"
@@ -94,6 +95,10 @@ static void app_start() {
 }
 
 void app_main(void) {
+#if !CONFIG_MEMFAULT_AUTOMATIC_INIT
+    memfault_boot();
+#endif
+
     app_init();
 
     size_t info_buffer_size = 200 * sizeof(char);

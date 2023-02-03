@@ -19,10 +19,10 @@ typedef struct timer_info_t {
 static timer_info_t timer_infos[3];
 static unsigned int next_timer_info_idx = 0;
 
-timer_info_handle timer_init(char        *timer_name,
-                             void        *timer_expired_callback,
-                             void        *callback_args,
-                             unsigned int timeout_milliseconds) {
+timer_info_handle timer_local_init(char        *timer_name,
+                                   void        *timer_expired_callback,
+                                   void        *callback_args,
+                                   unsigned int timeout_milliseconds) {
     configASSERT(next_timer_info_idx < sizeof(timer_infos) / sizeof(timer_info_t));
 
     timer_info_t *next_info = &timer_infos[next_timer_info_idx];

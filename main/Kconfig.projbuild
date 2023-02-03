@@ -38,4 +38,9 @@ menu "Spot Check Configuration"
         config ESP32_DEVBOARD
             bool "ESP32 dev board"
     endchoice
+
+    config MEMFAULT_PROJECT_KEY
+        string "Memfault project key"
+        help
+            Project key generated from valid Memfault account
 endmenu
