@@ -59,15 +59,15 @@ static void screen_img_handler_get_metadata(screen_img_t screen_img, screen_img_
 
     bool success = nvs_get_uint32(metadata->screen_img_size_key, &metadata->screen_img_size);
     if (!success) {
-        log_printf(LOG_LEVEL_ERROR, "No screen img size value stored in NVS, setting to zero");
+        log_printf(LOG_LEVEL_WARN, "No screen img size value stored in NVS, setting to zero");
     }
     success = nvs_get_uint32(metadata->screen_img_width_key, &metadata->screen_img_width);
     if (!success) {
-        log_printf(LOG_LEVEL_ERROR, "No screen img width value stored in NVS, setting to zero");
+        log_printf(LOG_LEVEL_WARN, "No screen img width value stored in NVS, setting to zero");
     }
     success = nvs_get_uint32(metadata->screen_img_height_key, &metadata->screen_img_height);
     if (!success) {
-        log_printf(LOG_LEVEL_ERROR, "No screen img height value stored in NVS, setting to zero");
+        log_printf(LOG_LEVEL_WARN, "No screen img height value stored in NVS, setting to zero");
     }
 }
 

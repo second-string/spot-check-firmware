@@ -771,6 +771,11 @@ BaseType_t cli_command_memfault(char *write_buffer, size_t write_buffer_size, co
         MEMFAULT_ASSERT(0);
     } else if (action_len == 6 && strncmp(action, "upload", action_len) == 0) {
         memfault_interface_post_data();
+    } else if (action_len == 8 && strncmp(action, "testcore", action_len) == 0) {
+        // note: this shouldn't be necessary if memfault setup is done. It dumps to flash and verifies that is saved
+        // correctly to the partition, which is redundant if we're already running asserts and uploading in real error
+        // situations
+        memfault_interface_test_coredump_memory();
     } else {
         strcpy(write_buffer, "Unknown mflt command");
     }
@@ -900,9 +905,8 @@ void cli_command_register_all() {
     static const CLI_Command_Definition_t memfault_cmd = {
         .pcCommand = "mflt",
         .pcHelpString =
-            "mflt:\n\tassert: force a memfault crash and dump collection\n\tupload: posts any available data to "
-            "memfault "
-            "server",
+            "mflt:\n\tassert: force a memfault crash and dump collection\n\theartbeat: posts any available data to "
+            "memfault server\n\ttestcore: test coredump memory",
         .pxCommandInterpreter        = cli_command_memfault,
         .cExpectedNumberOfParameters = -1,
     };

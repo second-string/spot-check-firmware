@@ -466,7 +466,7 @@ bool spot_check_draw_ota_start_text() {
 }
 
 void spot_check_show_unprovisioned_screen() {
-    log_printf(LOG_LEVEL_ERROR, "No prov info saved, showing provisioning screen without network checks.");
+    log_printf(LOG_LEVEL_WARN, "No prov info saved, showing provisioning screen without network checks.");
     display_full_clear();
     display_draw_text(
         "Download the Spot Check app and follow\nthe configuration steps to connect\n your device to a wifi "
