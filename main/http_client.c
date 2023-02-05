@@ -231,6 +231,13 @@ int http_client_perform_post(request                  *request_obj,
         esp_err_t err = esp_http_client_open(*client, post_data_size);
         if (err != ESP_OK) {
             log_printf(LOG_LEVEL_ERROR, "Error performing POST, error: %s", esp_err_to_name(err));
+
+            // always clean up on failure
+            err = esp_http_client_cleanup(*client);
+            if (err != ESP_OK) {
+                log_printf(LOG_LEVEL_INFO, "Error cleaning up  http client connection");
+            }
+
             req_start_success = false;
             break;
         } else {
