@@ -9,7 +9,7 @@
 #include "nvs.h"
 
 // Needs trailing slash!
-#define URL_BASE "https://spotcheck.brianteam.dev/"
+#define URL_BASE "https://spotcheck.brianteam.com/"
 
 typedef struct {
     char *key;

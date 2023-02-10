@@ -12,7 +12,7 @@ debug:
 
 # Run this manually - you want the second cert, the LetsEncrypt root CA one
 server_cert:
-	echo -n | openssl s_client -showcerts -connect spotcheck.brianteam.dev:443
+	echo -n | openssl s_client -showcerts -connect spotcheck.brianteam.com:443
 
 # Assumes current commit is the one to be released and is tagged with correct version, AND FW version has been bumped in CMakeLists.txt
 release:
