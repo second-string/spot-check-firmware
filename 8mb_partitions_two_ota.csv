@@ -1,7 +1,7 @@
 # Name,   Type, SubType, Offset,   Size, Flags
 # Note: if you have increased the bootloader size, make sure to update the offsets to avoid overlap
 # There is still space left unused, do rough calc of sizes to fit in 8MB flash
-coredump,   data, coredump,,        256k,
+coredump,   data, coredump,,        512K,
 nvs,        data, nvs,     ,        0x4000,
 otadata,    data, ota,     ,        0x2000,
 phy_init,   data, phy,     ,        0x1000,

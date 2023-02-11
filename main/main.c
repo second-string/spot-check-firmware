@@ -174,6 +174,11 @@ void app_main(void) {
             spot_check_show_no_internet_screen();
             screen_img_handler_render(__func__, __LINE__);
             scheduler_set_offline_mode();
+
+            // Have to re-init and restart since it would have been stopped and de-inited on initial startup due to
+            // finding already provisioned network
+            wifi_init_provisioning();
+            wifi_start_provisioning(true);
             break;
         }
 
@@ -184,8 +189,8 @@ void app_main(void) {
         bool sntp_time_set = false;
         start_ticks        = xTaskGetTickCount();
         now_ticks          = start_ticks;
+        log_printf(LOG_LEVEL_INFO, "Waiting for sntp time");
         while (!sntp_time_set && (now_ticks - start_ticks < pdMS_TO_TICKS(30 * 1000))) {
-            log_printf(LOG_LEVEL_INFO, "Waiting for sntp time");
             sntp_time_set = sntp_time_is_synced();
 
             vTaskDelay(pdMS_TO_TICKS(1000));

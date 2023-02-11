@@ -41,6 +41,7 @@ typedef enum {
     SC_TAG_WIFI,
     SC_TAG_SPOT_CHECK,
     SC_TAG_MFLT_INTRFC,
+    SC_TAG_MFLT_PORT,
     SC_TAG_COUNT,
     // Canot go above 32 elements, used as a bitmask in log.c for faster lookup in blacklist
 } sc_tag_t;
@@ -71,6 +72,7 @@ static const char* const tag_strs[SC_TAG_COUNT] = {
     [SC_TAG_WIFI]               = "[sc-wifi]",
     [SC_TAG_SPOT_CHECK]         = "[sc-spot-check]",
     [SC_TAG_MFLT_INTRFC]        = "[sc-mflt-intrfc]",
+    [SC_TAG_MFLT_PORT]          = "[sc-mflt-port]",
 };
 
 #endif

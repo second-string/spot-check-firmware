@@ -306,6 +306,7 @@ static BaseType_t cli_command_api(char *write_buffer, size_t write_buffer_size, 
         }
 
         memcpy(write_buffer, response_data, response_data_size);
+    } else if (endpoint_len == 5 && strncmp(endpoint, "close", endpoint_len) == 0) {
     } else {
         const char *const endpoints_with_query_params[] = {
             "conditions",
@@ -770,12 +771,12 @@ BaseType_t cli_command_memfault(char *write_buffer, size_t write_buffer_size, co
     if (action_len == 6 && strncmp(action, "assert", action_len) == 0) {
         MEMFAULT_ASSERT(0);
     } else if (action_len == 6 && strncmp(action, "upload", action_len) == 0) {
-        memfault_interface_post_data();
-    } else if (action_len == 8 && strncmp(action, "testcore", action_len) == 0) {
-        // note: this shouldn't be necessary if memfault setup is done. It dumps to flash and verifies that is saved
-        // correctly to the partition, which is redundant if we're already running asserts and uploading in real error
-        // situations
-        memfault_interface_test_coredump_memory();
+        bool success = memfault_interface_post_data();
+        if (success) {
+            strcpy(write_buffer, "Successfully uploaded heartbeat/coredump data to memfault");
+        } else {
+            strcpy(write_buffer, "Error uploading heatbeat/coredump data to memfault");
+        }
     } else {
         strcpy(write_buffer, "Unknown mflt command");
     }
@@ -825,8 +826,7 @@ void cli_command_register_all() {
         .pcCommand = "api",
         .pcHelpString =
             "api:\n\timg <tide|swell>: download and save image to flash\n\t<endpoint>: send request "
-            "to "
-            "API endpoint with base URL set in menuconfig",
+            "to API endpoint with base URL set in menuconfig\n\tclose: close the http client",
         .pxCommandInterpreter        = cli_command_api,
         .cExpectedNumberOfParameters = -1,
     };
@@ -906,7 +906,7 @@ void cli_command_register_all() {
         .pcCommand = "mflt",
         .pcHelpString =
             "mflt:\n\tassert: force a memfault crash and dump collection\n\theartbeat: posts any available data to "
-            "memfault server\n\ttestcore: test coredump memory",
+            "memfault server",
         .pxCommandInterpreter        = cli_command_memfault,
         .cExpectedNumberOfParameters = -1,
     };
