@@ -413,7 +413,10 @@ static void scheduler_task(void *args) {
             // TODO :: right now we have to mark all lines as dirty even every minute for time updates, because the
             // screen gray fade is so bad. This shouldn't be the case, we should be able to add our if-check back in
             // here that allows us to only do full dirty mark on non-time render updates
-            screen_img_handler_mark_all_lines_dirty();
+            if (update_bits & ~UPDATE_TIME_BIT) {
+                screen_img_handler_mark_all_lines_dirty();
+            }
+
             screen_img_handler_render(__func__, __LINE__);
         }
     }
