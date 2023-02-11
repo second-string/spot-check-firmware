@@ -9,10 +9,17 @@ set(MEMFAULT_FIRMWARE_SDK ~/Developer/memfault-firmware-sdk)
 include(${MEMFAULT_FIRMWARE_SDK}/ports/esp_idf/memfault.cmake)
 
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
-project(spot-check-embedded)
+project(spot-check-firmware)
 
 add_custom_command(TARGET ${CMAKE_PROJECT_NAME}.elf
   POST_BUILD
   COMMAND
   python3 ${MEMFAULT_FIRMWARE_SDK}/scripts/fw_build_id.py ${CMAKE_PROJECT_NAME}.elf)
+
+
+set(SYMBOL_FILE_DIR ${CMAKE_BINARY_DIR}/memfault_elfs)
+
+add_custom_command(TARGET ${PROJECT_NAME}.elf POST_BUILD
+    COMMAND shasum  -a 256 ${PROJECT_NAME}.elf | head -c 8 | xargs -I {} ${CMAKE_COMMAND} -E copy ${PROJECT_NAME}.elf ${SYMBOL_FILE_DIR}/${PROJECT_NAME}-{}.elf
+    COMMAND ${CMAKE_COMMAND} -E echo "Preserving elf in ${SYMBOL_FILE_DIR}")
 
