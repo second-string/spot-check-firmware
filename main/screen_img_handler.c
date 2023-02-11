@@ -5,7 +5,7 @@
 
 #include "esp_partition.h"
 #include "esp_sntp.h"
-#include "esp_spi_flash.h"
+#include "spi_flash_mmap.h"
 
 #include "constants.h"
 #include "display.h"

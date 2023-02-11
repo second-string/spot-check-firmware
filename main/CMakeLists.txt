@@ -29,3 +29,9 @@ idf_component_register(
                     INCLUDE_DIRS   "include"
                                    ${MEMFAULT_FIRMWARE_SDK}/ports/include
                     EMBED_TXTFILES ${project_dir}/server_certs/ca_cert.pem)
+
+# These are included in default idf flags but include for any future changes
+target_compile_options(${COMPONENT_LIB} PRIVATE -Werror -Wall -Wextra)
+
+# Manually include these as errors because idf defaults to '-Wno-error'ing them and there's no way to remove or override them. Last flag wins in compilation call so these are respected since they're appended last
+target_compile_options(${COMPONENT_LIB} PRIVATE -Werror=unused-function -Werror=unused-variable -Werror=deprecated-declarations -Werror=unused-but-set-variable)

@@ -4,8 +4,6 @@ cmake_minimum_required(VERSION 3.5)
 
 set(PROJECT_VER "0.0.8")
 
-# TODO :: figure this out
-# target_compile_options("${COMPONENT_LIB}" PUBLIC -Wall)
 
 set(MEMFAULT_FIRMWARE_SDK ~/Developer/memfault-firmware-sdk)
 include(${MEMFAULT_FIRMWARE_SDK}/ports/esp_idf/memfault.cmake)
