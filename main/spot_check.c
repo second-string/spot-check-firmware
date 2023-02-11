@@ -1,5 +1,7 @@
 #include <string.h>
 
+#include "memfault/panics/assert.h"
+
 #include "constants.h"
 #include "display.h"
 #include "http_client.h"
@@ -375,7 +377,7 @@ void spot_check_clear_conditions(bool clear_temperature, bool clear_wind, bool c
                            CONDITIONS_TIDE_DRAW_Y_PX - (CONDITIONS_TEMPERATURE_DRAW_Y_PX - font_height_px) + 10);
     } else {
         log_printf(LOG_LEVEL_ERROR, "CLEARINING INDIVIDUAL CONDITION LINES NOT YET SUPPORTED");
-        configASSERT(0);
+        MEMFAULT_ASSERT(0);
     }
 }
 

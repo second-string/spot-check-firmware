@@ -1,5 +1,6 @@
 #include "driver/gpio.h"
 #include "freertos/FreeRTOS.h"
+#include "memfault/panics/assert.h"
 
 #include "constants.h"
 #include "gpio.h"
@@ -56,7 +57,7 @@ static void button_timer_expired_callback(void *timer_args) {
         }
     } else {
         // Timer should never be running unless we're actively debouncing
-        configASSERT(0);
+        MEMFAULT_ASSERT(0);
     }
 }
 

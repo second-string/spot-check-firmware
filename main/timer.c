@@ -1,6 +1,7 @@
 #include "constants.h"
 
 #include "freeRTOS/FreeRTOS.h"
+#include "memfault/panics/assert.h"
 
 #include "constants.h"
 #include "log.h"
@@ -23,7 +24,7 @@ timer_info_handle timer_local_init(char        *timer_name,
                                    void        *timer_expired_callback,
                                    void        *callback_args,
                                    unsigned int timeout_milliseconds) {
-    configASSERT(next_timer_info_idx < sizeof(timer_infos) / sizeof(timer_info_t));
+    MEMFAULT_ASSERT(next_timer_info_idx < sizeof(timer_infos) / sizeof(timer_info_t));
 
     timer_info_t *next_info = &timer_infos[next_timer_info_idx];
     next_timer_info_idx++;

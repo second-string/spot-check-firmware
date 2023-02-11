@@ -1,5 +1,6 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
+#include "memfault/panics/assert.h"
 
 #include "constants.h"
 #include "log.h"
@@ -34,7 +35,7 @@ void sleep_handler_block_until_system_idle() {
  */
 void sleep_handler_set_busy(uint32_t system_idle_bitmask) {
     // Make sure we're just passing in a single bitmask macro
-    configASSERT((system_idle_bitmask & (system_idle_bitmask - 1)) == 0);
+    MEMFAULT_ASSERT((system_idle_bitmask & (system_idle_bitmask - 1)) == 0);
 
     xEventGroupClearBits(system_idle_event_group, system_idle_bitmask);
 }
@@ -45,7 +46,7 @@ void sleep_handler_set_busy(uint32_t system_idle_bitmask) {
  */
 void sleep_handler_set_idle(uint32_t system_idle_bitmask) {
     // Make sure we're just passing in a single bitmask macro
-    configASSERT((system_idle_bitmask & (system_idle_bitmask - 1)) == 0);
+    MEMFAULT_ASSERT((system_idle_bitmask & (system_idle_bitmask - 1)) == 0);
 
     xEventGroupSetBits(system_idle_event_group, system_idle_bitmask);
 }

@@ -1,4 +1,5 @@
 #include "esp_sntp.h"
+#include "memfault/panics/assert.h"
 
 #include "constants.h"
 #include "log.h"
@@ -91,7 +92,7 @@ void sntp_time_status_str(char *out_str) {
             strcpy(out_str, "completed");
             break;
         default:
-            configASSERT(0);
+            MEMFAULT_ASSERT(0);
     }
 }
 

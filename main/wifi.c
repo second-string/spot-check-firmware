@@ -8,6 +8,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
 #include "freertos/task.h"
+#include "memfault/panics/assert.h"
 
 #include "lwip/err.h"
 #include "lwip/sys.h"
@@ -154,7 +155,7 @@ void wifi_start_sta() {
 
 void wifi_init(void *event_handler) {
     wifi_event_group = xEventGroupCreate();
-    configASSERT(wifi_event_group);
+    MEMFAULT_ASSERT(wifi_event_group);
 
     ESP_ERROR_CHECK(esp_netif_init());
 

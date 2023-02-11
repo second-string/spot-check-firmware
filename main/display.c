@@ -1,6 +1,8 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 
+#include "memfault/panics/assert.h"
+
 #include "constants.h"
 #include "display.h"
 #include "epd_driver.h"
@@ -28,7 +30,7 @@ static uint32_t            display_width;
 static SemaphoreHandle_t   render_lock;
 
 static enum EpdFontFlags display_get_epd_font_flags_enum(display_font_align_t alignment) {
-    configASSERT(alignment < DISPLAY_FONT_ALIGN_COUNT);
+    MEMFAULT_ASSERT(alignment < DISPLAY_FONT_ALIGN_COUNT);
 
     switch (alignment) {
         case DISPLAY_FONT_ALIGN_LEFT:
@@ -44,7 +46,7 @@ static enum EpdFontFlags display_get_epd_font_flags_enum(display_font_align_t al
 }
 
 static const EpdFont *display_get_epd_font_enum(display_font_size_t size) {
-    configASSERT(size < DISPLAY_FONT_SIZE_COUNT);
+    MEMFAULT_ASSERT(size < DISPLAY_FONT_SIZE_COUNT);
 
     switch (size) {
         case DISPLAY_FONT_SIZE_SMALL:
@@ -62,7 +64,7 @@ static const EpdFont *display_get_epd_font_enum(display_font_size_t size) {
 }
 
 static char *display_get_epd_font_flags_enum_string(display_font_align_t alignment) {
-    configASSERT(alignment < DISPLAY_FONT_ALIGN_COUNT);
+    MEMFAULT_ASSERT(alignment < DISPLAY_FONT_ALIGN_COUNT);
 
     switch (alignment) {
         case DISPLAY_FONT_ALIGN_LEFT:
@@ -77,7 +79,7 @@ static char *display_get_epd_font_flags_enum_string(display_font_align_t alignme
 }
 
 static const char *display_get_epd_font_enum_string(display_font_size_t size) {
-    configASSERT(size < DISPLAY_FONT_SIZE_COUNT);
+    MEMFAULT_ASSERT(size < DISPLAY_FONT_SIZE_COUNT);
 
     switch (size) {
         case DISPLAY_FONT_SIZE_SMALL:
@@ -137,7 +139,7 @@ void display_init() {
 }
 
 void display_start() {
-    configASSERT(hl.front_fb && hl.back_fb);
+    MEMFAULT_ASSERT(hl.front_fb && hl.back_fb);
 
     //  We need at least 3 because there is no memory of what is displayed on screen from last run, so the diffing
     //  internal to epdiy won't run to help the  clearing process.
@@ -177,8 +179,8 @@ void display_clear_area(uint32_t x, uint32_t y, uint32_t width, uint32_t height)
     }
 
     // Limit these bounds to be w/in the framebuffer, epdiy will happily buffer overflow it
-    configASSERT(x + width <= ED060SC4_WIDTH_PX);
-    configASSERT(y + height <= ED060SC4_HEIGHT_PX);
+    MEMFAULT_ASSERT(x + width <= ED060SC4_WIDTH_PX);
+    MEMFAULT_ASSERT(y + height <= ED060SC4_HEIGHT_PX);
 
     EpdRect rect = {
         .x      = x,
@@ -218,7 +220,7 @@ void display_clear_area(uint32_t x, uint32_t y, uint32_t width, uint32_t height)
 }
 
 void display_render_splash_screen(char *fw_version) {
-    configASSERT(hl.front_fb && hl.back_fb);
+    MEMFAULT_ASSERT(hl.front_fb && hl.back_fb);
 
     const uint8_t version_str_len = 50;
     char          version_str[version_str_len];
@@ -226,7 +228,7 @@ void display_render_splash_screen(char *fw_version) {
     char          fw_version_str[25];
     sprintf(fw_version_str, "FW: %s", fw_version);
 
-    configASSERT(strlen(hw_version_str) + strlen(fw_version_str) < version_str_len);
+    MEMFAULT_ASSERT(strlen(hw_version_str) + strlen(fw_version_str) < version_str_len);
     sprintf(version_str, "%s    %s", hw_version_str, fw_version_str);
 
     display_draw_text("Spot Check", ED060SC4_WIDTH_PX / 2, 300, DISPLAY_FONT_SIZE_MEDIUM, DISPLAY_FONT_ALIGN_CENTER);
@@ -250,8 +252,8 @@ void display_draw_text(char                *text,
                        uint32_t             y_coord,
                        display_font_size_t  size,
                        display_font_align_t alignment) {
-    configASSERT(x_coord < ED060SC4_WIDTH_PX);
-    configASSERT(y_coord < ED060SC4_HEIGHT_PX);
+    MEMFAULT_ASSERT(x_coord < ED060SC4_WIDTH_PX);
+    MEMFAULT_ASSERT(y_coord < ED060SC4_HEIGHT_PX);
 
     int x = x_coord;
     int y = y_coord;
@@ -277,8 +279,8 @@ void display_invert_text(char                *text,
                          uint32_t             y_coord,
                          display_font_size_t  size,
                          display_font_align_t alignment) {
-    configASSERT(x_coord < ED060SC4_WIDTH_PX);
-    configASSERT(y_coord < ED060SC4_HEIGHT_PX);
+    MEMFAULT_ASSERT(x_coord < ED060SC4_WIDTH_PX);
+    MEMFAULT_ASSERT(y_coord < ED060SC4_HEIGHT_PX);
 
     int x = x_coord;
     int y = y_coord;
@@ -312,8 +314,8 @@ void display_draw_image(uint8_t *image_buffer,
                         uint32_t screen_x,
                         uint32_t screen_y) {
     // Limit these bounds to be w/in the framebuffer, epdiy will happily buffer overflow it
-    configASSERT(screen_x + width_px <= ED060SC4_WIDTH_PX);
-    configASSERT(screen_y + height_px <= ED060SC4_HEIGHT_PX);
+    MEMFAULT_ASSERT(screen_x + width_px <= ED060SC4_WIDTH_PX);
+    MEMFAULT_ASSERT(screen_y + height_px <= ED060SC4_HEIGHT_PX);
 
     uint8_t *fb   = epd_hl_get_framebuffer(&hl);
     EpdRect  rect = {
@@ -329,8 +331,8 @@ void display_draw_image(uint8_t *image_buffer,
 
 void display_draw_rect(uint32_t x, uint32_t y, uint32_t width_px, uint32_t height_px) {
     // Limit these bounds to be w/in the framebuffer, epdiy will happily buffer overflow it
-    configASSERT(x + width_px <= ED060SC4_WIDTH_PX);
-    configASSERT(y + height_px <= ED060SC4_HEIGHT_PX);
+    MEMFAULT_ASSERT(x + width_px <= ED060SC4_WIDTH_PX);
+    MEMFAULT_ASSERT(y + height_px <= ED060SC4_HEIGHT_PX);
 
     EpdRect rect = {
         .x      = x,

@@ -3,6 +3,7 @@
 
 #include "freertos/FreeRTOS.h"
 #include "log.h"
+#include "memfault/panics/assert.h"
 #include "nvs_flash.h"
 
 #include "constants.h"
@@ -41,7 +42,7 @@ void nvs_init() {
 
 bool nvs_get_uint32(char *key, uint32_t *val) {
     bool retval = false;
-    configASSERT(handle);
+    MEMFAULT_ASSERT(handle);
 
     esp_err_t err = nvs_get_u32(handle, key, val);
     switch (err) {
@@ -61,7 +62,7 @@ bool nvs_get_uint32(char *key, uint32_t *val) {
 
 bool nvs_set_uint32(char *key, uint32_t val) {
     bool retval = false;
-    configASSERT(handle);
+    MEMFAULT_ASSERT(handle);
 
     esp_err_t err = nvs_set_u32(handle, key, val);
     if (err == ESP_OK) {

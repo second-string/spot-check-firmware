@@ -1,7 +1,6 @@
-#include "constants.h"
-
 #include "log.h"
 #include "mdns.h"
+#include "memfault/panics/assert.h"
 
 #include "constants.h"
 #include "mdns_local.h"
@@ -13,7 +12,7 @@ static char *hostname = "spot-check";
 static bool mdns_advertising = false;
 
 void mdns_local_init() {
-    configASSERT(!mdns_advertising);
+    MEMFAULT_ASSERT(!mdns_advertising);
 
     // initialize mDNS service
     ESP_ERROR_CHECK(mdns_init());

@@ -1,6 +1,8 @@
 #include <string.h>
+
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
+#include "memfault/panics/assert.h"
 
 #include "constants.h"
 #include "http_client.h"
@@ -54,7 +56,7 @@ esp_err_t http_event_handler(esp_http_client_event_t *event) {
 
 void http_client_init() {
     request_lock = xSemaphoreCreateMutex();
-    configASSERT(request_lock);
+    MEMFAULT_ASSERT(request_lock);
 }
 
 // Caller passes in endpoint (tides/swell) the values for the 2 query params,
@@ -104,8 +106,8 @@ request http_client_build_request(char              *endpoint,
  * in.
  */
 bool http_client_perform_request(request *request_obj, esp_http_client_handle_t *client) {
-    configASSERT(client);
-    configASSERT(request_obj);
+    MEMFAULT_ASSERT(client);
+    MEMFAULT_ASSERT(request_obj);
 
     if (!wifi_is_connected_to_network()) {
         log_printf(LOG_LEVEL_INFO, "Attempted to make GET request, not connected to any wifi network yet so bailing");
@@ -283,8 +285,8 @@ int http_client_perform_post(request                  *request_obj,
  * Returns success, content length returned through last arg.
  */
 static bool http_client_check_response(esp_http_client_handle_t *client, int *content_length) {
-    configASSERT(client);
-    configASSERT(content_length);
+    MEMFAULT_ASSERT(client);
+    MEMFAULT_ASSERT(content_length);
 
     bool success = false;
 
@@ -326,9 +328,9 @@ static bool http_client_check_response(esp_http_client_handle_t *client, int *co
 esp_err_t http_client_read_response_to_buffer(esp_http_client_handle_t *client,
                                               char                    **response_data,
                                               size_t                   *response_data_size) {
-    configASSERT(client);
-    configASSERT(response_data);
-    configASSERT(response_data_size);
+    MEMFAULT_ASSERT(client);
+    MEMFAULT_ASSERT(response_data);
+    MEMFAULT_ASSERT(response_data_size);
     esp_err_t err = ESP_FAIL;
 
     size_t bytes_received = 0;
@@ -391,8 +393,8 @@ esp_err_t http_client_read_response_to_buffer(esp_http_client_handle_t *client,
 int http_client_read_response_to_flash(esp_http_client_handle_t *client,
                                        esp_partition_t          *partition,
                                        uint32_t                  offset_into_partition) {
-    configASSERT(client);
-    configASSERT(partition);
+    MEMFAULT_ASSERT(client);
+    MEMFAULT_ASSERT(partition);
 
     int  content_length = 0;
     bool success        = http_client_check_response(client, &content_length);

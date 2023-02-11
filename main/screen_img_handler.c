@@ -5,6 +5,7 @@
 
 #include "esp_partition.h"
 #include "esp_sntp.h"
+#include "memfault/panics/assert.h"
 #include "spi_flash_mmap.h"
 
 #include "constants.h"
@@ -54,7 +55,7 @@ static void screen_img_handler_get_metadata(screen_img_t screen_img, screen_img_
             metadata->endpoint              = "swell_chart";
             break;
         default:
-            configASSERT(0);
+            MEMFAULT_ASSERT(0);
     }
 
     bool success = nvs_get_uint32(metadata->screen_img_size_key, &metadata->screen_img_size);
