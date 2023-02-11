@@ -167,6 +167,18 @@ bool http_client_perform_request(request *request_obj, esp_http_client_handle_t 
         if (err != ESP_OK) {
             log_printf(LOG_LEVEL_ERROR, "Error opening http client, error: %s", esp_err_to_name(err));
 
+            // In looking at internals of esp_http_client_open, as long as we're not using client in async mode, this
+            // error is 1 to 1 with the socket < 0 log line from a failed call to esp_transport_connect. Internally all
+            // it does is call the transport close function of the tcp/ssl transport struct internal to the client
+            // handle. There are no negative repercussions from doing this extra times even when this is a normal
+            // cleanup scenario. Hopefully this is all that's required to get rid of the situation where we get 'stuck'
+            // with no open sockets, aka the tcp/ssl transport can't open a connection. We call close instead of
+            // cleanup, and before the cleanup call, because cleanup does a ton of freeing of all of the internal data
+            // of the client handle so nothing should be accessed after that call.
+            if (err == ESP_ERR_HTTP_CONNECT) {
+                esp_http_client_close(*client);
+            }
+
             // clean up and return no space allocated
             err = esp_http_client_cleanup(*client);
             if (err != ESP_OK) {
@@ -184,9 +196,10 @@ bool http_client_perform_request(request *request_obj, esp_http_client_handle_t 
     return req_start_success;
 }
 
-// TODO :: refactor the perform functions to be one func with arg for post or get. Almost identical now, just have to
-// resolve the small differences in implementation of the URL build w/ query params and setting client values. Will need
-// to include a call to esp_http_client_write for the post case
+// TODO :: refactor the perform functions to be one func with arg for post or get. Almost identical now, just have
+// to resolve the small differences in implementation of the URL build w/ query params and setting client values.
+// Will need to include a call to esp_http_client_write for the post case
+// Update: I think the differences have been eliminated in request building logic. Just need to bundle into one func
 int http_client_perform_post(request                  *request_obj,
                              char                     *post_data,
                              size_t                    post_data_size,
@@ -231,6 +244,11 @@ int http_client_perform_post(request                  *request_obj,
         esp_err_t err = esp_http_client_open(*client, post_data_size);
         if (err != ESP_OK) {
             log_printf(LOG_LEVEL_ERROR, "Error performing POST, error: %s", esp_err_to_name(err));
+
+            // See explanation comment for extra close call here in http_client_perform_request
+            if (err == ESP_ERR_HTTP_CONNECT) {
+                esp_http_client_close(*client);
+            }
 
             // always clean up on failure
             err = esp_http_client_cleanup(*client);
