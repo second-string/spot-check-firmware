@@ -771,12 +771,8 @@ BaseType_t cli_command_memfault(char *write_buffer, size_t write_buffer_size, co
     if (action_len == 6 && strncmp(action, "assert", action_len) == 0) {
         MEMFAULT_ASSERT(0);
     } else if (action_len == 6 && strncmp(action, "upload", action_len) == 0) {
-        bool success = memfault_interface_post_data();
-        if (success) {
-            strcpy(write_buffer, "Successfully uploaded heartbeat/coredump data to memfault");
-        } else {
-            strcpy(write_buffer, "Error uploading heatbeat/coredump data to memfault");
-        }
+        scheduler_trigger_mflt_upload();
+        strcpy(write_buffer, "Triggered memfault upload in scheduler");
     } else {
         strcpy(write_buffer, "Unknown mflt command");
     }

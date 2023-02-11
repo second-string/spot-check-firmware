@@ -11,6 +11,7 @@
 #include "gpio.h"
 #include "http_client.h"
 #include "log.h"
+#include "memfault_interface.h"
 #include "nvs.h"
 #include "ota_task.h"
 #include "screen_img_handler.h"
@@ -22,11 +23,12 @@
 
 #define TAG SC_TAG_SCHEDULER
 
-#define NUM_DIFFERENTIAL_UPDATES 2
+#define NUM_DIFFERENTIAL_UPDATES 3
 #define NUM_DISCRETE_UPDATES 7
 
 #define OTA_CHECK_INTERVAL_SECONDS (CONFIG_OTA_CHECK_INTERVAL_HOURS * MINS_PER_HOUR * SECS_PER_MIN)
 #define NETWORK_CHECK_INTERVAL_SECONDS (30)
+#define MFLT_UPLOAD_INTERVAL_SECONDS (30 * SECS_PER_MIN)
 
 #define UPDATE_CONDITIONS_BIT (1 << 0)
 #define UPDATE_TIDE_CHART_BIT (1 << 1)
@@ -35,6 +37,8 @@
 #define UPDATE_SPOT_NAME_BIT (1 << 4)
 #define CHECK_OTA_BIT (1 << 5)
 #define CHECK_NETWORK_BIT (1 << 6)
+#define SEND_MFLT_DATA_BIT (1 << 7)
+
 #define BITS_NEEDING_RENDER \
     (UPDATE_CONDITIONS_BIT | UPDATE_TIDE_CHART_BIT | UPDATE_SWELL_CHART_BIT | UPDATE_TIME_BIT | UPDATE_SPOT_NAME_BIT)
 
@@ -59,7 +63,6 @@ typedef struct {
     bool force_on_transition_to_online;
 } discrete_update_t;
 
-static void scheduler_trigger_ota_check();
 static void scheduler_trigger_network_check();
 
 static TaskHandle_t          scheduler_task_handle;
@@ -85,6 +88,13 @@ static differential_update_t differential_updates[NUM_DIFFERENTIAL_UPDATES] = {
         .update_interval_secs = NETWORK_CHECK_INTERVAL_SECONDS,
         .active               = false,
         .execute              = scheduler_trigger_network_check,
+    },
+    {
+        .name                 = "mflt_upload",
+        .force_next_update    = false,
+        .update_interval_secs = MFLT_UPLOAD_INTERVAL_SECONDS,
+        .active               = false,
+        .execute              = scheduler_trigger_mflt_upload,
     },
 };
 
@@ -303,6 +313,16 @@ static void scheduler_task(void *args) {
             sleep_handler_set_idle(SYSTEM_IDLE_SWELL_CHART_BIT);
         }
 
+        // Note: MUST come before OTA bit right now. Special case timer on boot where we delay first memfault and ota
+        // run triggers both ota task and memfault upload simultaneously. If order is reversed, async ota task will be
+        // running http reqs and memfault upload http req will fail. Will be fixed with refactor / improvement of http
+        // req queueing
+        if (update_bits & SEND_MFLT_DATA_BIT) {
+            // TODO :: brutally blocking right now for big coredump uploads
+            // Don't care about return value, all error-handling internal
+            (void)memfault_interface_post_data();
+        }
+
         if (update_bits & CHECK_OTA_BIT) {
             // Just kicks off the task non-blocking so this won't actually disrupt anything with rest of conditions
             // update loop
@@ -426,10 +446,6 @@ static void scheduler_trigger_network_check() {
     xTaskNotify(scheduler_task_handle, CHECK_NETWORK_BIT, eSetBits);
 }
 
-static void scheduler_trigger_ota_check() {
-    xTaskNotify(scheduler_task_handle, CHECK_OTA_BIT, eSetBits);
-}
-
 void scheduler_trigger_time_update() {
     xTaskNotify(scheduler_task_handle, UPDATE_TIME_BIT, eSetBits);
 }
@@ -452,6 +468,14 @@ void scheduler_trigger_swell_chart_update() {
 
 void scheduler_trigger_both_charts_update() {
     xTaskNotify(scheduler_task_handle, UPDATE_SWELL_CHART_BIT | UPDATE_TIDE_CHART_BIT, eSetBits);
+}
+
+void scheduler_trigger_ota_check() {
+    xTaskNotify(scheduler_task_handle, CHECK_OTA_BIT, eSetBits);
+}
+
+void scheduler_trigger_mflt_upload() {
+    xTaskNotify(scheduler_task_handle, SEND_MFLT_DATA_BIT, eSetBits);
 }
 
 scheduler_mode_t scheduler_get_mode() {

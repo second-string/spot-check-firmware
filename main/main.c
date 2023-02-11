@@ -49,6 +49,19 @@
 static uart_handle_t cli_uart_handle;
 static i2c_handle_t  bq24196_i2c_handle;
 
+/*
+ * Trigger mflt then wait 2 seconds to make sure scheduler begins executing mflt upload. Then trigger ota check so it
+ * has to wait until scheduler loops back around to process the new event bit, otherwise the un-locked ota http reqs
+ * will break the mflt one. This is a temporary hack until the http req system is refactored.
+ */
+static void special_case_boot_delayed_callback() {
+    log_printf(LOG_LEVEL_DEBUG, "Starting special case boot delay callback");
+    scheduler_trigger_mflt_upload();
+    vTaskDelay(pdMS_TO_TICKS(2000));
+    scheduler_trigger_ota_check();
+    log_printf(LOG_LEVEL_DEBUG, "Exiting special case boot delay callback");
+}
+
 static void app_init() {
     // ESP_ERROR_CHECK(esp_task_wdt_init());
 
@@ -218,34 +231,37 @@ void app_main(void) {
                    "Boot successful, showing time + last saved conditions / charts and kicked off conditions task");
     } while (0);
 
-    // Delay a few minutes before we run the on-boot OTA check. This is because the esp ota version header check for the
-    // server image uses its own internal http_client, so we can't force it to obey our http_client module request lock.
-    // For a normal boot, waiting a few minutes ensures no further network connections will be running. There's still
-    // the risk of edge cases for a late internet connection or provisioning that would force http errors from reqs
-    // stommping each other, so this is just a dirtyish fix for now.
-    uint8_t       initial_ota_delay_min = 1;
-    TimerHandle_t initial_ota_timer     = xTimerCreate("initial-ota-timer",
-                                                   pdMS_TO_TICKS(initial_ota_delay_min * SECS_PER_MIN * MS_PER_SEC),
-                                                   pdFALSE,
-                                                   NULL,
-                                                   ota_task_start);
-    if (initial_ota_timer == NULL) {
+    // Delay a few minutes before we run the on-boot delayed actions. This is because both mflt's http client and the
+    // esp ota version header check for the server image use their own internal http_client, so we can't force them to
+    // obey our http_client module request lock. For a normal boot, waiting a minute or two ensures no further network
+    // connections will be running. There's still the risk of edge cases for a late internet connection or provisioning
+    // that would force http errors from reqs stommping each other, so this is just a dirtyish fix for now.
+    uint8_t       initial_boot_delay_min = 1;
+    TimerHandle_t initial_boot_delay_timer =
+        xTimerCreate("initial-boot-delay-timer",
+                     pdMS_TO_TICKS(initial_boot_delay_min * SECS_PER_MIN * MS_PER_SEC),
+                     pdFALSE,
+                     NULL,
+                     special_case_boot_delayed_callback);
+    if (initial_boot_delay_timer == NULL) {
         log_printf(LOG_LEVEL_ERROR,
-                   "Initial OTA timer kickoff could not be created!! OTA will eventually start checking when scheduler "
+                   "Initial boot delay timer kickoff could not be created!! MFLT and OTA will eventually upload / "
+                   "check when scheduler "
                    "in online mode, but this is a very bad sign about the memory levels!");
     } else {
-        BaseType_t timer_success = xTimerStart(initial_ota_timer, 0);
+        BaseType_t timer_success = xTimerStart(initial_boot_delay_timer, 0);
         if (timer_success) {
             log_printf(LOG_LEVEL_INFO,
-                       "Started timer to run initial boot OTA after %u minutes (%ums)",
-                       initial_ota_delay_min,
-                       initial_ota_delay_min * SECS_PER_MIN * MS_PER_SEC);
+                       "Started timer to run initial boot delayed actions after %u minutes (%ums)",
+                       initial_boot_delay_min,
+                       initial_boot_delay_min * SECS_PER_MIN * MS_PER_SEC);
         } else {
-            log_printf(LOG_LEVEL_ERROR,
-                       "Failed to start initial OTA timer! OTA will eventually start checking when scheduler "
-                       "in online mode, but this is a very bad sign about the memory levels",
-                       initial_ota_delay_min,
-                       initial_ota_delay_min * SECS_PER_MIN * MS_PER_SEC);
+            log_printf(
+                LOG_LEVEL_ERROR,
+                "Failed to start initial boot delay timer! MFLT & OTA will eventually start checking when scheduler "
+                "in online mode, but this is a very bad sign about the memory levels",
+                initial_boot_delay_min,
+                initial_boot_delay_min * SECS_PER_MIN * MS_PER_SEC);
         }
     }
 

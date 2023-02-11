@@ -15,6 +15,8 @@ void             scheduler_trigger_conditions_update();
 void             scheduler_trigger_tide_chart_update();
 void             scheduler_trigger_swell_chart_update();
 void             scheduler_trigger_both_charts_update();
+void             scheduler_trigger_ota_check();
+void             scheduler_trigger_mflt_upload();
 void             scheduler_block_until_system_idle();
 void             scheduler_set_busy(uint32_t system_idle_bitmask);
 void             scheduler_set_idle(uint32_t system_idle_bitmask);
