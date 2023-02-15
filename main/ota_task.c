@@ -62,6 +62,7 @@ static esp_err_t ota_validate_image_header(esp_app_desc_t *new_image_info, esp_a
     }
 
     log_printf(LOG_LEVEL_INFO, "Running firmware version: %s", current_image_info->version);
+    ESP_LOGI(TAG, "Server generic get_binary endpoint returned version: %s", new_image_info->version);
 
     int version_comparison =
         memcmp(new_image_info->version, current_image_info->version, sizeof(new_image_info->version));
