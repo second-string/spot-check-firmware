@@ -72,6 +72,9 @@ static esp_err_t ota_validate_image_header(esp_app_desc_t *new_image_info, esp_a
         log_printf(LOG_LEVEL_INFO,
                    "Current version greater than OTA image version (%s), something is wrong!!",
                    new_image_info->version);
+
+        // TODO :: return correct code when memcmp bug fixed!
+        // https://www.notion.so/ota-logic-is-broken-going-from-9-to-10-version-04a62d0c9089470bb90ebe7e25aecb15?pvs=4
         // return ESP_FAIL;
         return ESP_OK;
     } else if (version_comparison > 0) {
