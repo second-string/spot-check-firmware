@@ -10,7 +10,10 @@ typedef struct {
     char    tide_height[7];  // minus sign, two digits, decimal point, two digits, null
 } conditions_t;
 
-bool spot_check_download_and_save_conditions(conditions_t *new_conditions);
+char *spot_check_get_serial();
+char *spot_check_get_fw_version();
+char *spot_check_get_hw_version();
+bool  spot_check_download_and_save_conditions(conditions_t *new_conditions);
 
 void spot_check_clear_date(bool force_clear);
 bool spot_check_draw_date();

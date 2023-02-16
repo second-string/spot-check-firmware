@@ -1,5 +1,7 @@
 #include <string.h>
 
+#include "esp_app_desc.h"
+#include "esp_mac.h"
 #include "memfault/panics/assert.h"
 
 #include "constants.h"
@@ -29,10 +31,27 @@
     (250)  // Draw right in the middle of tide chart - since it only updates every 24hr the likelihood of it updating
            // and re-drawing while we're firmware update is super low
 
+#define NUM_BYTES_VERSION_STR (26)
+
 const char *const ota_start_text    = "Firmware update in progress, please do not unplug Spot Check device";
 const char *const ota_finished_text = "Firmware update successful! Rebooting...";
 
 static struct tm last_time_displayed = {0};
+static char      device_serial[20];
+static char      firmware_version[NUM_BYTES_VERSION_STR + 1];  // 5-8 bytes for version, 1 for dash, 16 msb of elf hash.
+static char      hw_version[10];                               // always less, hardcoded below in ifdefs
+
+char *spot_check_get_serial() {
+    return device_serial;
+}
+
+char *spot_check_get_fw_version() {
+    return firmware_version;
+}
+
+char *spot_check_get_hw_version() {
+    return hw_version;
+}
 
 /*
  * Returns success
@@ -44,8 +63,9 @@ bool spot_check_download_and_save_conditions(conditions_t *new_conditions) {
 
     spot_check_config *config = nvs_get_config();
     char               url_buf[strlen(URL_BASE) + 80];
-    query_param        params[3];
-    request            request = http_client_build_request("conditions", config, url_buf, params, 3);
+    uint8_t            num_params = 4;
+    query_param        params[num_params];
+    request            request = http_client_build_request("conditions", config, url_buf, params, num_params);
 
     char                    *server_response    = NULL;
     size_t                   response_data_size = 0;
@@ -533,4 +553,41 @@ void spot_check_init() {
     // Init last_time_display with epoch so date update logic always executes to start with
     time_t epoch = 0;
     memcpy(&last_time_displayed, localtime(&epoch), sizeof(struct tm));
+
+    uint8_t mac[6];
+    // Note: must use this mac-reading func, it's the base one that actually pulls values from EFUSE while others just
+    // check that copy in RAM
+
+    // Store device ID
+    esp_err_t err = esp_read_mac(mac, ESP_MAC_WIFI_STA);
+    if (err != ESP_OK) {
+        MEMFAULT_ASSERT(0);
+    }
+    snprintf(device_serial, 20, "%02x-%02x-%02x-%02x-%02x-%02x", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+
+    // Store firmware version
+    const esp_app_desc_t *app_desc = esp_app_get_description();
+
+    // Assuming min length of version is 5 (1.1.1) and max is 8 (11.11.11). Always take 8 chars / 4 bytes from elf sha
+    snprintf(firmware_version,
+             NUM_BYTES_VERSION_STR,
+             "%*.*s-%02x%02x%02x%02x",
+             5,
+             8,
+             app_desc->version,
+             app_desc->app_elf_sha256[0],
+             app_desc->app_elf_sha256[1],
+             app_desc->app_elf_sha256[2],
+             app_desc->app_elf_sha256[3]);
+
+    // Store HW ID
+#ifdef CONFIG_SPOT_CHECK_REV_3_1
+    sprintf(hw_version, "rev3.1");
+#elif defined(CONFIG_SPOT_CHECK_REV_2)
+    sprintf(hw_version, "rev2.0");
+#elif defined(CONFIG_ESP32_DEVBOARD)
+    sprintf(hw_version, "revDEV");
+#else
+#error Current HW rev specified in menuconfig is not supported in memfault config
+#endif
 }

@@ -62,7 +62,7 @@ static esp_err_t ota_validate_image_header(esp_app_desc_t *new_image_info, esp_a
     }
 
     log_printf(LOG_LEVEL_INFO, "Running firmware version: %s", current_image_info->version);
-    ESP_LOGI(TAG, "Server generic get_binary endpoint returned version: %s", new_image_info->version);
+    log_printf(LOG_LEVEL_INFO, "Server generic get_binary endpoint returned version: %s", new_image_info->version);
 
     int version_comparison =
         memcmp(new_image_info->version, current_image_info->version, sizeof(new_image_info->version));
@@ -91,8 +91,11 @@ static esp_err_t ota_validate_image_header(esp_app_desc_t *new_image_info, esp_a
 
 static bool check_forced_update(esp_app_desc_t *current_image_info, char *version_to_download) {
     // Send a request to our custom FW endpoint to determine if we need to force a downgrade
-    char post_data[60];
-    int  err = sprintf(post_data, "{\"current_version\": \"%s\"}", current_image_info->version);
+    char post_data[100];
+    int  err = sprintf(post_data,
+                      "{\"current_version\": \"%s\", \"device_id\": \"%s\"}",
+                      current_image_info->version,
+                      spot_check_get_fw_version());
     if (err < 0) {
         log_printf(LOG_LEVEL_ERROR, "Error sprintfing version string into version_info endpoint post body");
         return ESP_FAIL;

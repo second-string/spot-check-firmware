@@ -177,7 +177,7 @@ bool screen_img_handler_download_and_save(screen_img_t screen_img) {
     bool               success = true;
     char               url[80];
     spot_check_config *config     = nvs_get_config();
-    const uint8_t      num_params = 3;
+    const uint8_t      num_params = 4;
     query_param        params[num_params];
 
     request req = http_client_build_request(metadata.endpoint, config, url, params, num_params);

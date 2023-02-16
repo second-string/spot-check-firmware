@@ -30,77 +30,36 @@
 #include "esp_system.h"
 
 #include "log.h"
+#include "spot_check.h"
 
 #define TAG SC_TAG_MFLT_PORT
 
 #define NUM_BYTES_SHA (16)
-#define NUM_BYTES_VERSION_STR (26)
 
 // These are declared static global because memfault told me i had to
-static char mac_str[20];  // 6 bytes in mac so 12 ascii chars, 7 for the dashed in between, one for null term
-static char version_str[NUM_BYTES_VERSION_STR +
-                        1];  // 5-8 bytes for version, 1 for dash, 16 msb of elf hash. Extra for double digit versions
-static char hw_version_str[10];  // always less, hardcoded below in ifdefs
 
 void memfault_platform_get_device_info(sMemfaultDeviceInfo *info) {
     // IMPORTANT: All strings returned in info must be constant
     // or static as they will be used _after_ the function returns
-
-    const esp_app_desc_t *app_desc = esp_app_get_description();
-
-    // Note: must use this mac-reading func, it's the base one that actually pulls values from EFUSE while others just
-    // check that copy in RAM
-    uint8_t   mac[6];
-    esp_err_t err = esp_read_mac(mac, ESP_MAC_WIFI_STA);
-    if (err != ESP_OK) {
-        // for (int i = 0; i < 6; i++) {
-        //     mac[i] = 0xFF;
-        // }
-        MEMFAULT_ASSERT(0);
-    }
-
-    snprintf(mac_str, 20, "%02x-%02x-%02x-%02x-%02x-%02x", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
-
-    // Assuming min length of version is 5 (1.1.1) and max is 8 (11.11.11). Always take 8 chars / 4 bytes from elf sha
-    snprintf(version_str,
-             NUM_BYTES_VERSION_STR,
-             "%*.*s-%02x%02x%02x%02x",
-             5,
-             8,
-             app_desc->version,
-             app_desc->app_elf_sha256[0],
-             app_desc->app_elf_sha256[1],
-             app_desc->app_elf_sha256[2],
-             app_desc->app_elf_sha256[3]);
-
-#ifdef CONFIG_SPOT_CHECK_REV_3_1
-    sprintf(hw_version_str, "rev3.1");
-#elif defined(CONFIG_SPOT_CHECK_REV_2)
-    sprintf(hw_version_str, "rev2.0");
-#elif defined(CONFIG_ESP32_DEVBOARD)
-    sprintf(hw_version_str, "revDEV");
-#else
-#error Current HW rev specified in menuconfig is not supported in memfault config
-#endif
 
     // See https://mflt.io/version-nomenclature for more context
     *info = (sMemfaultDeviceInfo){
         // An ID that uniquely identifies the device in your fleet
         // (i.e serial number, mac addr, chip id, etc)
         // Regular expression defining valid device serials: ^[-a-zA-Z0-9_]+$
-        .device_serial = mac_str,
+        .device_serial = spot_check_get_serial(),
         // A name to represent the firmware running on the MCU.
         // (i.e "ble-fw", "main-fw", or a codename for your project)
         .software_type = "spot-check-fw",
         // The version of the "software_type" currently running.
         // "software_type" + "software_version" must uniquely represent
         // a single binary
-        .software_version = version_str,
+        .software_version = spot_check_get_fw_version(),
         // The revision of hardware for the device. This value must remain
         // the same for a unique device.
         // (i.e evt, dvt, pvt, or rev1, rev2, etc)
         // Regular expression defining valid hardware versions: ^[-a-zA-Z0-9_\.\+]+$
-        .hardware_version = hw_version_str,
+        .hardware_version = spot_check_get_hw_version(),
     };
 }
 

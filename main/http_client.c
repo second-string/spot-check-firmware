@@ -1,11 +1,13 @@
 #include <string.h>
 
+#include "esp_mac.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 #include "memfault/panics/assert.h"
 
 #include "constants.h"
 #include "http_client.h"
+#include "spot_check.h"
 #include "wifi.h"
 
 // Must included below constants.h where we overwite the define of LOG_LOCAL_LEVEL
@@ -59,9 +61,11 @@ void http_client_init() {
     MEMFAULT_ASSERT(request_lock);
 }
 
-// Caller passes in endpoint (tides/swell) the values for the 2 query params,
-// a pointer to a block of already-allocated memory for the base url + endpoint,
-// and a pointer to a block of already-allocated memory to hold the query params structs
+/*
+ * Caller passes in endpoint (tides/swell) the values for the 2 query params, a pointer to a block of already-allocated
+ * memory for the base url + endpoint, and a pointer to a block of already-allocated memory to hold the query params
+ * structs
+ */
 request http_client_build_request(char              *endpoint,
                                   spot_check_config *config,
                                   char              *url_buf,
@@ -71,11 +75,12 @@ request http_client_build_request(char              *endpoint,
     if (params && num_params > 0) {
         query_param temp_params[num_params];
         if (strcmp(endpoint, "conditions") == 0 || strcmp(endpoint, "screen_update") == 0 ||
-            strcmp(endpoint, "test_swell_chart.raw") == 0 || strcmp(endpoint, "test_tide_chart.raw") == 0 ||
             strcmp(endpoint, "swell_chart") == 0 || strcmp(endpoint, "tides_chart") == 0) {
-            temp_params[0] = (query_param){.key = "lat", .value = config->spot_lat};
-            temp_params[1] = (query_param){.key = "lon", .value = config->spot_lon};
-            temp_params[2] = (query_param){.key = "spot_id", .value = config->spot_uid};
+            MEMFAULT_ASSERT(num_params == 4);
+            temp_params[0] = (query_param){.key = "device_id", .value = spot_check_get_serial()};
+            temp_params[1] = (query_param){.key = "lat", .value = config->spot_lat};
+            temp_params[2] = (query_param){.key = "lon", .value = config->spot_lon};
+            temp_params[3] = (query_param){.key = "spot_id", .value = config->spot_uid};
         } else if (strcmp(endpoint, "tides") == 0 || strcmp(endpoint, "swell") == 0) {
             temp_params[0] = (query_param){.key = "days", .value = config->number_of_days};
             temp_params[1] = (query_param){.key = "spot_id", .value = config->spot_uid};
@@ -115,7 +120,7 @@ bool http_client_perform_request(request *request_obj, esp_http_client_handle_t 
     }
 
     // assume we won't have that many query params. Could calc this too
-    char req_url[strlen(request_obj->url) + 80];
+    char req_url[strlen(request_obj->url) + 256];
     strcpy(req_url, request_obj->url);
 
     if (request_obj->num_params > 0) {

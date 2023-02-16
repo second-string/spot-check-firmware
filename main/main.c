@@ -128,10 +128,7 @@ void app_main(void) {
 
     app_start();
 
-    const esp_partition_t *current_partition = esp_ota_get_running_partition();
-    esp_app_desc_t         current_image_info;
-    esp_ota_get_partition_description(current_partition, &current_image_info);
-    display_render_splash_screen(current_image_info.version);
+    display_render_splash_screen(spot_check_get_fw_version(), spot_check_get_hw_version());
 
     // Enable breakout at each connectivity check of boot
     do {

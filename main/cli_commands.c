@@ -271,8 +271,11 @@ static BaseType_t cli_command_api(char *write_buffer, size_t write_buffer_size, 
         screen_img_handler_download_and_save(screen_img);
         memset(write_buffer, 0x0, write_buffer_size);
     } else if (endpoint_len == 3 && strncmp(endpoint, "ota", endpoint_len) == 0) {
-        char post_data[60];
-        int  err = sprintf(post_data, "{\"current_version\": \"%s\"}", "0.0.7");
+        char post_data[100];
+        int  err = sprintf(post_data,
+                          "{\"current_version\": \"%s\", \"device_id\": \"%s\"}",
+                          spot_check_get_fw_version(),
+                          spot_check_get_serial());
         if (err < 0) {
             strcpy(write_buffer, "Error sprintfing version string into version_info endpoint post body");
             return pdFALSE;
@@ -330,11 +333,11 @@ static BaseType_t cli_command_api(char *write_buffer, size_t write_buffer_size, 
         char              *res           = NULL;
         size_t             bytes_alloced = 0;
         spot_check_config *config        = NULL;
-        query_param        params[3];
+        query_param        params[4];
         uint8_t            num_params = 0;
         if (include_params) {
             config     = nvs_get_config();
-            num_params = 3;
+            num_params = 4;
         }
 
         request req = http_client_build_request((char *)endpoint, config, url, params, num_params);

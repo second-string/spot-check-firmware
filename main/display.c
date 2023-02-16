@@ -219,17 +219,22 @@ void display_clear_area(uint32_t x, uint32_t y, uint32_t width, uint32_t height)
     log_printf(LOG_LEVEL_DEBUG, "Cleared %uw %uh rect at (%u, %u)", width, height, x, y);
 }
 
-void display_render_splash_screen(char *fw_version) {
+void display_render_splash_screen(char *fw_version, char *hw_version) {
     MEMFAULT_ASSERT(hl.front_fb && hl.back_fb);
 
-    const uint8_t version_str_len = 50;
-    char          version_str[version_str_len];
-    char         *hw_version_str = "HW: rev. 3.1";
-    char          fw_version_str[25];
+    const uint8_t fw_version_str_len   = 50;
+    const uint8_t hw_version_str_len   = 50;
+    const uint8_t full_version_str_len = fw_version_str_len + hw_version_str_len + 10;
+    char          fw_version_str[fw_version_str_len];
+    char          hw_version_str[hw_version_str_len];
+    char          full_version_str[full_version_str_len];
     sprintf(fw_version_str, "FW: %s", fw_version);
+    sprintf(hw_version_str, "HW: %s", hw_version);
 
-    MEMFAULT_ASSERT(strlen(hw_version_str) + strlen(fw_version_str) < version_str_len);
-    sprintf(version_str, "%s    %s", hw_version_str, fw_version_str);
+    MEMFAULT_ASSERT(strlen(fw_version_str) < fw_version_str_len);
+    MEMFAULT_ASSERT(strlen(hw_version_str) < hw_version_str_len);
+    MEMFAULT_ASSERT(strlen(fw_version_str) + strlen(hw_version_str) < full_version_str_len);
+    sprintf(full_version_str, "%s    %s", hw_version_str, fw_version_str);
 
     display_draw_text("Spot Check", ED060SC4_WIDTH_PX / 2, 300, DISPLAY_FONT_SIZE_MEDIUM, DISPLAY_FONT_ALIGN_CENTER);
     display_draw_text("Second String Studios",
@@ -237,7 +242,7 @@ void display_render_splash_screen(char *fw_version) {
                       epd_rotated_display_height() - 60,
                       DISPLAY_FONT_SIZE_SMALL,
                       DISPLAY_FONT_ALIGN_CENTER);
-    display_draw_text(version_str,
+    display_draw_text(full_version_str,
                       ED060SC4_WIDTH_PX / 2,
                       epd_rotated_display_height() - 30,
                       DISPLAY_FONT_SIZE_SMALL,
