@@ -155,7 +155,7 @@ bool http_client_perform_request(request *request_obj, esp_http_client_handle_t 
                    http_config.url,
                    http_config.port);
         *client = esp_http_client_init(&http_config);
-        if (!client) {
+        if (!(*client)) {
             log_printf(LOG_LEVEL_INFO, "Error initing http client, returning without sending request");
             req_start_success = false;
             break;
@@ -231,7 +231,7 @@ int http_client_perform_post(request                  *request_obj,
 
         log_printf(LOG_LEVEL_INFO, "Initing http client for post request...");
         *client = esp_http_client_init(&http_config);
-        if (!client) {
+        if (!(*client)) {
             req_start_success = false;
             log_printf(LOG_LEVEL_INFO, "Error initing http client, returning without sending request");
             break;
