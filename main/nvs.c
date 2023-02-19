@@ -16,10 +16,11 @@
 static nvs_handle_t handle = 0;
 
 // Allocate backing field buffers for our settings
-static char _spot_name[MAX_LENGTH_SPOT_NAME_PARAM + 1] = {0};
-static char _spot_uid[MAX_LENGTH_SPOT_UID_PARAM + 1]   = {0};
-static char _spot_lat[MAX_LENGTH_SPOT_LAT_PARAM + 1]   = {0};
-static char _spot_lon[MAX_LENGTH_SPOT_LON_PARAM + 1]   = {0};
+static char   _spot_name[MAX_LENGTH_SPOT_NAME_PARAM + 1] = {0};
+static char   _spot_uid[MAX_LENGTH_SPOT_UID_PARAM + 1]   = {0};
+static char   _spot_lat[MAX_LENGTH_SPOT_LAT_PARAM + 1]   = {0};
+static char   _spot_lon[MAX_LENGTH_SPOT_LON_PARAM + 1]   = {0};
+static int8_t _utc_offset                                = 0;
 
 static spot_check_config current_config;
 
@@ -43,6 +44,44 @@ bool nvs_get_uint32(char *key, uint32_t *val) {
     MEMFAULT_ASSERT(handle);
 
     esp_err_t err = nvs_get_u32(handle, key, val);
+    switch (err) {
+        case ESP_OK:
+            retval = true;
+            break;
+        case ESP_ERR_NVS_NOT_FOUND:
+            log_printf(LOG_LEVEL_INFO, "The NVS value for key '%s' is not initialized yet", key);
+            *val = 0;
+            break;
+        default:
+            log_printf(LOG_LEVEL_ERROR, "Error (%s) reading value for key '%s' from NVS\n", esp_err_to_name(err), key);
+    }
+
+    return retval;
+}
+
+bool nvs_set_uint8(char *key, int8_t val) {
+    bool retval = false;
+    MEMFAULT_ASSERT(handle);
+
+    esp_err_t err = nvs_set_i8(handle, key, val);
+    if (err == ESP_OK) {
+        retval = true;
+    } else {
+        log_printf(LOG_LEVEL_ERROR,
+                   "Error (%s) setting int8 value '%u' for key '%s' in NVS",
+                   esp_err_to_name(err),
+                   val,
+                   key);
+    }
+
+    return retval;
+}
+
+bool nvs_get_int8(char *key, int8_t *val) {
+    bool retval = false;
+    MEMFAULT_ASSERT(handle);
+
+    esp_err_t err = nvs_get_i8(handle, key, val);
     switch (err) {
         case ESP_OK:
             retval = true;
@@ -95,6 +134,7 @@ void nvs_save_config(spot_check_config *config) {
     ESP_ERROR_CHECK(nvs_set_str(handle, "spot_uid", config->spot_uid));
     ESP_ERROR_CHECK(nvs_set_str(handle, "spot_lat", config->spot_lat));
     ESP_ERROR_CHECK(nvs_set_str(handle, "spot_lon", config->spot_lon));
+    ESP_ERROR_CHECK(nvs_set_i8(handle, "utc_offset", config->utc_offset));
 
     ESP_ERROR_CHECK(nvs_commit(handle));
 }
@@ -159,10 +199,24 @@ spot_check_config *nvs_get_config() {
             printf("Error (%s) reading spot_uid from flash!\n", esp_err_to_name(err));
     }
 
-    current_config.spot_name = _spot_name;
-    current_config.spot_uid  = _spot_uid;
-    current_config.spot_lat  = _spot_lat;
-    current_config.spot_lon  = _spot_lon;
+    err = nvs_get_i8(handle, "utc_offset", &_utc_offset);
+    switch (err) {
+        case ESP_OK:
+            break;
+        case ESP_ERR_NVS_NOT_FOUND:;
+            int8_t no_offset = 0;
+            printf("The value is not initialized yet, defaulting to UTC offset %d\n", no_offset);
+            _utc_offset = no_offset;
+            break;
+        default:
+            printf("Error (%s) reading utc_offset from flash!\n", esp_err_to_name(err));
+    }
+
+    current_config.spot_name  = _spot_name;
+    current_config.spot_uid   = _spot_uid;
+    current_config.spot_lat   = _spot_lat;
+    current_config.spot_lon   = _spot_lon;
+    current_config.utc_offset = _utc_offset;
 
     return &current_config;
 }
