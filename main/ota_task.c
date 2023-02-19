@@ -37,8 +37,16 @@ static esp_err_t http_client_init_callback(esp_http_client_handle_t http_client)
 
 // Sets up  OTA binary URL and queries to see if OTA image accessible (no version checking)
 static bool ota_start_ota(char *binary_url) {
+    // Have to manually build query params here since ota uses it's own internal http client
+    char url_with_params[strlen(binary_url) + 128];
+    strcpy(url_with_params, CONFIG_OTA_URL);
+    strcat(url_with_params, "?");
+    strcat(url_with_params, "device_id");
+    strcat(url_with_params, "=");
+    strcat(url_with_params, spot_check_get_serial());
+
     esp_http_client_config_t http_config = {
-        .url        = binary_url,
+        .url        = url_with_params,
         .cert_pem   = (char *)server_cert_pem_start,
         .timeout_ms = 10000,
     };
@@ -95,7 +103,7 @@ static bool check_forced_update(esp_app_desc_t *current_image_info, char *versio
     int  err = sprintf(post_data,
                       "{\"current_version\": \"%s\", \"device_id\": \"%s\"}",
                       current_image_info->version,
-                      spot_check_get_fw_version());
+                      spot_check_get_serial());
     if (err < 0) {
         log_printf(LOG_LEVEL_ERROR, "Error sprintfing version string into version_info endpoint post body");
         return ESP_FAIL;
