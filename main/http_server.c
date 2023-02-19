@@ -9,6 +9,8 @@
 #include "http_server.h"
 #include "json.h"
 #include "nvs.h"
+#include "scheduler_task.h"
+#include "sntp_time.h"
 
 #define TAG SC_TAG_HTTP_SERVER
 
@@ -84,11 +86,11 @@ static esp_err_t configure_post_handler(httpd_req_t *req) {
     // any more memory than the json takes because nvs will use those
     // pointers to write directly to flash
     spot_check_config config;
-    char             *default_spot_name  = "The Wedge";
-    char             *default_spot_lat   = "33.5930302087";
-    char             *default_spot_lon   = "-117.8819918632";
-    char             *default_spot_uid   = "5842041f4e65fad6a770882b";
-    int8_t            default_utc_offset = 0;
+    char             *default_spot_name = "The Wedge";
+    char             *default_spot_lat  = "33.5930302087";
+    char             *default_spot_lon  = "-117.8819918632";
+    char             *default_spot_uid  = "5842041f4e65fad6a770882b";
+    char             *default_tz_str    = "CET-1CEST,M3.4.0/2,M10.4.0/2";
 
     cJSON *json_spot_name = cJSON_GetObjectItem(payload, "spot_name");
     if (cJSON_IsString(json_spot_name)) {
@@ -150,15 +152,26 @@ static esp_err_t configure_post_handler(httpd_req_t *req) {
         config.spot_uid = default_spot_uid;
     }
 
-    cJSON *json_utc_offset = cJSON_GetObjectItem(payload, "utc_offset");
-    if (cJSON_IsNumber(json_utc_offset)) {
-        config.utc_offset = cJSON_GetNumberValue(json_utc_offset);
+    cJSON *json_tz_str = cJSON_GetObjectItem(payload, "tz_str");
+    if (cJSON_IsString(json_tz_str)) {
+        config.tz_str = cJSON_GetStringValue(json_tz_str);
+        if (strlen(config.tz_str) > MAX_LENGTH_TZ_STR_PARAM) {
+            log_printf(LOG_LEVEL_INFO,
+                       "Received tz_str > %d chars, invalid. Defaulting to wedge uid (%s)",
+                       MAX_LENGTH_TZ_STR_PARAM,
+                       default_tz_str);
+            config.tz_str = default_tz_str;
+        }
     } else {
-        log_printf(LOG_LEVEL_INFO, "Unable to parse utc_offset param, defaulting to %d", default_utc_offset);
-        config.utc_offset = default_utc_offset;
+        log_printf(LOG_LEVEL_INFO, "Unable to parse tz_str param, defaulting to Berlin (%s)", default_tz_str);
+        config.tz_str = default_tz_str;
     }
 
     nvs_save_config(&config);
+
+    // Update new time and trigger redraw immediately
+    sntp_set_tz_str(config.tz_str);
+    scheduler_trigger_time_update();
 
     // End response
     cJSON_Delete(payload);
@@ -169,17 +182,17 @@ static esp_err_t configure_post_handler(httpd_req_t *req) {
 static esp_err_t current_config_get_handler(httpd_req_t *req) {
     spot_check_config *current_config = nvs_get_config();
 
-    cJSON *root            = cJSON_CreateObject();
-    cJSON *spot_name_json  = cJSON_CreateString(current_config->spot_name);
-    cJSON *spot_lat_json   = cJSON_CreateString(current_config->spot_lat);
-    cJSON *spot_lon_json   = cJSON_CreateString(current_config->spot_lon);
-    cJSON *spot_uid_json   = cJSON_CreateString(current_config->spot_uid);
-    cJSON *utc_offset_json = cJSON_CreateNumber(current_config->utc_offset);
+    cJSON *root           = cJSON_CreateObject();
+    cJSON *spot_name_json = cJSON_CreateString(current_config->spot_name);
+    cJSON *spot_lat_json  = cJSON_CreateString(current_config->spot_lat);
+    cJSON *spot_lon_json  = cJSON_CreateString(current_config->spot_lon);
+    cJSON *spot_uid_json  = cJSON_CreateString(current_config->spot_uid);
+    cJSON *tz_str_json    = cJSON_CreateString(current_config->tz_str);
     cJSON_AddItemToObject(root, "spot_name", spot_name_json);
     cJSON_AddItemToObject(root, "spot_lat", spot_lat_json);
     cJSON_AddItemToObject(root, "spot_lon", spot_lon_json);
     cJSON_AddItemToObject(root, "spot_uid", spot_uid_json);
-    cJSON_AddItemToObject(root, "utc_offset", utc_offset_json);
+    cJSON_AddItemToObject(root, "tz_str", tz_str_json);
 
     char *response_json = cJSON_Print(root);
     httpd_resp_send(req, response_json, HTTPD_RESP_USE_STRLEN);

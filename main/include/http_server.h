@@ -9,6 +9,7 @@
 #define MAX_LENGTH_SPOT_UID_PARAM (30)
 #define MAX_LENGTH_SPOT_LAT_PARAM (20)
 #define MAX_LENGTH_SPOT_LON_PARAM (20)
+#define MAX_LENGTH_TZ_STR_PARAM (64)
 
 void http_server_start();
 void http_server_stop();

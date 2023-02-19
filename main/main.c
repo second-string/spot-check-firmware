@@ -128,6 +128,9 @@ void app_main(void) {
 
     app_start();
 
+    spot_check_config *config = nvs_get_config();
+    sntp_set_tz_str(config->tz_str);
+
     display_render_splash_screen(spot_check_get_fw_version(), spot_check_get_hw_version());
 
     // Enable breakout at each connectivity check of boot

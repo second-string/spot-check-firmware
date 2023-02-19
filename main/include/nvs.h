@@ -11,11 +11,11 @@
 // later w/o having to alloc and pass around a new buff. Easier to go
 // str -> int vs. other direction
 typedef struct {
-    char  *spot_name;
-    char  *spot_uid;
-    char  *spot_lat;
-    char  *spot_lon;
-    int8_t utc_offset;
+    char *spot_name;
+    char *spot_uid;
+    char *spot_lat;
+    char *spot_lon;
+    char *tz_str;
 } spot_check_config;
 
 void               nvs_init();
