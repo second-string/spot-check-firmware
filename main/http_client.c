@@ -82,9 +82,10 @@ request http_client_build_request(char              *endpoint,
             temp_params[2] = (query_param){.key = "lon", .value = config->spot_lon};
             temp_params[3] = (query_param){.key = "spot_id", .value = config->spot_uid};
         } else if (strcmp(endpoint, "tides") == 0 || strcmp(endpoint, "swell") == 0) {
-            temp_params[0] = (query_param){.key = "days", .value = config->number_of_days};
+            // backwards compat
             temp_params[1] = (query_param){.key = "spot_id", .value = config->spot_uid};
         }
+
         memcpy(params, temp_params, sizeof(temp_params));
         req.num_params = sizeof(temp_params) / sizeof(query_param);
         req.params     = params;

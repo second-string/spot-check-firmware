@@ -84,27 +84,10 @@ static esp_err_t configure_post_handler(httpd_req_t *req) {
     // any more memory than the json takes because nvs will use those
     // pointers to write directly to flash
     spot_check_config config;
-    char             *default_number_of_days = "2";
-    char             *default_spot_name      = "The Wedge";
-    char             *default_spot_lat       = "33.5930302087";
-    char             *default_spot_lon       = "-117.8819918632";
-    char             *default_spot_uid       = "5842041f4e65fad6a770882b";
-    char             *default_forecast_type  = "tides";
-
-    cJSON *json_number_of_days = cJSON_GetObjectItem(payload, "number_of_days");
-    if (cJSON_IsString(json_number_of_days)) {
-        config.number_of_days = cJSON_GetStringValue(json_number_of_days);
-        if (strlen(config.number_of_days) > MAX_LENGTH_NUMBER_OF_DAYS_PARAM) {
-            log_printf(LOG_LEVEL_INFO,
-                       "Received number > %d digits, invalid. Defaulting to %s",
-                       MAX_LENGTH_NUMBER_OF_DAYS_PARAM,
-                       default_number_of_days);
-            config.number_of_days = default_number_of_days;
-        }
-    } else {
-        log_printf(LOG_LEVEL_INFO, "Unable to parse number_of_days param, defaulting to %s", default_number_of_days);
-        config.number_of_days = default_number_of_days;
-    }
+    char             *default_spot_name = "The Wedge";
+    char             *default_spot_lat  = "33.5930302087";
+    char             *default_spot_lon  = "-117.8819918632";
+    char             *default_spot_uid  = "5842041f4e65fad6a770882b";
 
     cJSON *json_spot_name = cJSON_GetObjectItem(payload, "spot_name");
     if (cJSON_IsString(json_spot_name)) {
@@ -166,55 +149,6 @@ static esp_err_t configure_post_handler(httpd_req_t *req) {
         config.spot_uid = default_spot_uid;
     }
 
-    bool   one_valid_forecast_type = false;
-    cJSON *json_forecast_types     = cJSON_GetObjectItem(payload, "forecast_types");
-    if (cJSON_IsArray(json_forecast_types)) {
-        int    index              = 0;
-        cJSON *json_forecast_type = NULL;
-        cJSON_ArrayForEach(json_forecast_type, json_forecast_types) {
-            config.forecast_types[index] = cJSON_GetStringValue(json_forecast_type);
-            if (strlen(config.forecast_types[index]) > MAX_LENGTH_FORECAST_TYPE_PARAM) {
-                log_printf(LOG_LEVEL_INFO,
-                           "Received forecast type > %d chars, invalid. Defaulting to empty",
-                           MAX_LENGTH_FORECAST_TYPE_PARAM);
-                config.forecast_types[index] = NULL;
-            } else {
-                one_valid_forecast_type = true;
-            }
-
-            index++;
-        }
-
-        if (!one_valid_forecast_type) {
-            log_printf(LOG_LEVEL_INFO,
-                       "Didn't get a single valid forecast type, defaulting to a single '%s'",
-                       default_forecast_type);
-            config.forecast_types[0] = default_forecast_type;
-            nvs_zero_forecast_types(1, config.forecast_types);
-        } else {
-            nvs_zero_forecast_types(index, config.forecast_types);
-        }
-    } else {
-        log_printf(LOG_LEVEL_INFO,
-                   "Unable to parse forecast_types param, defaulting to [\"%s\"]",
-                   default_forecast_type);
-        config.forecast_types[0] = default_forecast_type;
-        nvs_zero_forecast_types(1, config.forecast_types);
-    }
-
-    // Packs our forecast_types down so we have contiguous types in the pointer array
-    // (if we got invalid types at indices in between valid ones)
-    int          i;
-    unsigned int next_valid_index = 0;
-    for (i = 0; i < MAX_NUM_FORECAST_TYPES; i++) {
-        if (config.forecast_types[i] != 0 && *config.forecast_types[i] != 0) {
-            config.forecast_types[next_valid_index] = config.forecast_types[i];
-            next_valid_index++;
-        }
-    }
-    nvs_zero_forecast_types(next_valid_index, config.forecast_types);
-    config.forecast_type_count = next_valid_index;
-
     nvs_save_config(&config);
 
     // End response
@@ -224,22 +158,17 @@ static esp_err_t configure_post_handler(httpd_req_t *req) {
 }
 
 static esp_err_t current_config_get_handler(httpd_req_t *req) {
-    spot_check_config *current_config     = nvs_get_config();
-    const char       **forecast_types_ptr = (const char **)current_config->forecast_types;
+    spot_check_config *current_config = nvs_get_config();
 
-    cJSON *root                = cJSON_CreateObject();
-    cJSON *num_days_json       = cJSON_CreateString(current_config->number_of_days);
-    cJSON *spot_name_json      = cJSON_CreateString(current_config->spot_name);
-    cJSON *spot_lat_json       = cJSON_CreateString(current_config->spot_lat);
-    cJSON *spot_lon_json       = cJSON_CreateString(current_config->spot_lon);
-    cJSON *spot_uid_json       = cJSON_CreateString(current_config->spot_uid);
-    cJSON *forecast_types_json = cJSON_CreateStringArray(forecast_types_ptr, current_config->forecast_type_count);
-    cJSON_AddItemToObject(root, "number_of_days", num_days_json);
+    cJSON *root           = cJSON_CreateObject();
+    cJSON *spot_name_json = cJSON_CreateString(current_config->spot_name);
+    cJSON *spot_lat_json  = cJSON_CreateString(current_config->spot_lat);
+    cJSON *spot_lon_json  = cJSON_CreateString(current_config->spot_lon);
+    cJSON *spot_uid_json  = cJSON_CreateString(current_config->spot_uid);
     cJSON_AddItemToObject(root, "spot_name", spot_name_json);
     cJSON_AddItemToObject(root, "spot_lat", spot_lat_json);
     cJSON_AddItemToObject(root, "spot_lon", spot_lon_json);
     cJSON_AddItemToObject(root, "spot_uid", spot_uid_json);
-    cJSON_AddItemToObject(root, "forecast_types", forecast_types_json);
 
     char *response_json = cJSON_Print(root);
     httpd_resp_send(req, response_json, HTTPD_RESP_USE_STRLEN);
