@@ -5,6 +5,8 @@
 #include <log.h>
 #include <sys/param.h>
 
+#include "memfault/panics/assert.h"
+
 #include "constants.h"
 #include "http_server.h"
 #include "json.h"
@@ -20,6 +22,7 @@ static esp_err_t health_get_handler(httpd_req_t *req);
 static esp_err_t configure_post_handler(httpd_req_t *req);
 static esp_err_t current_config_get_handler(httpd_req_t *req);
 static esp_err_t clear_nvs_post_handler(httpd_req_t *req);
+static esp_err_t set_time_post_handler(httpd_req_t *req);
 
 static const httpd_uri_t health_uri = {.uri      = "/health",
                                        .method   = HTTP_GET,
@@ -41,19 +44,22 @@ static const httpd_uri_t clear_nvs_uri = {.uri      = "/clear_nvs",
                                           .handler  = clear_nvs_post_handler,
                                           .user_ctx = NULL};
 
-static esp_err_t health_get_handler(httpd_req_t *req) {
-    httpd_resp_send(req, "Surviving not thriving", HTTPD_RESP_USE_STRLEN);
-    return ESP_OK;
-}
+static const httpd_uri_t set_time_uri = {.uri      = "/set_time",
+                                         .method   = HTTP_POST,
+                                         .handler  = set_time_post_handler,
+                                         .user_ctx = NULL};
 
-static esp_err_t configure_post_handler(httpd_req_t *req) {
+/*
+ * Caller responsible for deleting malloced cJSON payload with cJSON_Delete!
+ */
+static bool http_server_parse_post_body(httpd_req_t *req, cJSON **payload) {
     const int rx_buf_size = 300;
     char      buf[rx_buf_size];
 
     if (req->content_len > rx_buf_size) {
         log_printf(LOG_LEVEL_ERROR, "Payload is too big (%d bytes), bailing out", req->content_len);
         httpd_resp_send(req, "err", HTTPD_RESP_USE_STRLEN);
-        return ESP_FAIL;
+        return false;
     }
 
     int bytes_received = httpd_req_recv(req, buf, MIN(req->content_len, rx_buf_size));
@@ -65,7 +71,7 @@ static esp_err_t configure_post_handler(httpd_req_t *req) {
             httpd_resp_send(req, "err", HTTPD_RESP_USE_STRLEN);
             return ESP_FAIL;
         }
-        return ESP_FAIL;
+        return false;
     }
 
     /* Log data received */
@@ -75,12 +81,24 @@ static esp_err_t configure_post_handler(httpd_req_t *req) {
 
     // Should really be parsing this with prealloced buf. If user sends fat payload
     // we'll crash from heap overflow
-    cJSON *payload = parse_json(buf);
+    *payload = parse_json(buf);
     if (payload == NULL) {
         log_printf(LOG_LEVEL_ERROR, "Couldn't parse json (TODO return the right code");
         httpd_resp_send(req, "err", HTTPD_RESP_USE_STRLEN);
-        return ESP_FAIL;
+        return false;
     }
+
+    return true;
+}
+
+static esp_err_t health_get_handler(httpd_req_t *req) {
+    httpd_resp_send(req, "Surviving not thriving", HTTPD_RESP_USE_STRLEN);
+    return ESP_OK;
+}
+
+static esp_err_t configure_post_handler(httpd_req_t *req) {
+    cJSON *payload;
+    MEMFAULT_ASSERT(http_server_parse_post_body(req, &payload));
 
     // Load all our values into here to save to nvs. No need to alloc
     // any more memory than the json takes because nvs will use those
@@ -235,6 +253,26 @@ static esp_err_t clear_nvs_post_handler(httpd_req_t *req) {
     return ESP_OK;
 }
 
+static esp_err_t set_time_post_handler(httpd_req_t *req) {
+    cJSON *payload;
+    MEMFAULT_ASSERT(http_server_parse_post_body(req, &payload));
+
+    cJSON *json_epoch_secs = cJSON_GetObjectItem(payload, "epoch_secs");
+    if (cJSON_IsNumber(json_epoch_secs)) {
+        // Set time and de-init sntp to keep user's manual time set
+        uint32_t epoch_secs = cJSON_GetNumberValue(json_epoch_secs);
+        sntp_set_time(epoch_secs);
+        sntp_time_stop();
+    } else {
+        log_printf(LOG_LEVEL_INFO, "Unable to parse epoch_secs param, not changing time");
+    }
+
+    // End response
+    cJSON_Delete(payload);
+    httpd_resp_send(req, NULL, 0);
+    return ESP_OK;
+}
+
 void http_server_start() {
     if (server_handle) {
         log_printf(LOG_LEVEL_WARN, "http_server already started and http_server_start called, ignoring and bailing");
@@ -261,6 +299,7 @@ void http_server_start() {
     httpd_register_uri_handler(server, &health_uri);
     httpd_register_uri_handler(server, &current_config_uri);
     httpd_register_uri_handler(server, &clear_nvs_uri);
+    httpd_register_uri_handler(server, &set_time_uri);
 
     server_handle = server;
 }

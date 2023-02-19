@@ -40,6 +40,10 @@ void sntp_time_start() {
     }
 }
 
+void sntp_time_stop() {
+    sntp_stop();
+}
+
 /*
  * Returns success if at least one time value has been received from remote
  */
@@ -106,6 +110,14 @@ void sntp_time_get_time_str(struct tm *now_local, char *time_string, char *date_
     if (date_string) {
         strftime(date_string, 64, "%A %B %d, %Y", now_local);
     }
+}
+
+void sntp_set_time(uint32_t epoch_secs) {
+    // Must also set timzeone to UTC otherwise it will apply the current tz offset to the time set by the user
+    sntp_set_tz_str("UTC0");
+
+    const struct timeval time = {.tv_sec = epoch_secs, .tv_usec = 0};
+    MEMFAULT_ASSERT(settimeofday(&time, NULL) == 0);
 }
 
 void sntp_set_tz_str(char *new_tz_str) {
