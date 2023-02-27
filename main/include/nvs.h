@@ -16,6 +16,7 @@ typedef struct {
     char *spot_lat;
     char *spot_lon;
     char *tz_str;
+    char *tz_display_name;
 } spot_check_config;
 
 void               nvs_init();

@@ -16,11 +16,12 @@
 static nvs_handle_t handle = 0;
 
 // Allocate backing field buffers for our settings
-static char _spot_name[MAX_LENGTH_SPOT_NAME_PARAM + 1] = {0};
-static char _spot_uid[MAX_LENGTH_SPOT_UID_PARAM + 1]   = {0};
-static char _spot_lat[MAX_LENGTH_SPOT_LAT_PARAM + 1]   = {0};
-static char _spot_lon[MAX_LENGTH_SPOT_LON_PARAM + 1]   = {0};
-static char _tz_str[MAX_LENGTH_TZ_STR_PARAM + 1]       = {0};
+static char _spot_name[MAX_LENGTH_SPOT_NAME_PARAM + 1]             = {0};
+static char _spot_uid[MAX_LENGTH_SPOT_UID_PARAM + 1]               = {0};
+static char _spot_lat[MAX_LENGTH_SPOT_LAT_PARAM + 1]               = {0};
+static char _spot_lon[MAX_LENGTH_SPOT_LON_PARAM + 1]               = {0};
+static char _tz_str[MAX_LENGTH_TZ_STR_PARAM + 1]                   = {0};
+static char _tz_display_name[MAX_LENGTH_TZ_DISPLAY_NAME_PARAM + 1] = {0};
 
 static spot_check_config current_config;
 
@@ -135,6 +136,7 @@ void nvs_save_config(spot_check_config *config) {
     ESP_ERROR_CHECK(nvs_set_str(handle, "spot_lat", config->spot_lat));
     ESP_ERROR_CHECK(nvs_set_str(handle, "spot_lon", config->spot_lon));
     ESP_ERROR_CHECK(nvs_set_str(handle, "tz_str", config->tz_str));
+    ESP_ERROR_CHECK(nvs_set_str(handle, "tz_display_name", config->tz_display_name));
 
     ESP_ERROR_CHECK(nvs_commit(handle));
 }
@@ -145,11 +147,12 @@ spot_check_config *nvs_get_config() {
         return NULL;
     }
 
-    size_t max_length_spot_name_param = MAX_LENGTH_SPOT_NAME_PARAM;
-    size_t max_length_spot_uid_param  = MAX_LENGTH_SPOT_UID_PARAM;
-    size_t max_length_spot_lat_param  = MAX_LENGTH_SPOT_LAT_PARAM;
-    size_t max_length_spot_lon_param  = MAX_LENGTH_SPOT_LON_PARAM;
-    size_t max_length_tz_str_param    = MAX_LENGTH_TZ_STR_PARAM;
+    size_t max_length_spot_name_param       = MAX_LENGTH_SPOT_NAME_PARAM;
+    size_t max_length_spot_uid_param        = MAX_LENGTH_SPOT_UID_PARAM;
+    size_t max_length_spot_lat_param        = MAX_LENGTH_SPOT_LAT_PARAM;
+    size_t max_length_spot_lon_param        = MAX_LENGTH_SPOT_LON_PARAM;
+    size_t max_length_tz_str_param          = MAX_LENGTH_TZ_STR_PARAM;
+    size_t max_length_tz_display_name_param = MAX_LENGTH_TZ_DISPLAY_NAME_PARAM;
 
     esp_err_t err = nvs_get_str(handle, "spot_name", _spot_name, &max_length_spot_name_param);
     switch (err) {
@@ -213,11 +216,25 @@ spot_check_config *nvs_get_config() {
             printf("Error (%s) reading tz_str from flash!\n", esp_err_to_name(err));
     }
 
-    current_config.spot_name = _spot_name;
-    current_config.spot_uid  = _spot_uid;
-    current_config.spot_lat  = _spot_lat;
-    current_config.spot_lon  = _spot_lon;
-    current_config.tz_str    = _tz_str;
+    err = nvs_get_str(handle, "tz_display_name", _tz_display_name, &max_length_tz_display_name_param);
+    switch (err) {
+        case ESP_OK:
+            break;
+        case ESP_ERR_NVS_NOT_FOUND:;
+            char *display_name = "Europe/Berlin";
+            printf("The value is not initialized yet, defaulting to default Berlin tz  '%s'\n", display_name);
+            strcpy(_tz_display_name, display_name);
+            break;
+        default:
+            printf("Error (%s) reading tz_display_name from flash!\n", esp_err_to_name(err));
+    }
+
+    current_config.spot_name       = _spot_name;
+    current_config.spot_uid        = _spot_uid;
+    current_config.spot_lat        = _spot_lat;
+    current_config.spot_lon        = _spot_lon;
+    current_config.tz_str          = _tz_str;
+    current_config.tz_display_name = _tz_display_name;
 
     return &current_config;
 }

@@ -103,12 +103,13 @@ static esp_err_t configure_post_handler(httpd_req_t *req) {
     // Load all our values into here to save to nvs. No need to alloc
     // any more memory than the json takes because nvs will use those
     // pointers to write directly to flash
-    spot_check_config config;
-    char             *default_spot_name = "The Wedge";
-    char             *default_spot_lat  = "33.5930302087";
-    char             *default_spot_lon  = "-117.8819918632";
-    char             *default_spot_uid  = "5842041f4e65fad6a770882b";
-    char             *default_tz_str    = "CET-1CEST,M3.4.0/2,M10.4.0/2";
+    spot_check_config config                  = {0};
+    char             *default_spot_name       = "The Wedge";
+    char             *default_spot_lat        = "33.5930302087";
+    char             *default_spot_lon        = "-117.8819918632";
+    char             *default_spot_uid        = "5842041f4e65fad6a770882b";
+    char             *default_tz_str          = "CET-1CEST,M3.4.0/2,M10.4.0/2";
+    char             *default_tz_display_name = "Europe/Berlin";
 
     cJSON *json_spot_name = cJSON_GetObjectItem(payload, "spot_name");
     if (cJSON_IsString(json_spot_name)) {
@@ -175,7 +176,7 @@ static esp_err_t configure_post_handler(httpd_req_t *req) {
         config.tz_str = cJSON_GetStringValue(json_tz_str);
         if (strlen(config.tz_str) > MAX_LENGTH_TZ_STR_PARAM) {
             log_printf(LOG_LEVEL_INFO,
-                       "Received tz_str > %d chars, invalid. Defaulting to wedge uid (%s)",
+                       "Received tz_str > %d chars, invalid. Defaulting to Berlin (%s)",
                        MAX_LENGTH_TZ_STR_PARAM,
                        default_tz_str);
             config.tz_str = default_tz_str;
@@ -183,6 +184,23 @@ static esp_err_t configure_post_handler(httpd_req_t *req) {
     } else {
         log_printf(LOG_LEVEL_INFO, "Unable to parse tz_str param, defaulting to Berlin (%s)", default_tz_str);
         config.tz_str = default_tz_str;
+    }
+
+    cJSON *json_tz_display_name = cJSON_GetObjectItem(payload, "tz_display_name");
+    if (cJSON_IsString(json_tz_display_name)) {
+        config.tz_display_name = cJSON_GetStringValue(json_tz_display_name);
+        if (strlen(config.tz_display_name) > MAX_LENGTH_TZ_DISPLAY_NAME_PARAM) {
+            log_printf(LOG_LEVEL_INFO,
+                       "Received tz_display_name > %d chars, invalid. Defaulting to '%s'",
+                       MAX_LENGTH_TZ_DISPLAY_NAME_PARAM,
+                       default_tz_display_name);
+            config.tz_display_name = default_tz_display_name;
+        }
+    } else {
+        log_printf(LOG_LEVEL_INFO,
+                   "Unable to parse tz_display_name param, defaulting to Berlin (%s)",
+                   default_tz_display_name);
+        config.tz_display_name = default_tz_display_name;
     }
 
     nvs_save_config(&config);
@@ -200,17 +218,19 @@ static esp_err_t configure_post_handler(httpd_req_t *req) {
 static esp_err_t current_config_get_handler(httpd_req_t *req) {
     spot_check_config *current_config = nvs_get_config();
 
-    cJSON *root           = cJSON_CreateObject();
-    cJSON *spot_name_json = cJSON_CreateString(current_config->spot_name);
-    cJSON *spot_lat_json  = cJSON_CreateString(current_config->spot_lat);
-    cJSON *spot_lon_json  = cJSON_CreateString(current_config->spot_lon);
-    cJSON *spot_uid_json  = cJSON_CreateString(current_config->spot_uid);
-    cJSON *tz_str_json    = cJSON_CreateString(current_config->tz_str);
+    cJSON *root                 = cJSON_CreateObject();
+    cJSON *spot_name_json       = cJSON_CreateString(current_config->spot_name);
+    cJSON *spot_lat_json        = cJSON_CreateString(current_config->spot_lat);
+    cJSON *spot_lon_json        = cJSON_CreateString(current_config->spot_lon);
+    cJSON *spot_uid_json        = cJSON_CreateString(current_config->spot_uid);
+    cJSON *tz_str_json          = cJSON_CreateString(current_config->tz_str);
+    cJSON *tz_display_name_json = cJSON_CreateString(current_config->tz_display_name);
     cJSON_AddItemToObject(root, "spot_name", spot_name_json);
     cJSON_AddItemToObject(root, "spot_lat", spot_lat_json);
     cJSON_AddItemToObject(root, "spot_lon", spot_lon_json);
     cJSON_AddItemToObject(root, "spot_uid", spot_uid_json);
     cJSON_AddItemToObject(root, "tz_str", tz_str_json);
+    cJSON_AddItemToObject(root, "tz_display_name", tz_display_name_json);
 
     char *response_json = cJSON_Print(root);
     httpd_resp_send(req, response_json, HTTPD_RESP_USE_STRLEN);
