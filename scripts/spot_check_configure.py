@@ -9,6 +9,8 @@ from time import sleep
 
 # Manually bundle everything the scripts need from esp-idf into the correct components/tools paths stemming from here
 os.environ['IDF_PATH'] = "."
+sys.path.insert(0, './components/protocomm/python')
+sys.path.insert(1, './tools/esp_prov')
 
 from tools.esp_prov.esp_prov import main as prov_main
 
