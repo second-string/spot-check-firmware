@@ -81,6 +81,13 @@ static void app_init() {
               &cli_uart_handle);
     log_init(&cli_uart_handle);
     nvs_init();
+    spot_check_init();
+
+    // Strings used for serial/fw/hw versions must be set (aka spot_check_init called) before memfault_boot called!
+#if !CONFIG_MEMFAULT_AUTOMATIC_INIT
+    memfault_boot();
+#endif
+
     i2c_init(BQ24196_I2C_PORT, BQ24196_I2C_SDA_PIN, BQ24196_I2C_SCL_PIN, &bq24196_i2c_handle);
     gpio_init();
     bq24196_init(&bq24196_i2c_handle);
@@ -89,7 +96,6 @@ static void app_init() {
     display_init();
     sleep_handler_init();
     screen_img_handler_init();
-    spot_check_init();
 
     ESP_ERROR_CHECK(esp_event_loop_create_default());
     mdns_local_init();
@@ -114,10 +120,6 @@ static void app_start() {
 }
 
 void app_main(void) {
-#if !CONFIG_MEMFAULT_AUTOMATIC_INIT
-    memfault_boot();
-#endif
-
     app_init();
 
     size_t info_buffer_size = 200 * sizeof(char);
