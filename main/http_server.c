@@ -257,8 +257,11 @@ static esp_err_t clear_nvs_post_handler(httpd_req_t *req) {
         char value[15];
         if (httpd_query_key_value(query_buf, "key", value, sizeof(value)) == ESP_OK) {
             if (strcmp(value, "sekrit") == 0) {
+                // Clearing nvs takes a long time, send req before kicking off
+                httpd_resp_send(req,
+                                "Successfully received cmd to clear NVS, clearing and will reboot after",
+                                HTTPD_RESP_USE_STRLEN);
                 ESP_ERROR_CHECK(nvs_full_erase());
-                httpd_resp_send(req, "Successfully cleared nvs, restarting", HTTPD_RESP_USE_STRLEN);
                 esp_restart();
             } else {
                 log_printf(LOG_LEVEL_INFO, "Received incorrect key for erasing flash: %s", value);
