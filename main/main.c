@@ -10,7 +10,9 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/event_groups.h"
 #include "freertos/task.h"
+#include "memfault/core/data_packetizer.h"
 #include "memfault/esp_port/core.h"
+#include "memfault_interface.h"
 #include "sdkconfig.h"
 
 #include "driver/gpio.h"
@@ -56,6 +58,10 @@ static i2c_handle_t  bq24196_i2c_handle;
  */
 static void special_case_boot_delayed_callback() {
     log_printf(LOG_LEVEL_DEBUG, "Starting special case boot delay callback");
+
+    // Reset memfault back to full uploads for the rest of runtime
+    memfault_packetizer_set_active_sources(kMfltDataSourceMask_All);
+
     scheduler_trigger_mflt_upload();
     vTaskDelay(pdMS_TO_TICKS(2000));
     scheduler_trigger_ota_check();
@@ -130,7 +136,6 @@ void app_main(void) {
 
     spot_check_config *config = nvs_get_config();
     sntp_set_tz_str(config->tz_str);
-
     display_render_splash_screen(spot_check_get_fw_version(), spot_check_get_hw_version());
 
     // Enable breakout at each connectivity check of boot
@@ -195,10 +200,16 @@ void app_main(void) {
             break;
         }
 
-        // SNTP check doesn't change our boot process, we just block here a bit to make the experience better to make it
-        // less likely we render the epoch before it syncs correctly. Sometimes SNTP gets a new value within a second,
-        // sometimes it takes 45 seconds. If sntp doesn't report fully synced,  we also check the date and as long as
-        // it's not 1970 we call it synced to help speed up the process.
+        // Only enable heartbeat events on boot. This enables a quick heartbeat as soon as wifi conn. established
+        // without blocking the remainder of boot for a big coredump upload (if it exists). Mask needs to be reset after
+        // boot is complete so we properly upload a coredump if we have one.
+        memfault_packetizer_set_active_sources(kMfltDataSourceMask_Event);
+        memfault_interface_post_data();
+
+        // SNTP check doesn't change our boot process, we just block here a bit to make the experience better to
+        // make it less likely we render the epoch before it syncs correctly. Sometimes SNTP gets a new value within
+        // a second, sometimes it takes 45 seconds. If sntp doesn't report fully synced,  we also check the date and
+        // as long as it's not 1970 we call it synced to help speed up the process.
         bool sntp_time_set = false;
         start_ticks        = xTaskGetTickCount();
         now_ticks          = start_ticks;
@@ -231,7 +242,7 @@ void app_main(void) {
                    "Boot successful, showing time + last saved conditions / charts and kicked off conditions task");
     } while (0);
 
-    // Delay a few minutes before we run the on-boot delayed actions. This is because both mflt's http client and the
+    // Delay a minute before we run the on-boot delayed actions. This is because both mflt's http client and the
     // esp ota version header check for the server image use their own internal http_client, so we can't force them to
     // obey our http_client module request lock. For a normal boot, waiting a minute or two ensures no further network
     // connections will be running. There's still the risk of edge cases for a late internet connection or provisioning

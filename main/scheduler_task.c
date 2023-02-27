@@ -4,6 +4,7 @@
 #include "esp_wifi.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "memfault_interface.h"
 
 #include "scheduler_task.h"
 
@@ -11,7 +12,6 @@
 #include "gpio.h"
 #include "http_client.h"
 #include "log.h"
-#include "memfault_interface.h"
 #include "nvs.h"
 #include "ota_task.h"
 #include "screen_img_handler.h"
