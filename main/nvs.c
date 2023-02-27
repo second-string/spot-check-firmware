@@ -137,6 +137,7 @@ void nvs_save_config(spot_check_config *config) {
     ESP_ERROR_CHECK(nvs_set_str(handle, "spot_lon", config->spot_lon));
     ESP_ERROR_CHECK(nvs_set_str(handle, "tz_str", config->tz_str));
     ESP_ERROR_CHECK(nvs_set_str(handle, "tz_display_name", config->tz_display_name));
+    ESP_ERROR_CHECK(nvs_set_str(handle, "tz_display_name", config->tz_display_name));
 
     ESP_ERROR_CHECK(nvs_commit(handle));
 }
