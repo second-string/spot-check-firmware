@@ -43,4 +43,5 @@ int       http_client_read_response_to_flash(esp_http_client_handle_t *client,
                                              uint32_t                  offset_into_partition);
 bool      http_client_check_internet();
 
+bool http_client_check_response(esp_http_client_handle_t *client, int *content_length);
 #endif

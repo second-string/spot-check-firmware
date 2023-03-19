@@ -309,7 +309,15 @@ static BaseType_t cli_command_api(char *write_buffer, size_t write_buffer_size, 
         }
 
         memcpy(write_buffer, response_data, response_data_size);
-    } else if (endpoint_len == 5 && strncmp(endpoint, "close", endpoint_len) == 0) {
+    } else if (endpoint_len == 5 && strncmp(endpoint, "debug", endpoint_len) == 0) {
+        char                     url_buf[128];
+        int                      content_len = 0;
+        request                  req         = http_client_build_request("health", NULL, url_buf, NULL, 0);
+        esp_http_client_handle_t client      = NULL;
+        http_client_perform_request(&req, &client);
+        http_client_check_response(&client, &content_len);
+        sprintf(write_buffer, "Sent req, content_len returned: %d", content_len);
+        return pdFALSE;
     } else {
         const char *const endpoints_with_query_params[] = {
             "conditions",
@@ -825,7 +833,7 @@ void cli_command_register_all() {
         .pcCommand = "api",
         .pcHelpString =
             "api:\n\timg <tide|swell>: download and save image to flash\n\t<endpoint>: send request "
-            "to API endpoint with base URL set in menuconfig\n\tclose: close the http client",
+            "to API endpoint with base URL set in menuconfig\n\tdebug: perform debugging actions",
         .pxCommandInterpreter        = cli_command_api,
         .cExpectedNumberOfParameters = -1,
     };

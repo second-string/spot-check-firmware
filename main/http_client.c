@@ -290,7 +290,7 @@ int http_client_perform_post(request                  *request_obj,
  * functions before they read out data in different manners.
  * Returns success, content length returned through last arg.
  */
-static bool http_client_check_response(esp_http_client_handle_t *client, int *content_length) {
+bool http_client_check_response(esp_http_client_handle_t *client, int *content_length) {
     MEMFAULT_ASSERT(client);
     MEMFAULT_ASSERT(content_length);
 
