@@ -2,6 +2,7 @@
 
 #include "FreeRTOS_CLI.h"
 #include "freertos/FreeRTOS.h"
+#include "memfault/metrics/metrics.h"
 #include "memfault/panics/assert.h"
 
 #include "driver/gpio.h"
@@ -774,13 +775,17 @@ BaseType_t cli_command_memfault(char *write_buffer, size_t write_buffer_size, co
     BaseType_t  action_len;
     const char *action = FreeRTOS_CLIGetParameter(cmd_str, 1, &action_len);
     if (action == NULL) {
-        strcpy(write_buffer, "Error: usage is 'memfault <action>' where action is 'assert|upload'");
+        strcpy(write_buffer, "Error: usage is 'memfault <action>' where action is 'assert|heartbeat|upload'");
         return pdFALSE;
     }
 
     memset(write_buffer, 0x0, write_buffer_size);
     if (action_len == 6 && strncmp(action, "assert", action_len) == 0) {
         MEMFAULT_ASSERT(0);
+    } else if (action_len == 9 && strncmp(action, "heartbeat", action_len) == 0) {
+        memfault_metrics_heartbeat_debug_trigger();
+        strcpy(write_buffer,
+               "Marked heartbeat timer as elapsed so next trigger (timer or manual) will upload a heartbeat");
     } else if (action_len == 6 && strncmp(action, "upload", action_len) == 0) {
         scheduler_trigger_mflt_upload();
         strcpy(write_buffer, "Triggered memfault upload in scheduler");
@@ -912,8 +917,8 @@ void cli_command_register_all() {
     static const CLI_Command_Definition_t memfault_cmd = {
         .pcCommand = "mflt",
         .pcHelpString =
-            "mflt:\n\tassert: force a memfault crash and dump collection\n\theartbeat: posts any available data to "
-            "memfault server",
+            "mflt:\n\tassert: force a memfault crash and dump collection\n\theartbeat: mark heartbeat as dirty to send "
+            "before elapsed duration\n\tupload: upload all available memfault data currently stored",
         .pxCommandInterpreter        = cli_command_memfault,
         .cExpectedNumberOfParameters = -1,
     };

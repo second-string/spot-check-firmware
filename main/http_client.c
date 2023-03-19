@@ -3,6 +3,7 @@
 #include "esp_mac.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
+#include "memfault/metrics/metrics.h"
 #include "memfault/panics/assert.h"
 
 #include "constants.h"
@@ -21,6 +22,8 @@
 extern const uint8_t server_cert_pem_start[] asm("_binary_ca_cert_pem_start");
 
 static SemaphoreHandle_t request_lock;
+static uint16_t          failed_http_perform_reqs;
+static uint16_t          failed_http_perform_posts;
 
 /* Technically unnecessary, should be stubbed out for non-debug build */
 esp_err_t http_event_handler(esp_http_client_event_t *event) {
@@ -59,6 +62,9 @@ esp_err_t http_event_handler(esp_http_client_event_t *event) {
 void http_client_init() {
     request_lock = xSemaphoreCreateMutex();
     MEMFAULT_ASSERT(request_lock);
+
+    failed_http_perform_reqs  = 0;
+    failed_http_perform_posts = 0;
 }
 
 /*
@@ -163,6 +169,7 @@ bool http_client_perform_request(request *request_obj, esp_http_client_handle_t 
         *client = esp_http_client_init(&http_config);
         if (!(*client)) {
             log_printf(LOG_LEVEL_INFO, "Error initing http client, returning without sending request");
+            failed_http_perform_reqs++;
             req_start_success = false;
             break;
         }
@@ -174,6 +181,7 @@ bool http_client_perform_request(request *request_obj, esp_http_client_handle_t 
         // Opens and sends the request since we have no data
         if (err != ESP_OK) {
             log_printf(LOG_LEVEL_ERROR, "Error opening http client, error: %s", esp_err_to_name(err));
+            failed_http_perform_reqs++;
 
             // In looking at internals of esp_http_client_open, as long as we're not using client in async mode, this
             // error is 1 to 1 with the socket < 0 log line from a failed call to esp_transport_connect. Internally all
@@ -200,6 +208,8 @@ bool http_client_perform_request(request *request_obj, esp_http_client_handle_t 
 
     // Always give back no matter what happened with the req
     xSemaphoreGive(request_lock);
+
+    memfault_metrics_heartbeat_add(MEMFAULT_METRICS_KEY(failed_http_reqs), failed_http_perform_reqs);
 
     return req_start_success;
 }
@@ -239,6 +249,7 @@ int http_client_perform_post(request                  *request_obj,
         *client = esp_http_client_init(&http_config);
         if (!(*client)) {
             req_start_success = false;
+            failed_http_perform_posts++;
             log_printf(LOG_LEVEL_INFO, "Error initing http client, returning without sending request");
             break;
         }
@@ -252,6 +263,7 @@ int http_client_perform_post(request                  *request_obj,
         esp_err_t err = esp_http_client_open(*client, post_data_size);
         if (err != ESP_OK) {
             log_printf(LOG_LEVEL_ERROR, "Error performing POST, error: %s", esp_err_to_name(err));
+            failed_http_perform_posts++;
 
             // See explanation comment for extra close call here in http_client_perform_request
             if (err == ESP_ERR_HTTP_CONNECT) {
@@ -281,6 +293,8 @@ int http_client_perform_post(request                  *request_obj,
 
     // Always give back no matter what happened with the req
     xSemaphoreGive(request_lock);
+
+    memfault_metrics_heartbeat_add(MEMFAULT_METRICS_KEY(failed_http_posts), failed_http_perform_posts);
 
     return req_start_success;
 }

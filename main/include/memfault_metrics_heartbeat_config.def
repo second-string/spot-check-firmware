@@ -2,3 +2,6 @@
 // MEMFAULT_METRICS_KEY_DEFINE(main_task_stack_hwm, kMemfaultMetricType_Unsigned)
 // MEMFAULT_METRICS_KEY_DEFINE(ble_min_rssi, kMemfaultMetricType_Signed)
 // MEMFAULT_METRICS_KEY_DEFINE(mcu_sleep_time_ms, kMemfaultMetricType_Timer)
+
+MEMFAULT_METRICS_KEY_DEFINE(failed_http_reqs, kMemfaultMetricType_Unsigned)
+MEMFAULT_METRICS_KEY_DEFINE(failed_http_posts, kMemfaultMetricType_Unsigned)
