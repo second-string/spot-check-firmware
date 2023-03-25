@@ -512,3 +512,8 @@ bool http_client_check_internet() {
 
     return false;
 }
+
+void http_client_get_failures(uint16_t *get_failures, uint16_t *post_failures) {
+    *get_failures  = failed_http_perform_reqs;
+    *post_failures = failed_http_perform_posts;
+}

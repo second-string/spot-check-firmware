@@ -336,6 +336,11 @@ static BaseType_t cli_command_api(char *write_buffer, size_t write_buffer_size, 
         http_client_check_response(&client, &content_len);
         sprintf(write_buffer, "Sent req, content_len returned: %d", content_len);
         return pdFALSE;
+    } else if (endpoint_len == 8 && strncmp(endpoint, "failures", endpoint_len) == 0) {
+        uint16_t get_failures  = 0;
+        uint16_t post_failures = 0;
+        http_client_get_failures(&get_failures, &post_failures);
+        sprintf(write_buffer, "GET failures: %u -- POST failures: %u", get_failures, post_failures);
     } else {
         const char *const endpoints_with_query_params[] = {
             "conditions",
@@ -951,7 +956,8 @@ void cli_command_register_all() {
         .pcCommand = "api",
         .pcHelpString =
             "api:\n\timg <tide|swell>: download and save image to flash\n\t<endpoint>: send request "
-            "to API endpoint with base URL set in menuconfig\n\tdebug: perform debugging actions",
+            "to API endpoint with base URL set in menuconfig\n\tdebug: perform debugging actions\n\tfailures: print "
+            "failure count for get/post reqs",
         .pxCommandInterpreter        = cli_command_api,
         .cExpectedNumberOfParameters = -1,
     };

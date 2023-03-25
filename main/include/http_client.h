@@ -44,4 +44,7 @@ int       http_client_read_response_to_flash(esp_http_client_handle_t *client,
 bool      http_client_check_internet();
 
 bool http_client_check_response(esp_http_client_handle_t *client, int *content_length);
+
+// This is for debugging with cli, isn't necessary long term
+void http_client_get_failures(uint16_t *get_failures, uint16_t *post_failures);
 #endif
