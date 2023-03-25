@@ -32,7 +32,9 @@
 
 typedef enum {
     INFO_STATE_BANNER,
-    INFO_STATE_VERSION,
+    INFO_STATE_FW_VERSION,
+    INFO_STATE_HW_VERSION,
+    INFO_STATE_SERIAL,
     INFO_STATE_COMPILE_DATE,
 } info_state_t;
 
@@ -46,9 +48,9 @@ static const char *banner[] = {
     "   _____             _      _____ _               _",
     "  / ____|           | |    / ____| |             | |",
     " | (___  _ __   ___ | |_  | |    | |__   ___  ___| | __",
-    "  \\___ \\| '_ \\ / _ \\| __| | |    | '_ \\ / _ \\/ __| |//",
+    "  \\___ \\| '_ \\ / _ \\| __| | |    | '_ \\ / _ \\/ __| |/ /",
     "  ____) | |_) | (_) | |_  | |____| | | |  __/ (__|   <",
-    " |_____/| .__/ \\___/ \\__|  \\_____|_| |_|\\___|\\___|_|_\\",
+    " |_____/| .__/ \\___/ \\__|  \\_____|_| |_|\\___|\\___|_|\\_\\",
     "        | |",
     "        |_|",
     NULL,
@@ -62,9 +64,8 @@ BaseType_t cli_command_info(char *write_buffer, size_t write_buffer_size, const 
     switch (state) {
         case INFO_STATE_BANNER: {
             if (banner[banner_line] == NULL) {
-                state           = INFO_STATE_VERSION;
-                write_buffer[0] = '\n';
-                write_buffer[1] = 0x00;
+                state           = INFO_STATE_FW_VERSION;
+                write_buffer[0] = 0x00;
                 banner_line     = 0;
             } else {
                 strcpy(write_buffer, banner[banner_line]);
@@ -74,14 +75,28 @@ BaseType_t cli_command_info(char *write_buffer, size_t write_buffer_size, const 
             rval = pdTRUE;
             break;
         }
-        case INFO_STATE_VERSION: {
-            const esp_partition_t *current_partition_version = esp_ota_get_running_partition();
-            esp_app_desc_t         current_image_info_version;
-            esp_ota_get_partition_description(current_partition_version, &current_image_info_version);
-
+        case INFO_STATE_FW_VERSION: {
             char version[41];
-            sprintf(version, "Version: %s", current_image_info_version.version);
+            sprintf(version, "FW Version: %s", spot_check_get_fw_version());
             strcpy(write_buffer, version);
+            state = INFO_STATE_HW_VERSION;
+
+            rval = pdTRUE;
+            break;
+        }
+        case INFO_STATE_HW_VERSION: {
+            char version[41];
+            sprintf(version, "HW Version: %s", spot_check_get_hw_version());
+            strcpy(write_buffer, version);
+            state = INFO_STATE_SERIAL;
+
+            rval = pdTRUE;
+            break;
+        }
+        case INFO_STATE_SERIAL: {
+            char serial[41];
+            sprintf(serial, "Serial: %s", spot_check_get_serial());
+            strcpy(write_buffer, serial);
             state = INFO_STATE_COMPILE_DATE;
 
             rval = pdTRUE;
