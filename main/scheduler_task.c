@@ -4,6 +4,7 @@
 #include "esp_wifi.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "memfault/panics/assert.h"
 #include "memfault_interface.h"
 
 #include "scheduler_task.h"
@@ -580,6 +581,11 @@ void scheduler_set_online_mode() {
     }
 
     mode = SCHEDULER_MODE_ONLINE;
+}
+
+UBaseType_t scheduler_task_get_stack_high_water() {
+    MEMFAULT_ASSERT(scheduler_task_handle);
+    return uxTaskGetStackHighWaterMark(scheduler_task_handle);
 }
 
 void scheduler_task_init() {

@@ -23,6 +23,7 @@ void             scheduler_set_idle(uint32_t system_idle_bitmask);
 void             scheduler_set_offline_mode();
 void             scheduler_set_online_mode();
 scheduler_mode_t scheduler_get_mode();
+UBaseType_t      scheduler_task_get_stack_high_water();
 void             scheduler_task_init();
 void             scheduler_task_start();
 

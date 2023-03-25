@@ -5,6 +5,7 @@
 #include "freertos/task.h"
 
 #include "driver/uart.h"
+#include "memfault/panics/assert.h"
 
 #include "FreeRTOS_CLI.h"
 #include "cli_task.h"
@@ -28,6 +29,7 @@ typedef struct {
     size_t len;
 } cli_command_t;
 
+static TaskHandle_t   cli_task_handle;
 static uart_handle_t *handle;
 static char          *command_buffer;
 static uint8_t        command_char_idx;
@@ -101,6 +103,11 @@ static void cli_process_command(void *args) {
     }
 }
 
+UBaseType_t cli_task_get_stack_high_water() {
+    MEMFAULT_ASSERT(cli_task_handle);
+    return uxTaskGetStackHighWaterMark(cli_task_handle);
+}
+
 void cli_task_init(uart_handle_t *uart_handle) {
     assert(uart_handle);
     handle = uart_handle;
@@ -133,8 +140,8 @@ void cli_task_start() {
 
     rval = xTaskCreate(cli_process_command,
                        "CLI cmd process",
-                       SPOT_CHECK_MINIMAL_STACK_SIZE_BYTES * 4,
+                       SPOT_CHECK_MINIMAL_STACK_SIZE_BYTES * 5,
                        queue_handle,
                        CLI_CMD_PROCESS_TASK_PRIORITY,
-                       NULL);
+                       &cli_task_handle);
 }

@@ -15,6 +15,7 @@
 #include "bq24196.h"
 #include "cd54hc4094.h"
 #include "cli_commands.h"
+#include "cli_task.h"
 #include "constants.h"
 #include "display.h"
 #include "flash_partition.h"
@@ -22,6 +23,7 @@
 #include "log.h"
 #include "memfault_interface.h"
 #include "nvs.h"
+#include "ota_task.h"
 #include "scheduler_task.h"
 #include "screen_img_handler.h"
 #include "sleep_handler.h"
@@ -811,6 +813,102 @@ BaseType_t cli_command_memfault(char *write_buffer, size_t write_buffer_size, co
     return pdFALSE;
 }
 
+BaseType_t cli_command_mem(char *write_buffer, size_t write_buffer_size, const char *cmd_str) {
+    BaseType_t  action_len;
+    const char *action = FreeRTOS_CLIGetParameter(cmd_str, 1, &action_len);
+    if (action == NULL) {
+        strcpy(write_buffer, "Error: usage is 'mem <action>' where action is 'heap|stack'");
+        return pdFALSE;
+    }
+
+    static uint8_t output_idx = 0;
+
+    BaseType_t retval = pdFALSE;
+    memset(write_buffer, 0x0, write_buffer_size);
+    if (action_len == 4 && strncmp(action, "heap", action_len) == 0) {
+        char out_str[100];
+        switch (output_idx) {
+            case 0: {
+                strcpy(out_str, "HEAP allocations (bytes):");
+                output_idx++;
+                retval = pdTRUE;
+                break;
+            }
+            case 1: {
+                size_t total = heap_caps_get_total_size(MALLOC_CAP_8BIT);
+                sprintf(out_str, "Total size: %zu", total);
+                output_idx++;
+                retval = pdTRUE;
+                break;
+            }
+            case 2: {
+                size_t free = heap_caps_get_free_size(MALLOC_CAP_8BIT);
+                sprintf(out_str, "Free size: %zu", free);
+                output_idx++;
+                retval = pdTRUE;
+                break;
+            }
+            case 3: {
+                size_t min_free = heap_caps_get_minimum_free_size(MALLOC_CAP_8BIT);
+                sprintf(out_str, "Low watermark: %zu", min_free);
+                output_idx++;
+                retval = pdTRUE;
+                break;
+            }
+            case 4: {
+                size_t largest_block = heap_caps_get_largest_free_block(MALLOC_CAP_8BIT);
+                sprintf(out_str, "Largest free block: %zu", largest_block);
+                output_idx = 0;
+                retval     = pdFALSE;
+                break;
+            }
+            default:
+                MEMFAULT_ASSERT(0);
+        }
+
+        strcpy(write_buffer, out_str);
+    } else if (action_len == 5 && strncmp(action, "stack", action_len) == 0) {
+        char out_str[100];
+        switch (output_idx) {
+            case 0: {
+                strcpy(out_str, "STACK high water marks (bytes, lower closer to overflow):");
+                output_idx++;
+                retval = pdTRUE;
+                break;
+            }
+            case 1: {
+                UBaseType_t total_words = cli_task_get_stack_high_water();
+                sprintf(out_str, "cli:       %u", total_words * sizeof(uint32_t));
+                output_idx++;
+                retval = pdTRUE;
+                break;
+            }
+            case 2: {
+                UBaseType_t total_words = ota_task_get_stack_high_water();
+                sprintf(out_str, "ota:       %u", total_words * sizeof(uint32_t));
+                output_idx++;
+                retval = pdTRUE;
+                break;
+            }
+            case 3: {
+                UBaseType_t total_words = scheduler_task_get_stack_high_water();
+                sprintf(out_str, "scheduler: %u", total_words * sizeof(uint32_t));
+                output_idx = 0;
+                retval     = pdFALSE;
+                break;
+            }
+            default:
+                MEMFAULT_ASSERT(0);
+        }
+
+        strcpy(write_buffer, out_str);
+    } else {
+        strcpy(write_buffer, "Unknown mem command");
+    }
+
+    return retval;
+}
+
 void cli_command_register_all() {
     static const CLI_Command_Definition_t info_cmd = {
         .pcCommand                   = "info",
@@ -938,6 +1036,13 @@ void cli_command_register_all() {
         .cExpectedNumberOfParameters = -1,
     };
 
+    static const CLI_Command_Definition_t mem_cmd = {
+        .pcCommand    = "mem",
+        .pcHelpString = "mem:\n\theap: print info on all heap allocations\n\tstack: print info on all task stacks",
+        .pxCommandInterpreter        = cli_command_mem,
+        .cExpectedNumberOfParameters = 1,
+    };
+
     FreeRTOS_CLIRegisterCommand(&info_cmd);
     FreeRTOS_CLIRegisterCommand(&reset_cmd);
     FreeRTOS_CLIRegisterCommand(&bq_cmd);
@@ -953,4 +1058,5 @@ void cli_command_register_all() {
     FreeRTOS_CLIRegisterCommand(&sleep_cmd);
     FreeRTOS_CLIRegisterCommand(&event_cmd);
     FreeRTOS_CLIRegisterCommand(&memfault_cmd);
+    FreeRTOS_CLIRegisterCommand(&mem_cmd);
 }

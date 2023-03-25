@@ -7,6 +7,7 @@
 #include "esp_ota_ops.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "memfault/panics/assert.h"
 #include "sdkconfig.h"
 
 #include "constants.h"
@@ -309,6 +310,11 @@ static void check_ota_update_task(void *args) {
 
     // Catch-all to clear OTA text and clean up task
     ota_task_stop(true);
+}
+
+UBaseType_t ota_task_get_stack_high_water() {
+    // OTA task is usually not running
+    return ota_task_handle == NULL ? 0 : uxTaskGetStackHighWaterMark(ota_task_handle);
 }
 
 void ota_task_start() {
