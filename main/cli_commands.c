@@ -2,6 +2,7 @@
 
 #include "FreeRTOS_CLI.h"
 #include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 #include "memfault/metrics/metrics.h"
 #include "memfault/panics/assert.h"
 
@@ -57,6 +58,9 @@ static const char *banner[] = {
     "        |_|",
     NULL,
 };
+
+static UBaseType_t   num_tasks_created;
+static TaskStatus_t *task_statuses;
 
 BaseType_t cli_command_info(char *write_buffer, size_t write_buffer_size, const char *cmd_str) {
     static uint8_t      banner_line = 0;
@@ -874,36 +878,34 @@ BaseType_t cli_command_mem(char *write_buffer, size_t write_buffer_size, const c
         strcpy(write_buffer, out_str);
     } else if (action_len == 5 && strncmp(action, "stack", action_len) == 0) {
         char out_str[100];
-        switch (output_idx) {
-            case 0: {
-                strcpy(out_str, "STACK high water marks (bytes, lower closer to overflow):");
-                output_idx++;
-                retval = pdTRUE;
-                break;
+
+        // If this is the first run of the loop, populate everything. Make sure to reset values after printing all
+        // stacks
+        if (num_tasks_created == 0) {
+            num_tasks_created = uxTaskGetNumberOfTasks();
+            task_statuses     = malloc(sizeof(TaskStatus_t) * num_tasks_created);
+            configASSERT(task_statuses);
+
+            // This call is helllllllla slow - do not use anywhere except debugging
+            UBaseType_t num_tasks_read = uxTaskGetSystemState(task_statuses, num_tasks_created, NULL);
+            configASSERT(num_tasks_read == num_tasks_created);
+            output_idx = 0;
+            strcpy(out_str, "STACK high water marks (bytes, lower closer to overflow):");
+            retval = pdTRUE;
+        } else {
+            sprintf(out_str,
+                    "%-16s: %lu",
+                    task_statuses[output_idx].pcTaskName,
+                    task_statuses[output_idx].usStackHighWaterMark * sizeof(uint32_t));
+            output_idx++;
+            retval = pdTRUE;
+
+            if (output_idx == num_tasks_created) {
+                num_tasks_created = 0;
+                output_idx        = 0;
+                task_statuses     = NULL;
+                retval            = pdFALSE;
             }
-            case 1: {
-                UBaseType_t total_words = cli_task_get_stack_high_water();
-                sprintf(out_str, "cli:       %u", total_words * sizeof(uint32_t));
-                output_idx++;
-                retval = pdTRUE;
-                break;
-            }
-            case 2: {
-                UBaseType_t total_words = ota_task_get_stack_high_water();
-                sprintf(out_str, "ota:       %u", total_words * sizeof(uint32_t));
-                output_idx++;
-                retval = pdTRUE;
-                break;
-            }
-            case 3: {
-                UBaseType_t total_words = scheduler_task_get_stack_high_water();
-                sprintf(out_str, "scheduler: %u", total_words * sizeof(uint32_t));
-                output_idx = 0;
-                retval     = pdFALSE;
-                break;
-            }
-            default:
-                MEMFAULT_ASSERT(0);
         }
 
         strcpy(write_buffer, out_str);
@@ -915,6 +917,9 @@ BaseType_t cli_command_mem(char *write_buffer, size_t write_buffer_size, const c
 }
 
 void cli_command_register_all() {
+    num_tasks_created = 0;
+    task_statuses     = NULL;
+
     static const CLI_Command_Definition_t info_cmd = {
         .pcCommand                   = "info",
         .pcHelpString                = "info: Print info about the firmware",
