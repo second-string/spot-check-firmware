@@ -110,20 +110,14 @@ static bool check_forced_update(esp_app_desc_t *current_image_info, char *versio
         return ESP_FAIL;
     }
 
-    char   version_info_path[] = "ota/version_info";
-    size_t base_len            = strlen(URL_BASE);
-    size_t path_len            = strlen(version_info_path);
-
-    // Build our url with memcpy (no null term) then strcpy (null term)
-    char url[base_len + path_len + 1];
-    memcpy(url, URL_BASE, base_len);
-    strcpy(url + base_len, version_info_path);
-    request request_obj = {.num_params = 0, .params = NULL, .url = url};
+    char           version_info_path[] = "ota/version_info";
+    char           url[strlen(URL_BASE) + strlen(version_info_path) + 1];
+    http_request_t request_obj = http_client_build_post_request(version_info_path, url, post_data, strlen(post_data));
 
     char                    *response_data;
     size_t                   response_data_size;
     esp_http_client_handle_t client;
-    bool http_success = http_client_perform_post(&request_obj, post_data, strlen(post_data), &client);
+    bool                     http_success = http_client_perform(&request_obj, &client);
     if (!http_success) {
         log_printf(LOG_LEVEL_ERROR,
                    "Error in http perform request checking to see if need forced update, defaulting to no update");

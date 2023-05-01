@@ -180,11 +180,11 @@ bool screen_img_handler_download_and_save(screen_img_t screen_img) {
     const uint8_t      num_params = 4;
     query_param        params[num_params];
 
-    request req = http_client_build_request(metadata.endpoint, config, url, params, num_params);
+    http_request_t req = http_client_build_get_request(metadata.endpoint, config, url, params, num_params);
     vTaskDelay(pdMS_TO_TICKS(1000));
 
     esp_http_client_handle_t client;
-    success = http_client_perform_request(&req, &client);
+    success = http_client_perform(&req, &client);
     if (!success) {
         log_printf(LOG_LEVEL_ERROR, "Error making request, aborting");
         return false;

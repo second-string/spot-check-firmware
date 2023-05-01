@@ -303,23 +303,20 @@ static BaseType_t cli_command_api(char *write_buffer, size_t write_buffer_size, 
             return pdFALSE;
         }
 
-        char   version_info_path[] = "ota/version_info";
-        size_t base_len            = strlen(URL_BASE);
-        size_t path_len            = strlen(version_info_path);
-
-        // Build our url with memcpy (no null term) then strcpy (null term)
-        char url[base_len + path_len + 1];
-        memcpy(url, URL_BASE, base_len);
-        strcpy(url + base_len, version_info_path);
-        request request_obj = {.num_params = 0, .params = NULL, .url = url};
+        char           version_info_path[] = "ota/version_info";
+        size_t         base_len            = strlen(URL_BASE);
+        size_t         path_len            = strlen(version_info_path);
+        char           url[base_len + path_len + 1];
+        http_request_t request_obj =
+            http_client_build_post_request(version_info_path, url, post_data, strlen(post_data));
 
         char                    *response_data;
         size_t                   response_data_size;
         esp_http_client_handle_t client;
-        bool http_success = http_client_perform_post(&request_obj, post_data, strlen(post_data), &client);
+        bool                     http_success = http_client_perform(&request_obj, &client);
         if (!http_success) {
             strcpy(write_buffer,
-                   "Error in http perform request checking to see if need forced update, defaulting to no update");
+                   "Error in http perform checking to see if need forced update, defaulting to no update");
             return pdFALSE;
         }
 
@@ -334,9 +331,9 @@ static BaseType_t cli_command_api(char *write_buffer, size_t write_buffer_size, 
     } else if (endpoint_len == 5 && strncmp(endpoint, "debug", endpoint_len) == 0) {
         char                     url_buf[128];
         int                      content_len = 0;
-        request                  req         = http_client_build_request("health", NULL, url_buf, NULL, 0);
+        http_request_t           req         = http_client_build_get_request("health", NULL, url_buf, NULL, 0);
         esp_http_client_handle_t client      = NULL;
-        http_client_perform_request(&req, &client);
+        http_client_perform(&req, &client);
         http_client_check_response(&client, &content_len);
         sprintf(write_buffer, "Sent req, content_len returned: %d", content_len);
         return pdFALSE;
@@ -349,11 +346,11 @@ static BaseType_t cli_command_api(char *write_buffer, size_t write_buffer_size, 
         const char *const endpoints_with_query_params[] = {
             "conditions",
             "screen_update",
-            // NOTE: Make sure to update list of endpoints in http_client_build_request if changing this list
+            // NOTE: Make sure to update list of endpoints in http_client_build_get_request if changing this list
         };
 
         // If entered endpoint is in list to include config query params, include that data in call to
-        // http_client_build_request
+        // http_client_build_get_request
         bool include_params = false;
         for (uint8_t i = 0; i < sizeof(endpoints_with_query_params) / sizeof(char *); i++) {
             if (strlen(endpoints_with_query_params[i]) == endpoint_len &&
@@ -375,11 +372,11 @@ static BaseType_t cli_command_api(char *write_buffer, size_t write_buffer_size, 
             num_params = 4;
         }
 
-        request req = http_client_build_request((char *)endpoint, config, url, params, num_params);
+        http_request_t req = http_client_build_get_request((char *)endpoint, config, url, params, num_params);
         memset(write_buffer, 0x0, write_buffer_size);
 
         esp_http_client_handle_t client;
-        bool                     success = http_client_perform_request(&req, &client);
+        bool                     success = http_client_perform(&req, &client);
         if (!success) {
             log_printf(LOG_LEVEL_ERROR, "Error making request, aborting");
             return pdFALSE;

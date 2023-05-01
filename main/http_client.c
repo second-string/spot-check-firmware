@@ -72,12 +72,15 @@ void http_client_init() {
  * memory for the base url + endpoint, and a pointer to a block of already-allocated memory to hold the query params
  * structs
  */
-request http_client_build_request(char              *endpoint,
-                                  spot_check_config *config,
-                                  char              *url_buf,
-                                  query_param       *params,
-                                  uint8_t            num_params) {
-    request req = {0};
+http_request_t http_client_build_get_request(char              *endpoint,
+                                             spot_check_config *config,
+                                             char              *url_buf,
+                                             query_param       *params,
+                                             uint8_t            num_params) {
+    http_request_t req = {
+        .req_type = HTTP_REQ_TYPE_GET,
+    };
+
     if (params && num_params > 0) {
         query_param temp_params[num_params];
         if (strcmp(endpoint, "conditions") == 0 || strcmp(endpoint, "screen_update") == 0 ||
@@ -93,8 +96,8 @@ request http_client_build_request(char              *endpoint,
         }
 
         memcpy(params, temp_params, sizeof(temp_params));
-        req.num_params = sizeof(temp_params) / sizeof(query_param);
-        req.params     = params;
+        req.get_args.num_params = sizeof(temp_params) / sizeof(query_param);
+        req.get_args.params     = params;
     }
 
     strcpy(url_buf, URL_BASE);
@@ -103,26 +106,80 @@ request http_client_build_request(char              *endpoint,
     }
     req.url = url_buf;
     log_printf(LOG_LEVEL_DEBUG, "Built request URL: %s", url_buf);
-    log_printf(LOG_LEVEL_DEBUG, "Built %u request query params:", req.num_params);
+    log_printf(LOG_LEVEL_DEBUG, "Built %u request query params:", req.get_args.num_params);
     for (uint8_t i = 0; i < num_params; i++) {
-        log_printf(LOG_LEVEL_DEBUG, "Param %u - %s: %s", i, req.params[i].key, req.params[i].value);
+        log_printf(LOG_LEVEL_DEBUG, "Param %u - %s: %s", i, req.get_args.params[i].key, req.get_args.params[i].value);
     }
 
     return req;
 }
 
 /*
- * NOTE: only performs the HTTP request. Does not read out response data, does not clean up client (unless there was a
- * failure). Caller responsible for calling http_client_read_response after this function to read data into buffer and
- * close client, OR manually reading data and closing in the case of maniupulating large responses as they're chunked
- * in.
+ * Caller passes in endpoint, a pointer to a block of already-allocated memory for the base url + endpoint, and the
+ * already-built post data string (only used as json for now).
+ * Bit of a redundant function in the current request obj format but used for parity with GET flow.
  */
-bool http_client_perform_request(request *request_obj, esp_http_client_handle_t *client) {
+http_request_t http_client_build_post_request(char *endpoint, char *url_buf, char *post_data, size_t post_data_size) {
+    // Build our url with memcpy (no null term) then strcpy (null term)
+    size_t base_len = strlen(URL_BASE);
+    memcpy(url_buf, URL_BASE, base_len);
+    strcpy(url_buf + base_len, endpoint);
+    http_post_args_t post_args = {
+        .post_data      = post_data,
+        .post_data_size = post_data_size,
+    };
+
+    http_request_t req = {
+        .req_type  = HTTP_REQ_TYPE_POST,
+        .url       = url_buf,
+        .post_args = post_args,
+    };
+
+    return req;
+}
+
+/*
+ * Request-type-agnostic function for initiating the actual http contact with server.
+ * NOTE: only performs the HTTP request (and in the case of a POST, writes the post data to the socket). Does not read
+ * out response data, does not clean up client (unless there was a failure). Caller responsible for calling
+ * http_client_read_response after this function to read data into buffer and close client, OR manually reading data
+ * and closing in the case of maniupulating large responses as they're chunked in.
+ */
+bool http_client_perform(http_request_t *request_obj, esp_http_client_handle_t *client) {
     MEMFAULT_ASSERT(client);
     MEMFAULT_ASSERT(request_obj);
 
+    // Build out most shared variables here to minimize number of checks to req_type later in function.
+    // TODO :: really all of this stuff should be added to the request_obj_t struct in the build_request functions, so
+    // this func can be fully (or at least moreso) request-type-agnostic and just blindly populate stuff
+    char                     req_type_str[5];
+    uint16_t                *failed_error_ptr = NULL;
+    esp_http_client_method_t method;
+    char                     content_type[17];
+    MemfaultMetricId         memfault_key;
+    switch (request_obj->req_type) {
+        case HTTP_REQ_TYPE_GET:
+            strcpy(req_type_str, "GET");
+            strcpy(content_type, "text/html");
+            memfault_key     = MEMFAULT_METRICS_KEY(failed_http_reqs);
+            failed_error_ptr = &failed_http_perform_reqs;
+            method           = HTTP_METHOD_GET;
+            break;
+        case HTTP_REQ_TYPE_POST:
+            strcpy(req_type_str, "POST");
+            strcpy(content_type, "application/json");
+            memfault_key     = MEMFAULT_METRICS_KEY(failed_http_posts);
+            failed_error_ptr = &failed_http_perform_posts;
+            method           = HTTP_METHOD_POST;
+            break;
+        default:
+            MEMFAULT_ASSERT(0);
+    }
+
     if (!wifi_is_connected_to_network()) {
-        log_printf(LOG_LEVEL_INFO, "Attempted to make GET request, not connected to any wifi network yet so bailing");
+        log_printf(LOG_LEVEL_INFO,
+                   "Attempted to make %s request, not connected to any wifi network yet so bailing",
+                   req_type_str);
         return false;
     }
 
@@ -130,11 +187,11 @@ bool http_client_perform_request(request *request_obj, esp_http_client_handle_t 
     char req_url[strlen(request_obj->url) + 256];
     strcpy(req_url, request_obj->url);
 
-    if (request_obj->num_params > 0) {
-        log_printf(LOG_LEVEL_DEBUG, "Adding %d query params to URL", request_obj->num_params);
+    if (request_obj->req_type == HTTP_REQ_TYPE_GET && request_obj->get_args.num_params > 0) {
+        log_printf(LOG_LEVEL_DEBUG, "Adding %d query params to URL", request_obj->get_args.num_params);
         strcat(req_url, "?");
-        for (int i = 0; i < request_obj->num_params; i++) {
-            query_param param = request_obj->params[i];
+        for (int i = 0; i < request_obj->get_args.num_params; i++) {
+            query_param param = request_obj->get_args.params[i];
             strcat(req_url, param.key);
             strcat(req_url, "=");
             strcat(req_url, param.value);
@@ -163,138 +220,64 @@ bool http_client_perform_request(request *request_obj, esp_http_client_handle_t 
         }
 
         log_printf(LOG_LEVEL_INFO,
-                   "Initing http client for GET request with url '%s'...",
+                   "Initing http client for %s request with url '%s:%d'...",
+                   req_type_str,
                    http_config.url,
                    http_config.port);
         *client = esp_http_client_init(&http_config);
         if (!(*client)) {
             log_printf(LOG_LEVEL_INFO, "Error initing http client, returning without sending request");
-            failed_http_perform_reqs++;
+            (*failed_error_ptr)++;
             req_start_success = false;
             break;
         }
 
-        ESP_ERROR_CHECK(esp_http_client_set_method(*client, HTTP_METHOD_GET));
-        ESP_ERROR_CHECK(esp_http_client_set_header(*client, "Content-Type", "text/html"));
+        size_t open_data_size = 0;
+        ESP_ERROR_CHECK(esp_http_client_set_method(*client, method));
+        ESP_ERROR_CHECK(esp_http_client_set_header(*client, "Content-Type", content_type));
+        if (request_obj->req_type == HTTP_REQ_TYPE_POST) {
+            ESP_ERROR_CHECK(esp_http_client_set_post_field(*client,
+                                                           request_obj->post_args.post_data,
+                                                           request_obj->post_args.post_data_size));
+            open_data_size = request_obj->post_args.post_data_size;
+        }
 
-        esp_err_t err = esp_http_client_open(*client, 0);
-        // Opens and sends the request since we have no data
+        esp_err_t err = esp_http_client_open(*client, open_data_size);
+
         if (err != ESP_OK) {
             log_printf(LOG_LEVEL_ERROR, "Error opening http client, error: %s", esp_err_to_name(err));
-            failed_http_perform_reqs++;
+            (*failed_error_ptr)++;
 
-            // In looking at internals of esp_http_client_open, as long as we're not using client in async mode, this
-            // error is 1 to 1 with the socket < 0 log line from a failed call to esp_transport_connect. Internally all
-            // it does is call the transport close function of the tcp/ssl transport struct internal to the client
-            // handle. There are no negative repercussions from doing this extra times even when this is a normal
-            // cleanup scenario. Hopefully this is all that's required to get rid of the situation where we get 'stuck'
-            // with no open sockets, aka the tcp/ssl transport can't open a connection. We call close instead of
-            // cleanup, and before the cleanup call, because cleanup does a ton of freeing of all of the internal data
-            // of the client handle so nothing should be accessed after that call.
-            if (err == ESP_ERR_HTTP_CONNECT) {
-                esp_http_client_close(*client);
-            }
-
-            // clean up and return no space allocated
             err = esp_http_client_cleanup(*client);
             if (err != ESP_OK) {
-                log_printf(LOG_LEVEL_INFO, "Error cleaning up  http client connection");
+                log_printf(LOG_LEVEL_ERROR, "Error cleaning up http client connection after failure to open!!!");
             }
 
             req_start_success = false;
             break;
-        }
-    } while (0);
-
-    // Always give back no matter what happened with the req
-    xSemaphoreGive(request_lock);
-
-    memfault_metrics_heartbeat_add(MEMFAULT_METRICS_KEY(failed_http_reqs), failed_http_perform_reqs);
-
-    return req_start_success;
-}
-
-// TODO :: refactor the perform functions to be one func with arg for post or get. Almost identical now, just have
-// to resolve the small differences in implementation of the URL build w/ query params and setting client values.
-// Will need to include a call to esp_http_client_write for the post case
-// Update: I think the differences have been eliminated in request building logic. Just need to bundle into one func
-int http_client_perform_post(request                  *request_obj,
-                             char                     *post_data,
-                             size_t                    post_data_size,
-                             esp_http_client_handle_t *client) {
-    if (!wifi_is_connected_to_network()) {
-        log_printf(LOG_LEVEL_INFO, "Attempted to make POST request, not connected to any wifi network yet so bailing");
-        return 0;
-    }
-
-    esp_http_client_config_t http_config = {
-        .url            = request_obj->url,
-        .event_handler  = http_event_handler,
-        .buffer_size    = MAX_READ_BUFFER_SIZE,
-        .cert_pem       = (char *)&server_cert_pem_start,
-        .transport_type = HTTP_TRANSPORT_OVER_SSL,
-    };
-
-    bool req_start_success = true;
-    do {
-        BaseType_t lock_success = xSemaphoreTake(request_lock, pdMS_TO_TICKS(5000));
-        if (lock_success == pdFALSE) {
-            req_start_success = false;
-            log_printf(LOG_LEVEL_ERROR,
-                       "Failed to take http req lock in timeout, returning failure for the request status");
-            break;
-        }
-
-        log_printf(LOG_LEVEL_INFO, "Initing http client for post request...");
-        *client = esp_http_client_init(&http_config);
-        if (!(*client)) {
-            req_start_success = false;
-            failed_http_perform_posts++;
-            log_printf(LOG_LEVEL_INFO, "Error initing http client, returning without sending request");
-            break;
-        }
-
-        // TODO :: these shouldn't assert, fail gracefully
-        ESP_ERROR_CHECK(esp_http_client_set_method(*client, HTTP_METHOD_POST));
-        ESP_ERROR_CHECK(esp_http_client_set_header(*client, "Content-Type", "application/json"));
-        ESP_ERROR_CHECK(esp_http_client_set_post_field(*client, post_data, post_data_size));
-
-        log_printf(LOG_LEVEL_INFO, "Performing POST to %s with data size %u", request_obj->url, post_data_size);
-        esp_err_t err = esp_http_client_open(*client, post_data_size);
-        if (err != ESP_OK) {
-            log_printf(LOG_LEVEL_ERROR, "Error performing POST, error: %s", esp_err_to_name(err));
-            failed_http_perform_posts++;
-
-            // See explanation comment for extra close call here in http_client_perform_request
-            if (err == ESP_ERR_HTTP_CONNECT) {
-                esp_http_client_close(*client);
-            }
-
-            // always clean up on failure
-            err = esp_http_client_cleanup(*client);
-            if (err != ESP_OK) {
-                log_printf(LOG_LEVEL_INFO, "Error cleaning up  http client connection");
-            }
-
-            req_start_success = false;
-            break;
-        } else {
-            int write_err = esp_http_client_write(*client, post_data, post_data_size);
+        } else if (request_obj->req_type == HTTP_REQ_TYPE_POST) {
+            // POSTs have an extra step after opening to actually write the data, but we only want to perform it if the
+            // open was successful. GETs are fine with just the open.
+            int write_err =
+                esp_http_client_write(*client, request_obj->post_args.post_data, request_obj->post_args.post_data_size);
             if (write_err < 0) {
                 log_printf(LOG_LEVEL_ERROR, "Error performing POST in call to esp_http_client_write");
                 req_start_success = false;
                 break;
             }
 
+            // Preemptively check status here even though it's also checked inthe http_client_check-response function
+            // called after this
             uint16_t status   = esp_http_client_get_status_code(*client);
             req_start_success = status <= 200 || status > 299;
         }
+
     } while (0);
 
     // Always give back no matter what happened with the req
     xSemaphoreGive(request_lock);
 
-    memfault_metrics_heartbeat_add(MEMFAULT_METRICS_KEY(failed_http_posts), failed_http_perform_posts);
+    memfault_metrics_heartbeat_add(memfault_key, *failed_error_ptr);
 
     return req_start_success;
 }
@@ -492,10 +475,10 @@ bool http_client_check_internet() {
     char  *res           = NULL;
     size_t bytes_alloced = 0;
 
-    request req = http_client_build_request((char *)"health", NULL, url, NULL, 0);
+    http_request_t req = http_client_build_get_request((char *)"health", NULL, url, NULL, 0);
 
     esp_http_client_handle_t client;
-    bool                     success = http_client_perform_request(&req, &client);
+    bool                     success = http_client_perform(&req, &client);
     if (success) {
         esp_err_t http_err = http_client_read_response_to_buffer(&client, &res, &bytes_alloced);
         if (http_err == ESP_OK && res && bytes_alloced > 0) {

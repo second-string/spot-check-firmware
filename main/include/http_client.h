@@ -9,8 +9,15 @@
 #include "nvs.h"
 
 // Needs trailing slash!
-// #define URL_BASE "https://spotcheck.brianteam.com/"
-#define URL_BASE "http://192.168.0.11:9080/"
+#define URL_BASE "https://spotcheck.brianteam.com/"
+// #define URL_BASE "http://192.168.0.11:9080/"
+
+typedef enum {
+    HTTP_REQ_TYPE_GET,
+    HTTP_REQ_TYPE_POST,
+
+    HTTP_REQ_TYPE_COUNT,
+} http_req_type_t;
 
 typedef struct {
     char *key;
@@ -18,31 +25,41 @@ typedef struct {
 } query_param;
 
 typedef struct {
-    char        *url;
     query_param *params;
     uint8_t      num_params;
-} request;
+} http_get_args_t;
+
+typedef struct {
+    char  *post_data;
+    size_t post_data_size;
+} http_post_args_t;
+
+typedef struct {
+    char           *url;
+    http_req_type_t req_type;
+    union {
+        http_get_args_t  get_args;
+        http_post_args_t post_args;
+    };
+} http_request_t;
 
 // Expose event handler so OTA task can callback to it
-esp_err_t http_event_handler(esp_http_client_event_t *event);
-void      http_client_init();
-request   http_client_build_request(char              *endpoint,
-                                    spot_check_config *config,
-                                    char              *url_buf,
-                                    query_param       *params,
-                                    uint8_t            num_params);
-bool      http_client_perform_request(request *request_obj, esp_http_client_handle_t *client);
-int       http_client_perform_post(request                  *request_obj,
-                                   char                     *post_data,
-                                   size_t                    post_data_size,
-                                   esp_http_client_handle_t *client);
-esp_err_t http_client_read_response_to_buffer(esp_http_client_handle_t *client,
-                                              char                    **response_data,
-                                              size_t                   *response_data_size);
-int       http_client_read_response_to_flash(esp_http_client_handle_t *client,
-                                             esp_partition_t          *partition,
-                                             uint32_t                  offset_into_partition);
-bool      http_client_check_internet();
+esp_err_t      http_event_handler(esp_http_client_event_t *event);
+void           http_client_init();
+http_request_t http_client_build_get_request(char              *endpoint,
+                                             spot_check_config *config,
+                                             char              *url_buf,
+                                             query_param       *params,
+                                             uint8_t            num_params);
+http_request_t http_client_build_post_request(char *endpoint, char *url_buf, char *post_data, size_t post_data_size);
+bool           http_client_perform(http_request_t *request_obj, esp_http_client_handle_t *client);
+esp_err_t      http_client_read_response_to_buffer(esp_http_client_handle_t *client,
+                                                   char                    **response_data,
+                                                   size_t                   *response_data_size);
+int            http_client_read_response_to_flash(esp_http_client_handle_t *client,
+                                                  esp_partition_t          *partition,
+                                                  uint32_t                  offset_into_partition);
+bool           http_client_check_internet();
 
 bool http_client_check_response(esp_http_client_handle_t *client, int *content_length);
 

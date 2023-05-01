@@ -65,12 +65,12 @@ bool spot_check_download_and_save_conditions(conditions_t *new_conditions) {
     char               url_buf[strlen(URL_BASE) + 80];
     uint8_t            num_params = 4;
     query_param        params[num_params];
-    request            request = http_client_build_request("conditions", config, url_buf, params, num_params);
+    http_request_t     request = http_client_build_get_request("conditions", config, url_buf, params, num_params);
 
     char                    *server_response    = NULL;
     size_t                   response_data_size = 0;
     esp_http_client_handle_t client;
-    bool                     success = http_client_perform_request(&request, &client);
+    bool                     success = http_client_perform(&request, &client);
 
     // This MUST be here to short circuit execution. If http_client_read_response_to_* is called after a failure of
     // http_client_perform_request, the inner call to client cleanup function will assert and crash and there's nothing
