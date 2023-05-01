@@ -35,11 +35,10 @@ void wifi_start_sta();
 void wifi_init_provisioning();
 
 /*
- * Kicks off provisioning mode. If we've previously provisioned and saved
- * connection info, it will deinit itself and switch over into STA mode to
- * connect to network. If we haven't it starts the cycle
+ * Kicks off provisioning mode. Does no checking of previous provisioned status, just stop http server and starts
+ * manager.
  */
-void wifi_start_provisioning(bool force_reprovision);
+void wifi_start_provisioning();
 
 /* Deinits provisioning manager, unregisters from event handler, and sets internal flag */
 void wifi_deinit_provisioning();

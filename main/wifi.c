@@ -58,16 +58,28 @@ void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id
                     esp_wifi_connect();
                     sta_connect_attempts++;
                 } else {
-                    log_printf(LOG_LEVEL_INFO,
-                               "Got STA_DISCON and max quick retries, kickng scheduler into offline mode to poll until "
-                               "network is found / comes back");
+                    scheduler_mode_t mode = scheduler_get_mode();
+                    if (mode == SCHEDULER_MODE_INIT) {
+                        // Failed to connect to network on boot. We disregard potential case that for some reason the
+                        // network isn't working/available and assume re-provisioning is needed, so we don't kick
+                        // offline mode. If we're reprovisioning, we're giving up on ever having a successful network
+                        // request this boot, so device will either need to be rebooted to retry connecting to network
+                        // or provisioned with new creds
+                        log_printf(LOG_LEVEL_INFO,
+                                   "Got STA_DISCON and max quick retries during boot, leaving scheduler in INIT mode "
+                                   "so main can start the prov mgr");
+                    } else {
+                        // This case is a loss of connection to the network after the device has been successfully
+                        // running. Kick to offline and scheduler will handle either healthchecking (if network
+                        // available) or wifi re-initing (if trying to reconnect to network)
+                        log_printf(
+                            LOG_LEVEL_INFO,
+                            "Got STA_DISCON and max quick retries, kickng scheduler into offline mode to poll until "
+                            "network is found / comes back");
 
-                    xEventGroupClearBits(wifi_event_group, WIFI_EVENT_GROUP_CONNECTED_TO_NETWORK_BIT);
-
-                    // TODO :: check if provd network saved, don't kick offline mode if not (case when user gives wrong
-                    // provisioning pw). Need to make sure the prov deinit onfail and reinit is working, seems to be in
-                    // a weird state
-                    scheduler_set_offline_mode();
+                        xEventGroupClearBits(wifi_event_group, WIFI_EVENT_GROUP_CONNECTED_TO_NETWORK_BIT);
+                        scheduler_set_offline_mode();
+                    }
                 }
                 break;
             }
@@ -133,7 +145,7 @@ void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id
                 log_printf(LOG_LEVEL_INFO, "Provisioning successful event emitted");
                 break;
             case WIFI_PROV_END: {
-                log_printf(LOG_LEVEL_INFO, "Provisioning complete event emitted, de-initing prov mgr");
+                log_printf(LOG_LEVEL_INFO, "Provisioning complete event emitted, restarting");
                 wifi_deinit_provisioning();
                 esp_restart();
                 break;
@@ -174,7 +186,7 @@ void wifi_init(void *event_handler) {
 /*
  * Returns true if prov starting successfully, false if already provisioned
  */
-void wifi_start_provisioning(bool force_reprovision) {
+void wifi_start_provisioning() {
     if (wifi_event_group == NULL) {
         log_printf(
             LOG_LEVEL_ERROR,
@@ -182,41 +194,25 @@ void wifi_start_provisioning(bool force_reprovision) {
         return;
     }
 
-    bool already_provisioned = false;
-    ESP_ERROR_CHECK(wifi_prov_mgr_is_provisioned(&already_provisioned));
-    if (!already_provisioned || force_reprovision) {
-        const char *log = force_reprovision ? "Forcing reprovisioning process"
-                                            : "No saved provisioning info, starting provisioning process";
-        log_printf(LOG_LEVEL_INFO, "%s", log);
+    // SSID / device name (softap / ble respectively)
+    char *service_name = CONFIG_AP_SSID;
 
-        // SSID / device name (softap / ble respectively)
-        char *service_name = CONFIG_AP_SSID;
+    // 0 is plaintext, 1 uses a secure handshake for key exchange with proof of possession
+    wifi_prov_security_t security = WIFI_PROV_SECURITY_0;
 
-        // 0 is plaintext, 1 uses a secure handshake for key exchange with proof of possession
-        wifi_prov_security_t security = WIFI_PROV_SECURITY_0;
+    // Only used for WIFI_PROV_SECURITY_1 security level
+    const char *proof_of_poss = "abc123";
 
-        // Only used for WIFI_PROV_SECURITY_1 security level
-        const char *proof_of_poss = "abc123";
+    // Network password (only used for softap prov)
+    const char *service_key = NULL;
 
-        // Network password (only used for softap prov)
-        const char *service_key = NULL;
+    // MUST be manually stopped before trying to start prov mgr, otherwise call to
+    // wifi_prov_mgr_start_provisioning will return ESP_FAIL and fail error check since it needs it's
+    // own http_server for softap provisioning
+    http_server_stop();
 
-        // MUST be manually stopped before trying to start prov mgr, otherwise call to
-        // wifi_prov_mgr_start_provisioning will return ESP_FAIL and fail error check since it needs it's
-        // own http_server for softap provisioning
-        http_server_stop();
-
-        ESP_ERROR_CHECK(wifi_prov_mgr_start_provisioning(security, proof_of_poss, service_name, service_key));
-
-        // Can block on provisioning instead of using async event loop
-        // wifi_prov_mgr_wait();
-        // wifi_prov_mgr_deinit();
-
-    } else {
-        // Start STA mode and connect to known existing network
-        log_printf(LOG_LEVEL_INFO, "Already provisioned, de-initing prov mgr and doing nothing");
-        wifi_deinit_provisioning();
-    }
+    log_printf(LOG_LEVEL_INFO, "%s", "Starting provisioning manager");
+    ESP_ERROR_CHECK(wifi_prov_mgr_start_provisioning(security, proof_of_poss, service_name, service_key));
 }
 
 void wifi_init_provisioning() {

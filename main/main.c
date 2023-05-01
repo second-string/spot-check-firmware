@@ -57,6 +57,12 @@ static i2c_handle_t  bq24196_i2c_handle;
  * will break the mflt one. This is a temporary hack until the http req system is refactored.
  */
 static void special_case_boot_delayed_callback() {
+    if (scheduler_get_mode() == SCHEDULER_MODE_INIT) {
+        // We're in provisioning mode, don't bother with these calls
+        log_printf(LOG_LEVEL_DEBUG, "Skipping special case boot delay callback since device not connected");
+        return;
+    }
+
     log_printf(LOG_LEVEL_DEBUG, "Starting special case boot delay callback");
 
     // Reset memfault back to full uploads for the rest of runtime
@@ -88,6 +94,9 @@ static void app_init() {
     memfault_boot();
 #endif
 
+    // Note: intentionally don't init provisioning here as it doesn't need to be inited to check if device is
+    // provisioned or not (it's just a NVS check). Only if unprovisioned, or network connection fails, do we init and
+    // start provisioning in same step
     i2c_init(BQ24196_I2C_PORT, BQ24196_I2C_SDA_PIN, BQ24196_I2C_SCL_PIN, &bq24196_i2c_handle);
     gpio_init();
     bq24196_init(&bq24196_i2c_handle);
@@ -100,7 +109,6 @@ static void app_init() {
     ESP_ERROR_CHECK(esp_event_loop_create_default());
     mdns_local_init();
     wifi_init();
-    wifi_init_provisioning();
     http_client_init();
 
     scheduler_task_init();
@@ -148,58 +156,65 @@ void app_main(void) {
             spot_check_show_unprovisioned_screen();
             screen_img_handler_render(__func__, __LINE__);
             wifi_init_provisioning();
-            wifi_start_provisioning(false);
+            wifi_start_provisioning();
             break;
         }
 
-        // De-init prov and kick off wifi to attempt to connect to STA network. Event loop will handle kicking scheduler
-        // to offline mode if it can't connect to network, and below check will re-init prov mgr and kick us out of
-        // startup logic
-        wifi_deinit_provisioning();
+        // Kick off wifi to attempt to connect to STA network. Event loop will handle kicking scheduler to offline mode
+        // if it can't connect to network, and below check will re-init prov mgr and kick us out of startup logic
         wifi_start_sta();
 
         // Wait for all network and wifi  event loops to settle after startup sequence (including retries internal to
         // those modules). If scheduler transitions out of init mode it either successfully got network conn or executed
         // STA_DISCON event and kicked scheduler to offline mode to poll, no reason to keep spinning here.
-        uint32_t start_ticks = xTaskGetTickCount();
-        uint32_t now_ticks   = start_ticks;
+        const uint8_t max_wait_secs     = 60;
+        uint8_t       current_wait_secs = 0;
         while (!wifi_is_connected_to_network() && scheduler_get_mode() == SCHEDULER_MODE_INIT &&
-               (now_ticks - start_ticks < pdMS_TO_TICKS(30 * 1000))) {
+               (current_wait_secs < max_wait_secs)) {
             log_printf(LOG_LEVEL_INFO, "Waiting for connection to wifi network and IP assignment");
             vTaskDelay(pdMS_TO_TICKS(1000));
-            now_ticks = xTaskGetTickCount();
+
+            // TODO :: I don't think this is actually doing anything, need a way to actually test it
+            if (current_wait_secs == 30) {
+                log_printf(LOG_LEVEL_INFO,
+                           "30 seconds elapsed with no wifi connection still, kicking/restarting wifi connection");
+
+                ESP_ERROR_CHECK(esp_wifi_stop());
+                ESP_ERROR_CHECK(esp_wifi_start());
+            }
         }
 
         // If this is still false, it means we either couldn't find the provisioned network or just couldn't connect to
-        // it. Regardless, event loop will kick scheduler to offline mode to continue trying to connect, and restart
-        // provisioning here. This way, if it's just a network issue, the scheduler should keep retrying until it's
-        // connected. If the old provisioned network actually isn't available anymore, prov mgr is running for user to
-        // reprovision.
+        // it. Regardless, we give up entirely for the remainder of this boot on forming a successful conneciton.
+        // Scheduler stays in INIT mode and prov mgr is started. If network actually existss and we just couldn't
+        // connect, user will have to reboot. If they successfully provision then event loop will reboot with new prov
+        // creds. Too many problems with trying to support provisioning while also healthchecking to reconnect to maybe
+        // still-existing network because the http client and the prov manager use the same radio, one will always
+        // break.
         if (!wifi_is_connected_to_network()) {
             spot_check_show_no_network_screen();
             screen_img_handler_render(__func__, __LINE__);
-
-            // Have to re-init and restart since it would have been stopped and de-inited on initial startup due to
-            // finding already provisioned network
             wifi_init_provisioning();
-            wifi_start_provisioning(true);
+            wifi_start_provisioning();
             break;
         }
 
-        // Update splash screen with fetching data text, then check actual internet connection. Start scheduler in
-        // offline mode if failed
+        // Update splash screen with fetching data text, then check actual internet connection
         spot_check_show_checking_connection_screen();
         screen_img_handler_render(__func__, __LINE__);
         if (!http_client_check_internet()) {
-            spot_check_show_no_internet_screen();
-            screen_img_handler_render(__func__, __LINE__);
-            scheduler_set_offline_mode();
-
-            // Have to re-init and restart since it would have been stopped and de-inited on initial startup due to
-            // finding already provisioned network
-            wifi_init_provisioning();
-            wifi_start_provisioning(true);
-            break;
+            log_printf(LOG_LEVEL_WARN,
+                       "Failed healthcheck after being assigned IP. Waiting 5 seconds then trying again.");
+            vTaskDelay(pdMS_TO_TICKS(5000));
+            if (!http_client_check_internet()) {
+                log_printf(LOG_LEVEL_WARN, "Failed second healthcheck, fail out to prov");
+                spot_check_show_no_internet_screen();
+                screen_img_handler_render(__func__, __LINE__);
+                wifi_init_provisioning();
+                wifi_start_provisioning();
+                break;
+            }
+            log_printf(LOG_LEVEL_INFO, "Succeeded on second healthcheck request");
         }
 
         // Only enable heartbeat events on boot. This enables a quick heartbeat as soon as wifi conn. established
@@ -212,9 +227,9 @@ void app_main(void) {
         // make it less likely we render the epoch before it syncs correctly. Sometimes SNTP gets a new value within
         // a second, sometimes it takes 45 seconds. If sntp doesn't report fully synced,  we also check the date and
         // as long as it's not 1970 we call it synced to help speed up the process.
-        bool sntp_time_set = false;
-        start_ticks        = xTaskGetTickCount();
-        now_ticks          = start_ticks;
+        bool     sntp_time_set = false;
+        uint32_t start_ticks   = xTaskGetTickCount();
+        uint32_t now_ticks     = start_ticks;
         log_printf(LOG_LEVEL_INFO, "Waiting for sntp time");
         while (!sntp_time_set && (now_ticks - start_ticks < pdMS_TO_TICKS(30 * 1000))) {
             sntp_time_set = sntp_time_is_synced();
