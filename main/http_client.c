@@ -277,14 +277,16 @@ bool http_client_perform(http_request_t *request_obj, esp_http_client_handle_t *
     // Always give back no matter what happened with the req
     xSemaphoreGive(request_lock);
 
-    memfault_metrics_heartbeat_add(memfault_key, *failed_error_ptr);
+    if (!req_start_success) {
+        memfault_metrics_heartbeat_add(memfault_key, 1);
+    }
 
     return req_start_success;
 }
 
 /*
  * Check headers and status code to make sure request was successful. Should only be used internally by http request
- * functions before they read out data in different manners.
+ * functions before they read out data in different manners (not static because cli needs access for debugging).
  * Returns success, content length returned through last arg.
  */
 bool http_client_check_response(esp_http_client_handle_t *client, int *content_length) {
@@ -301,7 +303,7 @@ bool http_client_check_response(esp_http_client_handle_t *client, int *content_l
     int status = esp_http_client_get_status_code(*client);
     if (status >= 200 && status <= 299) {
         if (*content_length < 0) {
-            log_printf(LOG_LEVEL_INFO,
+            log_printf(LOG_LEVEL_WARN,
                        "Status code successful (%d), but error fetching headers with negative content-length, bailing",
                        status);
         } else if (content_length == 0) {
