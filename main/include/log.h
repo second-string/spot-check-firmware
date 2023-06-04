@@ -21,6 +21,7 @@ void     log_show_tag(sc_tag_t tag);
 void     log_show_all_tags();
 void     log_hide_all_tags();
 uint32_t log_get_tag_blacklist();
+char    *log_get_time_str();
 
 // Uses esp idf ansi color code macros
 #define LOG_LEVEL_DEBUG_COLOR LOG_COLOR(LOG_COLOR_BLACK)
@@ -38,11 +39,11 @@ uint32_t log_get_tag_blacklist();
 // Should not be called externally.
 // example literal output: \033[0;31m%s [ERR] example log from app %s %d %u\033[0;30m\n
 #define BUILD_LOG_LINE(_level_, _caller_format_) \
-    _level_##_COLOR "%s " _level_##_PREFIX " " _caller_format_ LOG_RESET_COLOR "\n"
+    "[%s] " _level_##_COLOR "%s " _level_##_PREFIX " " _caller_format_ LOG_RESET_COLOR "\n"
 
 // Main log macro - this is the only thing that should be called externally
 // Don't need to error check TAG existence because it will error on compile if calling file hasn't defined it. Must pass
 // the tag string as arg before optional var args as hardcoded %s in built log str will blow up in vsnprintf if not
 // included
 #define log_printf(_level_, _fmt_, ...) \
-    log_log_line(TAG, _level_, BUILD_LOG_LINE(_level_, _fmt_), tag_strs[TAG], ##__VA_ARGS__)
+    log_log_line(TAG, _level_, BUILD_LOG_LINE(_level_, _fmt_), log_get_time_str(), tag_strs[TAG], ##__VA_ARGS__)

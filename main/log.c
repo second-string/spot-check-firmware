@@ -6,6 +6,7 @@
 #include "driver/uart.h"
 
 #include "log.h"
+#include "sntp_time.h"
 
 // Should match CLI_UART_TX_BYTES probably
 #define LOG_OUT_BUFFER_BYTES (512)
@@ -16,6 +17,7 @@ static SemaphoreHandle_t mutex_handle;
 static StaticSemaphore_t mutex_buffer;
 static log_level_t       max_log_level;
 static uint32_t          tag_blacklist;
+static char              time_str_buffer[20];
 
 void log_init(uart_handle_t *cli_handle) {
     assert(cli_handle);
@@ -29,6 +31,7 @@ void log_init(uart_handle_t *cli_handle) {
     cli_uart_handle = cli_handle;
     max_log_level   = LOG_LEVEL_DEBUG;
     tag_blacklist   = 0x00000000;
+    memset(time_str_buffer, 0x00, sizeof(time_str_buffer));
 }
 
 void log_log_line(sc_tag_t tag, log_level_t level, char *fmt, ...) {
@@ -119,4 +122,15 @@ void log_hide_all_tags() {
  */
 uint32_t log_get_tag_blacklist() {
     return tag_blacklist;
+}
+
+/*
+ * Gets time string for log prefix. Doesn't matter if SNTP synced yet, RTC will return time since boot if not.
+ */
+char *log_get_time_str() {
+    struct tm now_local = {0};
+    sntp_time_get_local_time(&now_local);
+    sntp_time_get_time_str(&now_local, time_str_buffer, NULL);
+
+    return time_str_buffer;
 }
