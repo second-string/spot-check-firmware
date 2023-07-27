@@ -1,5 +1,6 @@
 #include <string.h>
 
+#include "esp_crt_bundle.h"
 #include "esp_mac.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
@@ -202,10 +203,11 @@ bool http_client_perform(http_request_t *request_obj, esp_http_client_handle_t *
     // Note: using port field means you have to use host and path options instead of URL - it generates the URL
     // internally based on these and setting the url field manually overwrites all that
     esp_http_client_config_t http_config = {
-        .url            = req_url,
-        .event_handler  = http_event_handler,
-        .buffer_size    = MAX_READ_BUFFER_SIZE,
-        .cert_pem       = (char *)&server_cert_pem_start,
+        .url               = req_url,
+        .event_handler     = http_event_handler,
+        .buffer_size       = MAX_READ_BUFFER_SIZE,
+        .crt_bundle_attach = esp_crt_bundle_attach,
+        // .cert_pem       = (char *)&server_cert_pem_start,
         .transport_type = HTTP_TRANSPORT_OVER_SSL,
     };
 

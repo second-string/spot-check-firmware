@@ -54,7 +54,7 @@ bool nvs_get_uint32(char *key, uint32_t *val) {
             *val = 0;
             break;
         default:
-            log_printf(LOG_LEVEL_ERROR, "Error (%s) reading value for key '%s' from NVS\n", esp_err_to_name(err), key);
+            log_printf(LOG_LEVEL_ERROR, "Error (%s) reading value for key '%s' from NVS", esp_err_to_name(err), key);
     }
 
     return retval;
@@ -92,7 +92,7 @@ bool nvs_get_int8(char *key, int8_t *val) {
             *val = 0;
             break;
         default:
-            log_printf(LOG_LEVEL_ERROR, "Error (%s) reading value for key '%s' from NVS\n", esp_err_to_name(err), key);
+            log_printf(LOG_LEVEL_ERROR, "Error (%s) reading value for key '%s' from NVS", esp_err_to_name(err), key);
     }
 
     return retval;
@@ -160,11 +160,11 @@ spot_check_config *nvs_get_config() {
         case ESP_OK:
             break;
         case ESP_ERR_NVS_NOT_FOUND:
-            printf("The value is not initialized yet, defaulting to wedge!\n");
+            log_printf(LOG_LEVEL_DEBUG, "The value is not initialized yet, defaulting to wedge!");
             strcpy(_spot_name, "Wedge");
             break;
         default:
-            printf("Error (%s) reading spot_name from flash!\n", esp_err_to_name(err));
+            log_printf(LOG_LEVEL_ERROR, "Error (%s) reading spot_name from flash!", esp_err_to_name(err));
     }
 
     err = nvs_get_str(handle, "spot_lat", _spot_lat, &max_length_spot_lat_param);
@@ -172,11 +172,11 @@ spot_check_config *nvs_get_config() {
         case ESP_OK:
             break;
         case ESP_ERR_NVS_NOT_FOUND:
-            printf("The value is not initialized yet, defaulting to 33.5930302087!\n");
+            log_printf(LOG_LEVEL_DEBUG, "The value is not initialized yet, defaulting to 33.5930302087!");
             strcpy(_spot_lat, "33.5930302087");
             break;
         default:
-            printf("Error (%s) reading spot_lat from flash!\n", esp_err_to_name(err));
+            log_printf(LOG_LEVEL_ERROR, "Error (%s) reading spot_lat from flash!", esp_err_to_name(err));
     }
 
     err = nvs_get_str(handle, "spot_lon", _spot_lon, &max_length_spot_lon_param);
@@ -184,11 +184,11 @@ spot_check_config *nvs_get_config() {
         case ESP_OK:
             break;
         case ESP_ERR_NVS_NOT_FOUND:
-            printf("The value is not initialized yet, defaulting to -117.8819918632!\n");
+            log_printf(LOG_LEVEL_DEBUG, "The value is not initialized yet, defaulting to -117.8819918632!");
             strcpy(_spot_lon, "-117.8819918632");
             break;
         default:
-            printf("Error (%s) reading spot_lon from flash!\n", esp_err_to_name(err));
+            log_printf(LOG_LEVEL_ERROR, "Error (%s) reading spot_lon from flash!", esp_err_to_name(err));
     }
 
     err = nvs_get_str(handle, "spot_uid", _spot_uid, &max_length_spot_uid_param);
@@ -197,11 +197,11 @@ spot_check_config *nvs_get_config() {
             break;
         case ESP_ERR_NVS_NOT_FOUND:;
             char *wedge_uid = "5842041f4e65fad6a770882b";
-            printf("The value is not initialized yet, defaulting to wedge's uid (%s)\n", wedge_uid);
+            log_printf(LOG_LEVEL_DEBUG, "The value is not initialized yet, defaulting to wedge's uid (%s)", wedge_uid);
             strcpy(_spot_uid, wedge_uid);
             break;
         default:
-            printf("Error (%s) reading spot_uid from flash!\n", esp_err_to_name(err));
+            log_printf(LOG_LEVEL_ERROR, "Error (%s) reading spot_uid from flash!", esp_err_to_name(err));
     }
 
     err = nvs_get_str(handle, "tz_str", _tz_str, &max_length_tz_str_param);
@@ -210,11 +210,13 @@ spot_check_config *nvs_get_config() {
             break;
         case ESP_ERR_NVS_NOT_FOUND:;
             char *tz_str = "CET-1CEST,M3.4.0/2,M10.4.0/2";
-            printf("The value is not initialized yet, defaulting to default Berlin tz  '%s'\n", tz_str);
+            log_printf(LOG_LEVEL_DEBUG,
+                       "The value is not initialized yet, defaulting to default Berlin tz  '%s'",
+                       tz_str);
             strcpy(_tz_str, tz_str);
             break;
         default:
-            printf("Error (%s) reading tz_str from flash!\n", esp_err_to_name(err));
+            log_printf(LOG_LEVEL_ERROR, "Error (%s) reading tz_str from flash!", esp_err_to_name(err));
     }
 
     err = nvs_get_str(handle, "tz_display_name", _tz_display_name, &max_length_tz_display_name_param);
@@ -223,11 +225,13 @@ spot_check_config *nvs_get_config() {
             break;
         case ESP_ERR_NVS_NOT_FOUND:;
             char *display_name = "Europe/Berlin";
-            printf("The value is not initialized yet, defaulting to default Berlin tz  '%s'\n", display_name);
+            log_printf(LOG_LEVEL_DEBUG,
+                       "The value is not initialized yet, defaulting to default Berlin tz  '%s'",
+                       display_name);
             strcpy(_tz_display_name, display_name);
             break;
         default:
-            printf("Error (%s) reading tz_display_name from flash!\n", esp_err_to_name(err));
+            log_printf(LOG_LEVEL_ERROR, "Error (%s) reading tz_display_name from flash!", esp_err_to_name(err));
     }
 
     current_config.spot_name       = _spot_name;

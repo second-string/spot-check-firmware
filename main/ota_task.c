@@ -12,10 +12,10 @@
 
 #include "constants.h"
 #include "http_client.h"
-#include "json.h"
+// #include "json.h"
 #include "log.h"
 #include "ota_task.h"
-#include "screen_img_handler.h"
+// #include "screen_img_handler.h"
 #include "sleep_handler.h"
 #include "spot_check.h"
 #include "wifi.h"
@@ -132,22 +132,22 @@ static bool check_forced_update(esp_app_desc_t *current_image_info, char *versio
     }
 
     log_printf(LOG_LEVEL_INFO, "%s", response_data);
-    bool   force_update      = false;
-    cJSON *response_json     = parse_json(response_data);
-    cJSON *needs_update_json = cJSON_GetObjectItem(response_json, "needs_update");
-    if (cJSON_IsTrue(needs_update_json)) {
-        // This will break if server gives us a string larger than pre-alloced buf passed in. Right now it's 10 bytes
-        cJSON *version_to_download_json = cJSON_GetObjectItem(response_json, "server_version");
-        char  *temp_version             = cJSON_GetStringValue(version_to_download_json);
-        strcpy(version_to_download, temp_version);
-        force_update = true;
-    }
+    bool force_update = false;
+    // cJSON *response_json     = parse_json(response_data);
+    // cJSON *needs_update_json = cJSON_GetObjectItem(response_json, "needs_update");
+    // if (cJSON_IsTrue(needs_update_json)) {
+    //     // This will break if server gives us a string larger than pre-alloced buf passed in. Right now it's 10 bytes
+    //     cJSON *version_to_download_json = cJSON_GetObjectItem(response_json, "server_version");
+    //     char  *temp_version             = cJSON_GetStringValue(version_to_download_json);
+    //     strcpy(version_to_download, temp_version);
+    //     force_update = true;
+    // }
 
-    // Clean up request and json mem
-    if (response_data_size && response_data) {
-        free(response_data);
-    }
-    cJSON_free(response_json);
+    // // Clean up request and json mem
+    // if (response_data_size && response_data) {
+    //     free(response_data);
+    // }
+    // cJSON_free(response_json);
 
     return force_update;
 }
@@ -159,7 +159,7 @@ static bool check_forced_update(esp_app_desc_t *current_image_info, char *versio
 static void ota_task_stop(bool clear_ota_text) {
     if (clear_ota_text) {
         spot_check_clear_ota_start_text();
-        screen_img_handler_render(__func__, __LINE__);
+        // screen_img_handler_render(__func__, __LINE__);
     }
 
     sleep_handler_set_idle(SYSTEM_IDLE_OTA_BIT);
@@ -254,7 +254,7 @@ static void check_ota_update_task(void *args) {
 
     // Notify user on screen
     spot_check_draw_ota_start_text();
-    screen_img_handler_render(__func__, __LINE__);
+    // screen_img_handler_render(__func__, __LINE__);
 
     uint32_t iter_counter = 0;
     uint32_t bytes_received;
@@ -312,20 +312,21 @@ UBaseType_t ota_task_get_stack_high_water() {
 }
 
 void ota_task_start() {
-    if (ota_task_handle != NULL) {
-        log_printf(LOG_LEVEL_WARN,
-                   "%s called when ota task handle not null. This means the task wasn't torn down correctly after last "
-                   "check, or it is somehow being called from somewhere it shouldn't (OTA should only run on set "
-                   "schedule far apart). This is a bug, it should never happen.",
-                   __func__);
-        return;
-    }
+    (void)check_ota_update_task;
+    // if (ota_task_handle != NULL) {
+    //     log_printf(LOG_LEVEL_WARN,
+    //                "%s called when ota task handle not null. This means the task wasn't torn down correctly after
+    //                last " "check, or it is somehow being called from somewhere it shouldn't (OTA should only run on
+    //                set " "schedule far apart). This is a bug, it should never happen.",
+    //                __func__);
+    //     return;
+    // }
 
-    // minimal * 3 is the smallest we can go w/o SO
-    xTaskCreate(&check_ota_update_task,
-                "check-ota-update",
-                SPOT_CHECK_MINIMAL_STACK_SIZE_BYTES * 4,
-                NULL,
-                tskIDLE_PRIORITY,
-                &ota_task_handle);
+    // // minimal * 3 is the smallest we can go w/o SO
+    // xTaskCreate(&check_ota_update_task,
+    //             "check-ota-update",
+    //             SPOT_CHECK_MINIMAL_STACK_SIZE_BYTES * 4,
+    //             NULL,
+    //             tskIDLE_PRIORITY,
+    //             &ota_task_handle);
 }

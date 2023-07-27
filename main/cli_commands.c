@@ -18,7 +18,7 @@
 #include "cli_commands.h"
 #include "cli_task.h"
 #include "constants.h"
-#include "display.h"
+// #include "display.h"
 #include "flash_partition.h"
 #include "http_client.h"
 #include "log.h"
@@ -26,7 +26,7 @@
 #include "nvs.h"
 #include "ota_task.h"
 #include "scheduler_task.h"
-#include "screen_img_handler.h"
+// #include "screen_img_handler.h"
 #include "sleep_handler.h"
 #include "sntp_time.h"
 #include "spot_check.h"
@@ -271,26 +271,26 @@ static BaseType_t cli_command_api(char *write_buffer, size_t write_buffer_size, 
     const char *endpoint = FreeRTOS_CLIGetParameter(cmd_str, 1, &endpoint_len);
 
     if (endpoint_len == 3 && strncmp(endpoint, "img", endpoint_len) == 0) {
-        BaseType_t  screen_img_str_len;
-        const char *screen_img_str = FreeRTOS_CLIGetParameter(cmd_str, 2, &screen_img_str_len);
-        if (screen_img_str == NULL) {
-            strcpy(write_buffer, "Error: usage is 'api img <screen_img_t>'");
-            return pdFALSE;
-        }
+        // BaseType_t  screen_img_str_len;
+        // const char *screen_img_str = FreeRTOS_CLIGetParameter(cmd_str, 2, &screen_img_str_len);
+        // if (screen_img_str == NULL) {
+        //     strcpy(write_buffer, "Error: usage is 'api img <screen_img_t>'");
+        //     return pdFALSE;
+        // }
 
-        screen_img_t screen_img = SCREEN_IMG_COUNT;
-        if (screen_img_str_len == 4 && strcmp(screen_img_str, "tide") == 0) {
-            screen_img = SCREEN_IMG_TIDE_CHART;
-        } else if (screen_img_str_len == 5 && strcmp(screen_img_str, "swell") == 0) {
-            screen_img = SCREEN_IMG_SWELL_CHART;
-        } else {
-            char msg[80];
-            sprintf(msg, "Found no matching screen_img_t enum value for img '%s'", screen_img_str);
-            strcpy(write_buffer, msg);
-            return pdFALSE;
-        }
+        // screen_img_t screen_img = SCREEN_IMG_COUNT;
+        // if (screen_img_str_len == 4 && strcmp(screen_img_str, "tide") == 0) {
+        //     screen_img = SCREEN_IMG_TIDE_CHART;
+        // } else if (screen_img_str_len == 5 && strcmp(screen_img_str, "swell") == 0) {
+        //     screen_img = SCREEN_IMG_SWELL_CHART;
+        // } else {
+        //     char msg[80];
+        //     sprintf(msg, "Found no matching screen_img_t enum value for img '%s'", screen_img_str);
+        //     strcpy(write_buffer, msg);
+        //     return pdFALSE;
+        // }
 
-        screen_img_handler_download_and_save(screen_img);
+        // screen_img_handler_download_and_save(screen_img);
         memset(write_buffer, 0x0, write_buffer_size);
     } else if (endpoint_len == 3 && strncmp(endpoint, "ota", endpoint_len) == 0) {
         char post_data[100];
@@ -411,18 +411,18 @@ static BaseType_t cli_command_partition(char *write_buffer, size_t write_buffer_
             return pdFALSE;
         }
 
-        const esp_partition_t *part = flash_partition_get_screen_img_partition();
-        if (part == NULL) {
-            strcpy(write_buffer, "No partition by that name found");
-        }
+        // const esp_partition_t *part = flash_partition_get_screen_img_partition();
+        // if (part == NULL) {
+        //     strcpy(write_buffer, "No partition by that name found");
+        // }
 
-        uint8_t temp[16];
-        ESP_ERROR_CHECK(esp_partition_read(part, 0x00, temp, 16));
+        // uint8_t temp[16];
+        // ESP_ERROR_CHECK(esp_partition_read(part, 0x00, temp, 16));
 
         log_printf(LOG_LEVEL_INFO, "First 16 bytes of the %s partition:", part_label);
-        for (int i = 0; i < sizeof(temp); i++) {
-            log_printf(LOG_LEVEL_INFO, "%02X", temp[i]);
-        }
+        // for (int i = 0; i < sizeof(temp); i++) {
+        //     log_printf(LOG_LEVEL_INFO, "%02X", temp[i]);
+        // }
 
         // Empty out the buffer since we'll print the output of the last command if we don't
         strcpy(write_buffer, "");
@@ -438,16 +438,16 @@ static BaseType_t cli_command_partition(char *write_buffer, size_t write_buffer_
             strcpy(write_buffer, "No partition by that name found");
         }
 
-        char msg[60];
-        if ((part_label_len == 3 && strcmp(part_label, "nvs") == 0) ||
-            (part_label_len == 10 && strcmp(part_label, SCREEN_IMG_PARTITION_LABEL) == 0)) {
-            esp_partition_erase_range(part, 0x0, part->size);
-            sprintf(msg, "Successfully erased '%s' partition", part->label);
-            strcpy(write_buffer, msg);
-        } else {
-            sprintf(msg, "Erasing of '%s' partition not allowed!", part->label);
-            strcpy(write_buffer, msg);
-        }
+        // char msg[60];
+        // if ((part_label_len == 3 && strcmp(part_label, "nvs") == 0) ||
+        //     (part_label_len == 10 && strcmp(part_label, SCREEN_IMG_PARTITION_LABEL) == 0)) {
+        //     esp_partition_erase_range(part, 0x0, part->size);
+        //     sprintf(msg, "Successfully erased '%s' partition", part->label);
+        //     strcpy(write_buffer, msg);
+        // } else {
+        //     sprintf(msg, "Erasing of '%s' partition not allowed!", part->label);
+        //     strcpy(write_buffer, msg);
+        // }
     } else if (action_len == 4 && strncmp(action, "list", action_len) == 0) {
         static esp_partition_iterator_t iter = NULL;
         static const esp_partition_t   *part = NULL;
@@ -506,7 +506,7 @@ static BaseType_t cli_command_display(char *write_buffer, size_t write_buffer_si
 
     memset(write_buffer, 0x0, write_buffer_size);
     if (action_len == 5 && strncmp(action, "clear", action_len) == 0) {
-        display_full_clear();
+        // display_full_clear();
     } else if (action_len == 3 && strncmp(action, "img", action_len) == 0) {
         BaseType_t  screen_len;
         const char *screen = FreeRTOS_CLIGetParameter(cmd_str, 2, &screen_len);
@@ -515,17 +515,17 @@ static BaseType_t cli_command_display(char *write_buffer, size_t write_buffer_si
             return pdFALSE;
         }
 
-        screen_img_t screen_img = SCREEN_IMG_COUNT;
-        if (screen_len == 4 && strncmp(screen, "tide", screen_len) == 0) {
-            screen_img = SCREEN_IMG_TIDE_CHART;
-        } else if (screen_len == 5 && strncmp(screen, "swell", screen_len) == 0) {
-            screen_img = SCREEN_IMG_SWELL_CHART;
-        } else {
-            char msg[80];
-            sprintf(msg, "Found no matching screen_img_t enum value for screen '%s'", screen);
-            strcpy(write_buffer, msg);
-            return pdFALSE;
-        }
+        // screen_img_t screen_img = SCREEN_IMG_COUNT;
+        // if (screen_len == 4 && strncmp(screen, "tide", screen_len) == 0) {
+        //     screen_img = SCREEN_IMG_TIDE_CHART;
+        // } else if (screen_len == 5 && strncmp(screen, "swell", screen_len) == 0) {
+        //     screen_img = SCREEN_IMG_SWELL_CHART;
+        // } else {
+        //     char msg[80];
+        //     sprintf(msg, "Found no matching screen_img_t enum value for screen '%s'", screen);
+        //     strcpy(write_buffer, msg);
+        //     return pdFALSE;
+        // }
 
         // TODO :: Don't know if we want to expose the ability to render img to coords from screen_img_handler in
         // the future or only encompass the logic there
@@ -550,11 +550,11 @@ static BaseType_t cli_command_display(char *write_buffer, size_t write_buffer_si
         (void)x_coord;
         (void)y_coord;
 
-        bool success = screen_img_handler_draw_screen_img(screen_img);
-        screen_img_handler_render(__func__, __LINE__);
-        if (!success) {
-            strcpy(write_buffer, "CLI command to render screen_img failed");
-        }
+        // bool success = screen_img_handler_draw_screen_img(screen_img);
+        // screen_img_handler_render(__func__, __LINE__);
+        // if (!success) {
+        //     strcpy(write_buffer, "CLI command to render screen_img failed");
+        // }
     } else {
         strcpy(write_buffer, "Unknown display command");
     }
@@ -881,11 +881,11 @@ BaseType_t cli_command_mem(char *write_buffer, size_t write_buffer_size, const c
         if (num_tasks_created == 0) {
             num_tasks_created = uxTaskGetNumberOfTasks();
             task_statuses     = malloc(sizeof(TaskStatus_t) * num_tasks_created);
-            configASSERT(task_statuses);
+            MEMFAULT_ASSERT(task_statuses);
 
             // This call is helllllllla slow - do not use anywhere except debugging
             UBaseType_t num_tasks_read = uxTaskGetSystemState(task_statuses, num_tasks_created, NULL);
-            configASSERT(num_tasks_read == num_tasks_created);
+            MEMFAULT_ASSERT(num_tasks_read == num_tasks_created);
             output_idx = 0;
             strcpy(out_str, "STACK high water marks (bytes, lower closer to overflow):");
             retval = pdTRUE;

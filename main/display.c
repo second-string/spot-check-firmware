@@ -24,10 +24,10 @@
 #define ED060SC4_WIDTH_PX 800
 #define ED060SC4_HEIGHT_PX 600
 
-static EpdiyHighlevelState hl;
-static uint32_t            display_height;
-static uint32_t            display_width;
-static SemaphoreHandle_t   render_lock;
+// static EpdiyHighlevelState hl;
+static uint32_t          display_height;
+static uint32_t          display_width;
+static SemaphoreHandle_t render_lock;
 
 static enum EpdFontFlags display_get_epd_font_flags_enum(display_font_align_t alignment) {
     MEMFAULT_ASSERT(alignment < DISPLAY_FONT_ALIGN_COUNT);
@@ -115,26 +115,32 @@ static void display_render_mode(enum EpdDrawMode mode, const char *calling_func,
         return;
     }
 
+    /*
     epd_poweron();
     vTaskDelay(pdMS_TO_TICKS(20));
     enum EpdDrawError err = epd_hl_update_screen(&hl, mode, 25);
     (void)err;
     // TODO :: error check
     epd_poweroff();
+*/
 
     render_release_lock();
 }
 
 void display_init() {
+    /*
     epd_init(EPD_LUT_1K);
     hl          = epd_hl_init(EPD_BUILTIN_WAVEFORM);
     uint8_t *fb = epd_hl_get_framebuffer(&hl);
     memset(fb, 0x00, EPD_WIDTH / 2 * EPD_HEIGHT);
+    */
 
     render_lock = xSemaphoreCreateMutex();
 
+    /*
     display_width  = epd_rotated_display_width();
     display_height = epd_rotated_display_height();
+    */
     log_printf(LOG_LEVEL_DEBUG, "Display dimensions,  width: %dpx height: %dpx", display_width, display_height);
 }
 
@@ -155,6 +161,7 @@ void display_full_clear_cycles(uint8_t cycles) {
         return;
     }
 
+    /*
     epd_poweron();
     epd_hl_set_all_white(&hl);
     enum EpdDrawError err = epd_hl_update_screen(&hl, MODE_GC16, 25);
@@ -162,6 +169,7 @@ void display_full_clear_cycles(uint8_t cycles) {
     vTaskDelay(pdMS_TO_TICKS(20));
     epd_clear_area_cycles(epd_full_screen(), cycles, 12);
     epd_poweroff();
+    */
 
     render_release_lock();
 }
@@ -190,8 +198,10 @@ void display_clear_area(uint32_t x, uint32_t y, uint32_t width, uint32_t height)
     };
 
     // Fill framebuffer with white to ovewrite any drawn data in epd_hl_update_area
+    /*
     uint8_t *fb = epd_hl_get_framebuffer(&hl);
     epd_fill_rect(rect, 0xFF, fb);
+    */
 
     // Add in 1-pixel padding to erase area to make sure a gray outline isn't left from bleedover
     if (rect.x > 0) {
@@ -207,12 +217,14 @@ void display_clear_area(uint32_t x, uint32_t y, uint32_t width, uint32_t height)
         rect.height += 2;
     }
 
+    /*
     epd_poweron();
     epd_hl_update_area(&hl, MODE_GC16, 18, rect);
     vTaskDelay(pdMS_TO_TICKS(40));
     epd_clear_area_cycles(rect, 1, 12);
     vTaskDelay(pdMS_TO_TICKS(40));
     epd_poweroff();
+    */
 
     render_release_lock();
 
@@ -263,10 +275,10 @@ void display_draw_text(char                *text,
     int x = x_coord;
     int y = y_coord;
 
-    EpdFontProperties font_props = epd_font_properties_default();
-    font_props.flags             = display_get_epd_font_flags_enum(alignment);
-    const EpdFont *font          = display_get_epd_font_enum(size);
-    uint8_t       *fb            = epd_hl_get_framebuffer(&hl);
+    // EpdFontProperties font_props = epd_font_properties_default();
+    // font_props.flags             = display_get_epd_font_flags_enum(alignment);
+    // const EpdFont *font          = display_get_epd_font_enum(size);
+    // uint8_t       *fb            = epd_hl_get_framebuffer(&hl);
 
     log_printf(LOG_LEVEL_DEBUG,
                "Rendering %s, %s-aligned text at (%u, %u): '%s'",
@@ -276,7 +288,7 @@ void display_draw_text(char                *text,
                y,
                text);
 
-    epd_write_string(font, text, &x, &y, fb, &font_props);
+    // epd_write_string(font, text, &x, &y, fb, &font_props);
 }
 
 void display_invert_text(char                *text,
@@ -290,11 +302,11 @@ void display_invert_text(char                *text,
     int x = x_coord;
     int y = y_coord;
 
-    EpdFontProperties font_props = epd_font_properties_default();
-    font_props.flags             = display_get_epd_font_flags_enum(alignment);
-    font_props.fg_color          = 0xF;
-    const EpdFont *font          = display_get_epd_font_enum(size);
-    uint8_t       *fb            = epd_hl_get_framebuffer(&hl);
+    // EpdFontProperties font_props = epd_font_properties_default();
+    // font_props.flags             = display_get_epd_font_flags_enum(alignment);
+    // font_props.fg_color          = 0xF;
+    // const EpdFont *font          = display_get_epd_font_enum(size);
+    // uint8_t       *fb            = epd_hl_get_framebuffer(&hl);
 
     log_printf(LOG_LEVEL_DEBUG,
                "Inverting %s, %s-aligned text at (%u, %u): '%s'",
@@ -304,7 +316,7 @@ void display_invert_text(char                *text,
                y,
                text);
 
-    epd_write_string(font, text, &x, &y, fb, &font_props);
+    // epd_write_string(font, text, &x, &y, fb, &font_props);
 }
 
 /*
@@ -322,16 +334,16 @@ void display_draw_image(uint8_t *image_buffer,
     MEMFAULT_ASSERT(screen_x + width_px <= ED060SC4_WIDTH_PX);
     MEMFAULT_ASSERT(screen_y + height_px <= ED060SC4_HEIGHT_PX);
 
-    uint8_t *fb   = epd_hl_get_framebuffer(&hl);
-    EpdRect  rect = {
-         .x      = screen_x,
-         .y      = screen_y,
-         .width  = width_px,
-         .height = height_px,
-    };
+    // uint8_t *fb   = epd_hl_get_framebuffer(&hl);
+    // EpdRect  rect = {
+    //      .x      = screen_x,
+    //      .y      = screen_y,
+    //      .width  = width_px,
+    //      .height = height_px,
+    // };
 
     // Data MUST be 2 pixels per byte, aka 1 pixel per 4-bit nibble.
-    epd_copy_to_framebuffer(rect, image_buffer, fb);
+    // epd_copy_to_framebuffer(rect, image_buffer, fb);
 }
 
 void display_draw_rect(uint32_t x, uint32_t y, uint32_t width_px, uint32_t height_px) {
@@ -339,15 +351,15 @@ void display_draw_rect(uint32_t x, uint32_t y, uint32_t width_px, uint32_t heigh
     MEMFAULT_ASSERT(x + width_px <= ED060SC4_WIDTH_PX);
     MEMFAULT_ASSERT(y + height_px <= ED060SC4_HEIGHT_PX);
 
-    EpdRect rect = {
-        .x      = x,
-        .y      = y,
-        .width  = width_px,
-        .height = height_px,
-    };
+    // EpdRect rect = {
+    //     .x      = x,
+    //     .y      = y,
+    //     .width  = width_px,
+    //     .height = height_px,
+    // };
 
-    uint8_t *fb = epd_hl_get_framebuffer(&hl);
-    epd_fill_rect(rect, 0x0, fb);
+    // uint8_t *fb = epd_hl_get_framebuffer(&hl);
+    // epd_fill_rect(rect, 0x0, fb);
 
     log_printf(LOG_LEVEL_DEBUG, "Rendering %uw %uh rect at (%u, %u)", width_px, height_px, x, y);
 }
@@ -387,7 +399,7 @@ void display_get_text_bounds(char                *text,
 }
 
 void display_mark_all_lines_dirty() {
-    for (int i = 0; i < (EPD_WIDTH / 2 * EPD_HEIGHT); i++) {
-        hl.back_fb[i] = ~hl.front_fb[i];
-    }
+    // for (int i = 0; i < (EPD_WIDTH / 2 * EPD_HEIGHT); i++) {
+    //     hl.back_fb[i] = ~hl.front_fb[i];
+    // }
 }

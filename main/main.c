@@ -21,17 +21,17 @@
 #include "cd54hc4094.h"
 #include "cli_commands.h"
 #include "cli_task.h"
-#include "display.h"
+// #include "display.h"
 #include "gpio.h"
 #include "http_client.h"
 #include "http_server.h"
 #include "i2c.h"
-#include "json.h"
+// #include "json.h"
 #include "mdns_local.h"
 #include "nvs.h"
 #include "ota_task.h"
 #include "scheduler_task.h"
-#include "screen_img_handler.h"
+// #include "screen_img_handler.h"
 #include "sleep_handler.h"
 #include "sntp_time.h"
 #include "spot_check.h"
@@ -102,9 +102,9 @@ static void app_init() {
     bq24196_init(&bq24196_i2c_handle);
     sntp_time_init();
     cd54hc4094_init(SHIFTREG_CLK_PIN, SHIFTREG_DATA_PIN, SHIFTREG_STROBE_PIN);
-    display_init();
+    // display_init();
     sleep_handler_init();
-    screen_img_handler_init();
+    // screen_img_handler_init();
 
     ESP_ERROR_CHECK(esp_event_loop_create_default());
     mdns_local_init();
@@ -119,7 +119,7 @@ static void app_init() {
 static void app_start() {
     i2c_start(&bq24196_i2c_handle);
     bq24196_start();
-    display_start();
+    // display_start();
     sleep_handler_start();
     sntp_time_start();
     scheduler_task_start();
@@ -127,8 +127,15 @@ static void app_start() {
     cli_task_start();
 }
 
+#include "epd_driver.h"
+#include "epd_highlevel.h"
 void app_main(void) {
     app_init();
+
+    epd_init(EPD_LUT_1K);
+    EpdiyHighlevelState hl = epd_hl_init(EPD_BUILTIN_WAVEFORM);
+    uint8_t            *fb = epd_hl_get_framebuffer(&hl);
+    memset(fb, 0x00, EPD_WIDTH / 2 * EPD_HEIGHT);
 
     size_t info_buffer_size = 200 * sizeof(char);
     char  *info_buffer      = (char *)malloc(info_buffer_size);
@@ -146,7 +153,7 @@ void app_main(void) {
 
     spot_check_config *config = nvs_get_config();
     sntp_set_tz_str(config->tz_str);
-    display_render_splash_screen(spot_check_get_fw_version(), spot_check_get_hw_version());
+    // display_render_splash_screen(spot_check_get_fw_version(), spot_check_get_hw_version());
 
     // Enable breakout at each connectivity check of boot
     do {
@@ -154,7 +161,7 @@ void app_main(void) {
         // displaying provisioning text. No need to waste time trying to connect to network.
         if (!wifi_is_provisioned()) {
             spot_check_show_unprovisioned_screen();
-            screen_img_handler_render(__func__, __LINE__);
+            // screen_img_handler_render(__func__, __LINE__);
             wifi_init_provisioning();
             wifi_start_provisioning();
             break;
@@ -167,12 +174,13 @@ void app_main(void) {
         // Wait for all network and wifi  event loops to settle after startup sequence (including retries internal to
         // those modules). If scheduler transitions out of init mode it either successfully got network conn or executed
         // STA_DISCON event and kicked scheduler to offline mode to poll, no reason to keep spinning here.
-        const uint8_t max_wait_secs     = 60;
+        const uint8_t max_wait_secs     = 30;
         uint8_t       current_wait_secs = 0;
         while (!wifi_is_connected_to_network() && scheduler_get_mode() == SCHEDULER_MODE_INIT &&
                (current_wait_secs < max_wait_secs)) {
             log_printf(LOG_LEVEL_INFO, "Waiting for connection to wifi network and IP assignment");
             vTaskDelay(pdMS_TO_TICKS(1000));
+            current_wait_secs++;
 
             // TODO :: I don't think this is actually doing anything, need a way to actually test it
             if (current_wait_secs == 30) {
@@ -193,7 +201,7 @@ void app_main(void) {
         // break.
         if (!wifi_is_connected_to_network()) {
             spot_check_show_no_network_screen();
-            screen_img_handler_render(__func__, __LINE__);
+            // screen_img_handler_render(__func__, __LINE__);
             wifi_init_provisioning();
             wifi_start_provisioning();
             break;
@@ -201,7 +209,7 @@ void app_main(void) {
 
         // Update splash screen with fetching data text, then check actual internet connection
         spot_check_show_checking_connection_screen();
-        screen_img_handler_render(__func__, __LINE__);
+        // screen_img_handler_render(__func__, __LINE__);
         if (!http_client_check_internet()) {
             log_printf(LOG_LEVEL_WARN,
                        "Failed healthcheck after being assigned IP. Waiting 5 seconds then trying again.");
@@ -209,7 +217,7 @@ void app_main(void) {
             if (!http_client_check_internet()) {
                 log_printf(LOG_LEVEL_WARN, "Failed second healthcheck, fail out to prov");
                 spot_check_show_no_internet_screen();
-                screen_img_handler_render(__func__, __LINE__);
+                // screen_img_handler_render(__func__, __LINE__);
                 wifi_init_provisioning();
                 wifi_start_provisioning();
                 break;

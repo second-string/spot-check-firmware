@@ -15,7 +15,7 @@
 #include "log.h"
 #include "nvs.h"
 #include "ota_task.h"
-#include "screen_img_handler.h"
+// #include "screen_img_handler.h"
 #include "sleep_handler.h"
 #include "sntp_time.h"
 #include "spot_check.h"
@@ -117,7 +117,7 @@ static discrete_update_t discrete_updates[NUM_DISCRETE_UPDATES] = {
         .force_next_update             = false,
         .force_on_transition_to_online = true,
         .hour                          = 0xFF,  // wildcard, runs on 5th minute of every hours
-        .minute                        = 5,
+        .minute                        = 0xFF,
         .hour_last_executed            = 0,
         .minute_last_executed          = 0,
         .active                        = false,
@@ -304,13 +304,13 @@ static void scheduler_task(void *args) {
 
         if (update_bits & UPDATE_TIDE_CHART_BIT) {
             sleep_handler_set_busy(SYSTEM_IDLE_TIDE_CHART_BIT);
-            screen_img_handler_download_and_save(SCREEN_IMG_TIDE_CHART);
+            // screen_img_handler_download_and_save(SCREEN_IMG_TIDE_CHART);
             sleep_handler_set_idle(SYSTEM_IDLE_TIDE_CHART_BIT);
         }
 
         if (update_bits & UPDATE_SWELL_CHART_BIT) {
             sleep_handler_set_busy(SYSTEM_IDLE_SWELL_CHART_BIT);
-            screen_img_handler_download_and_save(SCREEN_IMG_SWELL_CHART);
+            // screen_img_handler_download_and_save(SCREEN_IMG_SWELL_CHART);
             sleep_handler_set_idle(SYSTEM_IDLE_SWELL_CHART_BIT);
         }
 
@@ -321,7 +321,7 @@ static void scheduler_task(void *args) {
         if (update_bits & SEND_MFLT_DATA_BIT) {
             // TODO :: brutally blocking right now for big coredump uploads
             // Don't care about return value, all error-handling internal
-            (void)memfault_interface_post_data();
+            memfault_interface_post_data();
         }
 
         if (update_bits & CHECK_OTA_BIT) {
@@ -355,7 +355,7 @@ static void scheduler_task(void *args) {
         if (full_clear) {
             log_printf(LOG_LEVEL_DEBUG,
                        "Performing full screen clear from scheduler_task since every piece was updated");
-            screen_img_handler_full_clear();
+            // screen_img_handler_full_clear();
         }
 
         if (update_bits & UPDATE_TIME_BIT) {
@@ -410,9 +410,9 @@ static void scheduler_task(void *args) {
         if (update_bits & UPDATE_TIDE_CHART_BIT) {
             sleep_handler_set_busy(SYSTEM_IDLE_TIDE_CHART_BIT);
             if (!full_clear) {
-                screen_img_handler_clear_screen_img(SCREEN_IMG_TIDE_CHART);
+                // screen_img_handler_clear_screen_img(SCREEN_IMG_TIDE_CHART);
             }
-            screen_img_handler_draw_screen_img(SCREEN_IMG_TIDE_CHART);
+            // screen_img_handler_draw_screen_img(SCREEN_IMG_TIDE_CHART);
             log_printf(LOG_LEVEL_INFO, "scheduler task updated tide chart");
             sleep_handler_set_idle(SYSTEM_IDLE_TIDE_CHART_BIT);
         }
@@ -420,9 +420,9 @@ static void scheduler_task(void *args) {
         if (update_bits & UPDATE_SWELL_CHART_BIT) {
             sleep_handler_set_busy(SYSTEM_IDLE_SWELL_CHART_BIT);
             if (!full_clear) {
-                screen_img_handler_clear_screen_img(SCREEN_IMG_SWELL_CHART);
+                // screen_img_handler_clear_screen_img(SCREEN_IMG_SWELL_CHART);
             }
-            screen_img_handler_draw_screen_img(SCREEN_IMG_SWELL_CHART);
+            // screen_img_handler_draw_screen_img(SCREEN_IMG_SWELL_CHART);
             log_printf(LOG_LEVEL_INFO, "scheduler task updated swell chart");
             sleep_handler_set_idle(SYSTEM_IDLE_SWELL_CHART_BIT);
         }
@@ -435,10 +435,10 @@ static void scheduler_task(void *args) {
             // screen gray fade is so bad. This shouldn't be the case, we should be able to add our if-check back in
             // here that allows us to only do full dirty mark on non-time render updates
             if (update_bits & ~UPDATE_TIME_BIT) {
-                screen_img_handler_mark_all_lines_dirty();
+                // screen_img_handler_mark_all_lines_dirty();
             }
 
-            screen_img_handler_render(__func__, __LINE__);
+            // screen_img_handler_render(__func__, __LINE__);
         }
     }
 }
@@ -535,9 +535,9 @@ void scheduler_set_online_mode() {
 
     // Who knows what error, OTA, random state screen was in from offline mode. Full clear, show fetching conditions,
     // and kick everything off.
-    screen_img_handler_full_clear();
+    // screen_img_handler_full_clear();
     spot_check_draw_fetching_conditions_text();
-    screen_img_handler_render(__func__, __LINE__);
+    // screen_img_handler_render(__func__, __LINE__);
 
     // Only have one update struct that shouldn't run in online mode so just hardcode it
     char *offline_only_update_name = "network_check";
