@@ -18,7 +18,7 @@
 #include "cli_commands.h"
 #include "cli_task.h"
 #include "constants.h"
-#include "display.h"
+// #include "display.h"
 #include "flash_partition.h"
 #include "http_client.h"
 #include "log.h"
@@ -506,7 +506,7 @@ static BaseType_t cli_command_display(char *write_buffer, size_t write_buffer_si
 
     memset(write_buffer, 0x0, write_buffer_size);
     if (action_len == 5 && strncmp(action, "clear", action_len) == 0) {
-        display_full_clear();
+        // display_full_clear();
     } else if (action_len == 3 && strncmp(action, "img", action_len) == 0) {
         BaseType_t  screen_len;
         const char *screen = FreeRTOS_CLIGetParameter(cmd_str, 2, &screen_len);

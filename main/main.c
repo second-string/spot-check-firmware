@@ -21,7 +21,7 @@
 #include "cd54hc4094.h"
 #include "cli_commands.h"
 #include "cli_task.h"
-#include "display.h"
+// #include "display.h"
 #include "gpio.h"
 #include "http_client.h"
 #include "http_server.h"
@@ -102,7 +102,7 @@ static void app_init() {
     bq24196_init(&bq24196_i2c_handle);
     sntp_time_init();
     cd54hc4094_init(SHIFTREG_CLK_PIN, SHIFTREG_DATA_PIN, SHIFTREG_STROBE_PIN);
-    display_init();
+    // display_init();
     sleep_handler_init();
     screen_img_handler_init();
 
@@ -119,7 +119,7 @@ static void app_init() {
 static void app_start() {
     i2c_start(&bq24196_i2c_handle);
     bq24196_start();
-    display_start();
+    // display_start();
     sleep_handler_start();
     sntp_time_start();
     scheduler_task_start();
@@ -146,7 +146,7 @@ void app_main(void) {
 
     spot_check_config *config = nvs_get_config();
     sntp_set_tz_str(config->tz_str);
-    display_render_splash_screen(spot_check_get_fw_version(), spot_check_get_hw_version());
+    // display_render_splash_screen(spot_check_get_fw_version(), spot_check_get_hw_version());
 
     // Enable breakout at each connectivity check of boot
     do {

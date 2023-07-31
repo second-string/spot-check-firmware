@@ -9,7 +9,7 @@
 #include "spi_flash_mmap.h"
 
 #include "constants.h"
-#include "display.h"
+// #include "display.h"
 #include "flash_partition.h"
 #include "http_client.h"
 #include "json.h"
@@ -125,7 +125,7 @@ bool screen_img_handler_clear_screen_img(screen_img_t screen_img) {
     screen_img_metadata_t metadata = {0};
     screen_img_handler_get_metadata(screen_img, &metadata);
 
-    display_clear_area(metadata.x_coord, metadata.y_coord, metadata.screen_img_width, metadata.screen_img_height);
+    // display_clear_area(metadata.x_coord, metadata.y_coord, metadata.screen_img_width, metadata.screen_img_height);
     return true;
 }
 
@@ -151,12 +151,12 @@ bool screen_img_handler_draw_screen_img(screen_img_t screen_img) {
                        SPI_FLASH_MMAP_DATA,
                        (const void **)&mapped_flash,
                        &spi_flash_handle);
-    display_draw_image((uint8_t *)mapped_flash,
-                       metadata.screen_img_width,
-                       metadata.screen_img_height,
-                       1,
-                       metadata.x_coord,
-                       metadata.y_coord);
+    // display_draw_image((uint8_t *)mapped_flash,
+    //                    metadata.screen_img_width,
+    //                    metadata.screen_img_height,
+    //                    1,
+    //                    metadata.x_coord,
+    //                    metadata.y_coord);
     spi_flash_munmap(spi_flash_handle);
 
     log_printf(LOG_LEVEL_INFO,
@@ -203,13 +203,13 @@ bool screen_img_handler_download_and_save(screen_img_t screen_img) {
  * Wrappers for display render funcs so our logic modules don't have a dependency on display driver
  */
 void screen_img_handler_full_clear() {
-    display_full_clear();
+    // display_full_clear();
 }
 
 void screen_img_handler_mark_all_lines_dirty() {
-    display_mark_all_lines_dirty();
+    // display_mark_all_lines_dirty();
 }
 
 void screen_img_handler_render(const char *calling_func, uint32_t line) {
-    display_render(calling_func, line);
+    // display_render(calling_func, line);
 }

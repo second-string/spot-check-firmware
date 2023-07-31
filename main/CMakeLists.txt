@@ -18,7 +18,7 @@ idf_component_register(
                                    "i2c.c"
                                    "bq24196.c"
                                    "cd54hc4094.c"
-                                   "display.c"
+                                   # "display.c"
                                    "flash_partition.c"
                                    "screen_img_handler.c"
                                    "sntp_time.c"
