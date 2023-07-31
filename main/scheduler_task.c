@@ -117,7 +117,7 @@ static discrete_update_t discrete_updates[NUM_DISCRETE_UPDATES] = {
         .force_next_update             = false,
         .force_on_transition_to_online = true,
         .hour                          = 0xFF,  // wildcard, runs on 5th minute of every hours
-        .minute                        = 5,
+        .minute                        = 0xFF,
         .hour_last_executed            = 0,
         .minute_last_executed          = 0,
         .active                        = false,
@@ -321,7 +321,7 @@ static void scheduler_task(void *args) {
         if (update_bits & SEND_MFLT_DATA_BIT) {
             // TODO :: brutally blocking right now for big coredump uploads
             // Don't care about return value, all error-handling internal
-            (void)memfault_interface_post_data();
+            // (void)memfault_interface_post_data();
         }
 
         if (update_bits & CHECK_OTA_BIT) {

@@ -2,6 +2,7 @@
 
 #include <string.h>
 
+#include "esp_crt_bundle.h"
 #include "esp_http_client.h"
 #include "esp_https_ota.h"
 #include "esp_ota_ops.h"
@@ -47,8 +48,9 @@ static bool ota_start_ota(char *binary_url) {
     strcat(url_with_params, spot_check_get_serial());
 
     esp_http_client_config_t http_config = {
-        .url        = url_with_params,
-        .cert_pem   = (char *)server_cert_pem_start,
+        .url               = url_with_params,
+        .crt_bundle_attach = esp_crt_bundle_attach,
+        // .cert_pem   = (char *)server_cert_pem_start,
         .timeout_ms = 10000,
     };
 
@@ -322,10 +324,11 @@ void ota_task_start() {
     }
 
     // minimal * 3 is the smallest we can go w/o SO
-    xTaskCreate(&check_ota_update_task,
-                "check-ota-update",
-                SPOT_CHECK_MINIMAL_STACK_SIZE_BYTES * 4,
-                NULL,
-                tskIDLE_PRIORITY,
-                &ota_task_handle);
+    // xTaskCreate(&check_ota_update_task,
+    //             "check-ota-update",
+    //             SPOT_CHECK_MINIMAL_STACK_SIZE_BYTES * 4,
+    //             NULL,
+    //             tskIDLE_PRIORITY,
+    //             &ota_task_handle);
+    (void)check_ota_update_task;
 }
