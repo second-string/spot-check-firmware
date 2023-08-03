@@ -160,8 +160,7 @@ bool spot_check_download_and_save_conditions(conditions_t *new_conditions) {
         strcpy(new_conditions->wind_dir, wind_dir_str);
         strcpy(new_conditions->tide_height, tide_height_str);
 
-        cJSON_free(data_value);
-        cJSON_free(json);
+        cJSON_Delete(json);
     } else {
         log_printf(LOG_LEVEL_INFO, "Failed to get new conditions, leaving last saved values displayed");
         return false;
