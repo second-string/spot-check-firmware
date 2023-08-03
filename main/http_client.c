@@ -328,7 +328,8 @@ bool http_client_check_response(esp_http_client_handle_t *client, int *content_l
  * Read response from http requeste into caller-supplied buffer. Caller responsible for freeing malloced buffer
  * saved in response_data pointer if return value > 0. Request must have been sent through client using
  * http_client_perform_request.
- * Returns -1 for error, otherwise number of bytes malloced.
+ * Returns ESP_OK on success, ESP_FAIL for failure. Returns malloced data and the size of that data in the two pointer
+ * args.
  */
 esp_err_t http_client_read_response_to_buffer(esp_http_client_handle_t *client,
                                               char                    **response_data,
@@ -336,13 +337,12 @@ esp_err_t http_client_read_response_to_buffer(esp_http_client_handle_t *client,
     MEMFAULT_ASSERT(client);
     MEMFAULT_ASSERT(response_data);
     MEMFAULT_ASSERT(response_data_size);
-    esp_err_t err = ESP_FAIL;
 
-    size_t bytes_received = 0;
-    bool   success        = false;
+    esp_err_t err            = ESP_FAIL;
+    size_t    bytes_received = 0;
     do {
-        int content_length = 0;
-        success            = http_client_check_response(client, &content_length);
+        int  content_length = 0;
+        bool success        = http_client_check_response(client, &content_length);
         if (!success || content_length == 0) {
             break;
         }
@@ -393,79 +393,89 @@ esp_err_t http_client_read_response_to_buffer(esp_http_client_handle_t *client,
 /*
  * Read response from http request in chunks into flash partition. Request must have been sent through client using
  * http_client_perform_request. Caller must erase desired location in flash first.
- * Returns -1 for error, otherwise number of bytes saved to flash.
+ * Returns ESP_OK on success, ESP_FAIL for failure. Returns total bytes saved to NVS in pointer arg.
  */
-int http_client_read_response_to_flash(esp_http_client_handle_t *client,
-                                       esp_partition_t          *partition,
-                                       uint32_t                  offset_into_partition) {
+esp_err_t http_client_read_response_to_flash(esp_http_client_handle_t *client,
+                                             esp_partition_t          *partition,
+                                             uint32_t                  offset_into_partition,
+                                             size_t                   *bytes_saved_size) {
     MEMFAULT_ASSERT(client);
     MEMFAULT_ASSERT(partition);
 
-    int  content_length = 0;
-    bool success        = http_client_check_response(client, &content_length);
-    if (!success) {
-        return -1;
-    } else if (content_length == 0) {
-        return 0;
-    }
-
-    size_t bytes_received = 0;
-    log_printf(LOG_LEVEL_INFO,
-               "Reading %u payload bytes into flash in chunks of size %u",
-               content_length,
-               MAX_READ_BUFFER_SIZE);
-
-    uint32_t moving_screen_img_addr = offset_into_partition;
-    int      length_received        = 0;
-    uint8_t *response_data          = malloc(MAX_READ_BUFFER_SIZE);
-    if (!response_data) {
-        log_printf(LOG_LEVEL_ERROR, "Malloc of %u bytes failed for http response!", content_length + 1);
-        return -1;
-    }
+    esp_err_t err            = ESP_FAIL;
+    size_t    bytes_received = 0;
     do {
-        // Pull in chunk and immediately write to flash
-        length_received = esp_http_client_read(*client, (char *)response_data, MAX_READ_BUFFER_SIZE);
-        if (length_received > 0) {
-            if (moving_screen_img_addr + length_received > partition->size) {
-                log_printf(LOG_LEVEL_ERROR,
-                           "Attempting to write 0x%02X bytes to partition at offset 0x%02X which would "
-                           "overflow the boundary of 0x%02X bytes, aborting",
-                           length_received,
-                           moving_screen_img_addr,
-                           partition->size);
-                break;
-            }
-            esp_partition_write(partition, moving_screen_img_addr, response_data, length_received);
-            log_printf(LOG_LEVEL_DEBUG,
-                       "Wrote %d bytes to screen image partition at offset %d",
-                       length_received,
-                       moving_screen_img_addr);
-            moving_screen_img_addr += length_received;
-            bytes_received += length_received;
+        int  content_length = 0;
+        bool success        = http_client_check_response(client, &content_length);
+        if (!success) {
+            break;
+        } else if (content_length == 0) {
+            // Not an error, but no reason to continue with logic
+            err = ESP_OK;
+            break;
         }
-    } while (length_received > 0);
 
-    if (response_data) {
-        free(response_data);
-    }
+        log_printf(LOG_LEVEL_INFO,
+                   "Reading %u payload bytes into flash in chunks of size %u",
+                   content_length,
+                   MAX_READ_BUFFER_SIZE);
 
-    if (length_received < 0) {
-        // NVS has already been marked as invalid at time of flash erase, so just return error
-        log_printf(LOG_LEVEL_ERROR, "Error reading response after successful http client request");
-        return -1;
-    } else {
-        log_printf(LOG_LEVEL_DEBUG, "Rcvd %zu bytes total of response data and saved to flash", bytes_received);
-    }
+        uint32_t moving_screen_img_addr = offset_into_partition;
+        int      length_received        = 0;
+        uint8_t *response_data          = malloc(MAX_READ_BUFFER_SIZE);
+        if (!response_data) {
+            log_printf(LOG_LEVEL_ERROR, "Malloc of %u bytes failed for http response!", content_length + 1);
+            break;
+        }
+
+        do {
+            // Pull in chunk and immediately write to flash
+            length_received = esp_http_client_read(*client, (char *)response_data, MAX_READ_BUFFER_SIZE);
+            if (length_received > 0) {
+                if (moving_screen_img_addr + length_received > partition->size) {
+                    log_printf(LOG_LEVEL_ERROR,
+                               "Attempting to write 0x%02X bytes to partition at offset 0x%02X which would "
+                               "overflow the boundary of 0x%02X bytes, aborting",
+                               length_received,
+                               moving_screen_img_addr,
+                               partition->size);
+                    break;
+                }
+                esp_partition_write(partition, moving_screen_img_addr, response_data, length_received);
+                log_printf(LOG_LEVEL_DEBUG,
+                           "Wrote %d bytes to screen image partition at offset %d",
+                           length_received,
+                           moving_screen_img_addr);
+                moving_screen_img_addr += length_received;
+                bytes_received += length_received;
+            }
+        } while (length_received > 0);
+
+        if (response_data) {
+            free(response_data);
+        }
+
+        if (length_received < 0) {
+            // NVS has already been marked as invalid at time of flash erase, so just return error
+            log_printf(LOG_LEVEL_ERROR, "Error reading response after successful http client request");
+            break;
+        } else {
+            log_printf(LOG_LEVEL_DEBUG, "Rcvd %zu bytes total of response data and saved to flash", bytes_received);
+            err = ESP_OK;
+        }
+    } while (0);
 
     esp_err_t cleanup_err = esp_http_client_cleanup(*client);
     if (cleanup_err != ESP_OK) {
+        err = cleanup_err;
         log_printf(LOG_LEVEL_ERROR,
                    "Call to esp_http_client_cleanup after reading response to flash failed with err: %s. Malloced buff "
                    "already freed so not altering bytes_received returned to caller",
                    esp_err_to_name(cleanup_err));
     }
 
-    return bytes_received;
+    *bytes_saved_size = bytes_received;
+    return err;
 }
 
 /*

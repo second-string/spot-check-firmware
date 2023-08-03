@@ -104,8 +104,10 @@ static int screen_img_handler_save(esp_http_client_handle_t *client,
                    metadata->screen_img_size_key);
     }
 
-    int bytes_saved = http_client_read_response_to_flash(client, (esp_partition_t *)part, metadata->screen_img_offset);
-    if (bytes_saved > 0) {
+    size_t    bytes_saved = 0;
+    esp_err_t err =
+        http_client_read_response_to_flash(client, (esp_partition_t *)part, metadata->screen_img_offset, &bytes_saved);
+    if (err == ESP_OK && bytes_saved > 0) {
         // Save metadata as last action to make sure all steps have succeeded and there's a valid image in
         // flash
         nvs_set_uint32(metadata->screen_img_size_key, bytes_saved);

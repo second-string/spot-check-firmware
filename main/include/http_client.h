@@ -56,9 +56,10 @@ bool           http_client_perform(http_request_t *request_obj, esp_http_client_
 esp_err_t      http_client_read_response_to_buffer(esp_http_client_handle_t *client,
                                                    char                    **response_data,
                                                    size_t                   *response_data_size);
-int            http_client_read_response_to_flash(esp_http_client_handle_t *client,
+esp_err_t      http_client_read_response_to_flash(esp_http_client_handle_t *client,
                                                   esp_partition_t          *partition,
-                                                  uint32_t                  offset_into_partition);
+                                                  uint32_t                  offset_into_partition,
+                                                  size_t                   *bytes_saved_size);
 bool           http_client_check_internet();
 
 bool http_client_check_response(esp_http_client_handle_t *client, int *content_length);
