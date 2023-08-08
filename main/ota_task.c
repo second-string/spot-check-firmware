@@ -2,6 +2,7 @@
 
 #include <string.h>
 
+#include "esp_crt_bundle.h"
 #include "esp_http_client.h"
 #include "esp_https_ota.h"
 #include "esp_ota_ops.h"
@@ -21,9 +22,6 @@
 #include "wifi.h"
 
 #define TAG SC_TAG_OTA
-
-extern const uint8_t server_cert_pem_start[] asm("_binary_ca_cert_pem_start");
-extern const uint8_t server_cert_pem_end[] asm("_binary_ca_cert_pem_end");
 
 // Global OTA and task handles
 static esp_https_ota_handle_t ota_handle;
@@ -47,9 +45,9 @@ static bool ota_start_ota(char *binary_url) {
     strcat(url_with_params, spot_check_get_serial());
 
     esp_http_client_config_t http_config = {
-        .url        = url_with_params,
-        .cert_pem   = (char *)server_cert_pem_start,
-        .timeout_ms = 10000,
+        .url               = url_with_params,
+        .crt_bundle_attach = esp_crt_bundle_attach,
+        .timeout_ms        = 10000,
     };
 
     esp_https_ota_config_t ota_config = {
