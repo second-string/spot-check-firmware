@@ -7,6 +7,7 @@ typedef enum {
     SCHEDULER_MODE_INIT,
     SCHEDULER_MODE_OFFLINE,
     SCHEDULER_MODE_ONLINE,
+    SCHEDULER_MODE_OTA,
 } scheduler_mode_t;
 
 void             scheduler_trigger_time_update();
@@ -21,6 +22,7 @@ void             scheduler_block_until_system_idle();
 void             scheduler_set_busy(uint32_t system_idle_bitmask);
 void             scheduler_set_idle(uint32_t system_idle_bitmask);
 void             scheduler_set_offline_mode();
+void             scheduler_set_ota_mode();
 void             scheduler_set_online_mode();
 scheduler_mode_t scheduler_get_mode();
 UBaseType_t      scheduler_task_get_stack_high_water();

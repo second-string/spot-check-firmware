@@ -528,6 +528,31 @@ void scheduler_set_offline_mode() {
     mode = SCHEDULER_MODE_OFFLINE;
 }
 
+/*
+ * Disable everything except for time update. We're running OTA and that means no network requests will work, and
+ * ideally then we reboot normally. If OTA fails we have bigger problems
+ */
+void scheduler_set_ota_mode() {
+    if (mode == SCHEDULER_MODE_OTA) {
+        return;
+    }
+
+    for (int i = 0; i < NUM_DIFFERENTIAL_UPDATES; i++) {
+        differential_updates[i].active = false;
+        log_printf(LOG_LEVEL_DEBUG, "Deactivated update struct '%s'", differential_updates[i].name);
+    }
+
+    for (int i = 0; i < NUM_DISCRETE_UPDATES; i++) {
+        // Don't disable time
+        if (strncmp(discrete_updates[i].name, "time", 4) != 0) {
+            discrete_updates[i].active = false;
+            log_printf(LOG_LEVEL_DEBUG, "Deactivated update struct '%s'", discrete_updates[i].name);
+        }
+    }
+
+    mode = SCHEDULER_MODE_OTA;
+}
+
 void scheduler_set_online_mode() {
     if (mode == SCHEDULER_MODE_ONLINE) {
         return;

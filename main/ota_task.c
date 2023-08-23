@@ -16,6 +16,7 @@
 #include "json.h"
 #include "log.h"
 #include "ota_task.h"
+#include "scheduler_task.h"
 #include "screen_img_handler.h"
 #include "sleep_handler.h"
 #include "spot_check.h"
@@ -63,33 +64,47 @@ static bool ota_start_ota(char *binary_url) {
     return error == ESP_OK;
 }
 
+/*
+ * Return ESP_FAIL if no update needed, ESP_OK if update should proceed
+ */
 static esp_err_t ota_validate_image_header(esp_app_desc_t *new_image_info, esp_app_desc_t *current_image_info) {
     if (new_image_info == NULL) {
         return ESP_ERR_INVALID_ARG;
     }
 
-    log_printf(LOG_LEVEL_INFO, "Running firmware version: %s", current_image_info->version);
-    log_printf(LOG_LEVEL_INFO, "Server generic get_binary endpoint returned version: %s", new_image_info->version);
+    log_printf(LOG_LEVEL_INFO,
+               "Running firmware version: %s - server get_binary endpoint returned version: %s",
+               current_image_info->version,
+               new_image_info->version);
 
-    int version_comparison =
-        memcmp(new_image_info->version, current_image_info->version, sizeof(new_image_info->version));
-    if (version_comparison == 0) {
+    uint8_t current_major;
+    uint8_t current_minor;
+    uint8_t current_dot;
+    sscanf(current_image_info->version, "%s.%s.%s", &current_major, &current_minor, &current_dot);
+    uint8_t new_major;
+    uint8_t new_minor;
+    uint8_t new_dot;
+    sscanf(new_image_info->version, "%s.%s.%s", &new_major, &new_minor, &new_dot);
+
+    if (current_major == new_major && current_minor == new_minor && current_dot == new_dot) {
         log_printf(LOG_LEVEL_INFO, "OTA image version same as current version, no update needed");
         return ESP_FAIL;
-    } else if (version_comparison < 0) {
-        log_printf(LOG_LEVEL_INFO,
-                   "Current version greater than OTA image version (%s), something is wrong!!",
+    } else if (current_major < new_major) {
+        log_printf(LOG_LEVEL_WARN, "OTA image version has lower major, starting OTA update...");
+    } else if (current_major == new_major && current_minor < new_minor) {
+        log_printf(LOG_LEVEL_WARN, "OTA image version has same major but lower minor, starting OTA update...");
+    } else if (current_major == new_major && current_minor == new_minor && current_dot < new_dot) {
+        log_printf(LOG_LEVEL_WARN,
+                   "OTA image version has same major and minor but lower dot version, starting OTA update...");
+    } else {
+        // This means at least one of the current versions was greater than the new versions. That should never happen
+        // unless server version is mistakenly saved OR the server is trying to force downgrade due to an issue. The
+        // secondary manual version check should handle those
+        log_printf(LOG_LEVEL_ERROR,
+                   "Current version greater than OTA image version, something is wrong!!",
                    new_image_info->version);
 
-        // TODO :: return correct code when memcmp bug fixed!
-        // https://www.notion.so/ota-logic-is-broken-going-from-9-to-10-version-04a62d0c9089470bb90ebe7e25aecb15?pvs=4
-        // return ESP_FAIL;
-        return ESP_OK;
-    } else if (version_comparison > 0) {
-        log_printf(LOG_LEVEL_INFO,
-                   "Current version less than OTA image version (%s), starting OTA update",
-                   new_image_info->version);
-        return ESP_OK;
+        return ESP_FAIL;
     }
 
     // Satisfy the compiler, will never be executed with above if/else
@@ -160,6 +175,8 @@ static void ota_task_stop(bool clear_ota_text) {
         screen_img_handler_render(__func__, __LINE__);
     }
 
+    // Shouldn't matter as we should be rebooting on success and doing something on failure
+    scheduler_set_online_mode();
     sleep_handler_set_idle(SYSTEM_IDLE_OTA_BIT);
     ota_task_handle = NULL;
     vTaskDelete(NULL);
@@ -167,6 +184,7 @@ static void ota_task_stop(bool clear_ota_text) {
 
 static void check_ota_update_task(void *args) {
     sleep_handler_set_busy(SYSTEM_IDLE_OTA_BIT);
+    scheduler_set_ota_mode();
     log_printf(LOG_LEVEL_INFO, "Starting OTA task to check update status");
 
 #ifdef CONFIG_DISABLE_OTA
