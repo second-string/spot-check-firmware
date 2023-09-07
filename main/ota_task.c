@@ -77,25 +77,28 @@ static esp_err_t ota_validate_image_header(esp_app_desc_t *new_image_info, esp_a
                current_image_info->version,
                new_image_info->version);
 
-    uint8_t current_major;
-    uint8_t current_minor;
-    uint8_t current_dot;
-    sscanf(current_image_info->version, "%s.%s.%s", &current_major, &current_minor, &current_dot);
-    uint8_t new_major;
-    uint8_t new_minor;
-    uint8_t new_dot;
-    sscanf(new_image_info->version, "%s.%s.%s", &new_major, &new_minor, &new_dot);
+    uint32_t current_major;
+    uint32_t current_minor;
+    uint32_t current_dot;
+    sscanf(current_image_info->version, "%lu.%lu.%lu", &current_major, &current_minor, &current_dot);
+    uint32_t new_major;
+    uint32_t new_minor;
+    uint32_t new_dot;
+    sscanf(new_image_info->version, "%lu.%lu.%lu", &new_major, &new_minor, &new_dot);
 
     if (current_major == new_major && current_minor == new_minor && current_dot == new_dot) {
         log_printf(LOG_LEVEL_INFO, "OTA image version same as current version, no update needed");
         return ESP_FAIL;
     } else if (current_major < new_major) {
         log_printf(LOG_LEVEL_WARN, "OTA image version has lower major, starting OTA update...");
+        return ESP_OK;
     } else if (current_major == new_major && current_minor < new_minor) {
         log_printf(LOG_LEVEL_WARN, "OTA image version has same major but lower minor, starting OTA update...");
+        return ESP_OK;
     } else if (current_major == new_major && current_minor == new_minor && current_dot < new_dot) {
         log_printf(LOG_LEVEL_WARN,
                    "OTA image version has same major and minor but lower dot version, starting OTA update...");
+        return ESP_OK;
     } else {
         // This means at least one of the current versions was greater than the new versions. That should never happen
         // unless server version is mistakenly saved OR the server is trying to force downgrade due to an issue. The
