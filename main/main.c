@@ -154,7 +154,7 @@ void app_main(void) {
         // displaying provisioning text. No need to waste time trying to connect to network.
         if (!wifi_is_provisioned()) {
             spot_check_show_unprovisioned_screen();
-            screen_img_handler_render(__func__, __LINE__);
+            spot_check_render(__func__, __LINE__);
             wifi_init_provisioning();
             wifi_start_provisioning();
             break;
@@ -193,7 +193,7 @@ void app_main(void) {
         // break.
         if (!wifi_is_connected_to_network()) {
             spot_check_show_no_network_screen();
-            screen_img_handler_render(__func__, __LINE__);
+            spot_check_render(__func__, __LINE__);
             wifi_init_provisioning();
             wifi_start_provisioning();
             break;
@@ -201,7 +201,7 @@ void app_main(void) {
 
         // Update splash screen with fetching data text, then check actual internet connection
         spot_check_show_checking_connection_screen();
-        screen_img_handler_render(__func__, __LINE__);
+        spot_check_render(__func__, __LINE__);
         if (!http_client_check_internet()) {
             log_printf(LOG_LEVEL_WARN,
                        "Failed healthcheck after being assigned IP. Waiting 5 seconds then trying again.");
@@ -209,7 +209,7 @@ void app_main(void) {
             if (!http_client_check_internet()) {
                 log_printf(LOG_LEVEL_WARN, "Failed second healthcheck, fail out to prov");
                 spot_check_show_no_internet_screen();
-                screen_img_handler_render(__func__, __LINE__);
+                spot_check_render(__func__, __LINE__);
                 wifi_init_provisioning();
                 wifi_start_provisioning();
                 break;

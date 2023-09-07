@@ -200,18 +200,3 @@ bool screen_img_handler_download_and_save(screen_img_t screen_img) {
 
     return success;
 }
-
-/*
- * Wrappers for display render funcs so our logic modules don't have a dependency on display driver
- */
-void screen_img_handler_full_clear() {
-    display_full_clear();
-}
-
-void screen_img_handler_mark_all_lines_dirty() {
-    display_mark_all_lines_dirty();
-}
-
-void screen_img_handler_render(const char *calling_func, uint32_t line) {
-    display_render(calling_func, line);
-}

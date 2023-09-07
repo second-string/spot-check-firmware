@@ -355,7 +355,7 @@ static void scheduler_task(void *args) {
         if (full_clear) {
             log_printf(LOG_LEVEL_DEBUG,
                        "Performing full screen clear from scheduler_task since every piece was updated");
-            screen_img_handler_full_clear();
+            spot_check_full_clear();
         }
 
         if (update_bits & UPDATE_TIME_BIT) {
@@ -366,6 +366,7 @@ static void scheduler_task(void *args) {
             }
             spot_check_draw_time();
             spot_check_draw_date();
+            spot_check_mark_time_dirty();
             log_printf(LOG_LEVEL_INFO, "scheduler task updated time");
             sleep_handler_set_idle(SYSTEM_IDLE_TIME_BIT);
         }
@@ -431,14 +432,11 @@ static void scheduler_task(void *args) {
          * Render section
          **************************************/
         if (update_bits & BITS_NEEDING_RENDER) {
-            // TODO :: right now we have to mark all lines as dirty even every minute for time updates, because the
-            // screen gray fade is so bad. This shouldn't be the case, we should be able to add our if-check back in
-            // here that allows us to only do full dirty mark on non-time render updates
             if (update_bits & ~UPDATE_TIME_BIT) {
-                screen_img_handler_mark_all_lines_dirty();
+                spot_check_mark_all_lines_dirty();
             }
 
-            screen_img_handler_render(__func__, __LINE__);
+            spot_check_render(__func__, __LINE__);
         }
     }
 }
@@ -560,9 +558,9 @@ void scheduler_set_online_mode() {
 
     // Who knows what error, OTA, random state screen was in from offline mode. Full clear, show fetching conditions,
     // and kick everything off.
-    screen_img_handler_full_clear();
+    spot_check_full_clear();
     spot_check_draw_fetching_conditions_text();
-    screen_img_handler_render(__func__, __LINE__);
+    spot_check_render(__func__, __LINE__);
 
     // Only have one update struct that shouldn't run in online mode so just hardcode it
     char *offline_only_update_name = "network_check";

@@ -391,3 +391,17 @@ void display_mark_all_lines_dirty() {
         hl.back_fb[i] = ~hl.front_fb[i];
     }
 }
+
+void display_mark_rect_dirty(uint32_t x_coord, uint32_t y_coord, uint32_t width, uint32_t height) {
+    uint32_t row_start_index   = 0;
+    uint32_t dirty_rect_height = MIN(height, EPD_HEIGHT - y_coord);
+    uint32_t dirty_rect_width  = MIN(width, EPD_WIDTH - x_coord);
+
+    for (int i = y_coord; i < (y_coord + dirty_rect_height); i++) {
+        row_start_index = i * (EPD_WIDTH / 2);
+
+        for (int j = (x_coord / 2); j < ((x_coord + dirty_rect_width) / 2); j++) {
+            hl.back_fb[row_start_index + j] = ~hl.front_fb[row_start_index + j];
+        }
+    }
+}

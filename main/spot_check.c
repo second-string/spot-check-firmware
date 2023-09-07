@@ -174,18 +174,15 @@ bool spot_check_download_and_save_conditions(conditions_t *new_conditions) {
 
     return true;
 }
-
-void spot_check_clear_time() {
-    char time_string[6];
-    sntp_time_get_time_str(&last_time_displayed, time_string, NULL);
-    display_invert_text(time_string, TIME_DRAW_X_PX, TIME_DRAW_Y_PX, DISPLAY_FONT_SIZE_LARGE, DISPLAY_FONT_ALIGN_LEFT);
-    return;
-
-    // TODO :: separate full timebox clear into different function than invert
-    /*
+/*
+ * Dirties the whole time rect to ensure no gray-in in the time bounding box over time (mostly noticeable around the
+minutes digits)
+*/
+void spot_check_mark_time_dirty() {
     char     time_string[6];
     uint32_t previous_time_width_px;
     uint32_t previous_time_height_px;
+
     sntp_time_get_time_str(&last_time_displayed, time_string, NULL);
     display_get_text_bounds(time_string,
                             TIME_DRAW_X_PX,
@@ -195,68 +192,27 @@ void spot_check_clear_time() {
                             &previous_time_width_px,
                             &previous_time_height_px);
 
-    struct tm now_local = {0};
-    sntp_time_get_local_time(&now_local);
-
-    uint32_t erase_x      = 0;
-    uint32_t erase_y      = 0;
-    uint32_t erase_width  = 0;
-    uint32_t erase_height = 0;
-    uint32_t digit_width  = 0;
-    uint32_t digit_height = 0;
-
-    // If the hour changed at all (one or both digits), minutes has to have changed as well so just erase full time box.
-    // If hours haven't changed but minutes have, erase one or two digits depending on what the new minutes value is.
-    if (now_local.tm_hour != last_time_displayed.tm_hour) {
-        erase_x      = TIME_DRAW_X_PX;
-        erase_y      = TIME_DRAW_Y_PX - previous_time_height_px;
-        erase_width  = previous_time_width_px;
-        erase_height = previous_time_height_px;
-    } else if (now_local.tm_min != last_time_displayed.tm_min) {
-        // Whether erasing one or two digits of minute, get the bounds of the one or two characters to use in
-        // calculating what size of rect to erase (character width and kerning varies)
-        if (now_local.tm_min >= 10 && ((now_local.tm_min % 10) == 0)) {
-            // Erase both digits of minute
-            char digit[3];
-            sprintf(digit, "%02u", last_time_displayed.tm_min % 100);
-            display_get_text_bounds(digit,
-                                    0,
-                                    0,
-                                    DISPLAY_FONT_SIZE_LARGE,
-                                    DISPLAY_FONT_ALIGN_LEFT,
-                                    &digit_width,
-                                    &digit_height);
-        } else {
-            // Erase ones digit of minute
-            char digit[2];
-            sprintf(digit, "%u", last_time_displayed.tm_min % 10);
-            display_get_text_bounds(digit,
-                                    0,
-                                    0,
-                                    DISPLAY_FONT_SIZE_LARGE,
-                                    DISPLAY_FONT_ALIGN_LEFT,
-                                    &digit_width,
-                                    &digit_height);
-        }
-
-        erase_x      = TIME_DRAW_X_PX + previous_time_width_px - digit_width;
-        erase_y      = TIME_DRAW_Y_PX - previous_time_height_px;
-        erase_width  = digit_width;
-        erase_height = previous_time_height_px;
-    }
-
-    // Text draws from x,y in lower left corner, but erase rect treats x,y as upper left, so compensate by subracting
-    // height from y. Add a bit of padding to be 100% sure we clear all artifacts
-    if (erase_width > 0 && erase_height > 0) {
-        display_clear_area(erase_x - 5, erase_y - 5, erase_width + 10, erase_height + 10);
+    if (previous_time_width_px > 0 && previous_time_height_px > 0) {
+        display_mark_rect_dirty(TIME_DRAW_X_PX - 5,
+                                TIME_DRAW_Y_PX - previous_time_height_px - 5,
+                                previous_time_width_px + 10,
+                                previous_time_height_px + 10);
         log_printf(LOG_LEVEL_DEBUG,
-                   "Erasing text starting (%u, %u) width: %u height: %u",
-                   erase_x,
-                   erase_y,
-                   erase_width,
-                   erase_height);
+                   "Marking text rect as dirty coords (%u, %u) width: %u height: %u",
+                   TIME_DRAW_X_PX,
+                   TIME_DRAW_Y_PX - previous_time_height_px,
+                   previous_time_width_px,
+                   previous_time_height_px);
     }
-    */
+}
+
+/*
+ * Clears time text by inverting previously-written time
+ */
+void spot_check_clear_time() {
+    char time_string[6];
+    sntp_time_get_time_str(&last_time_displayed, time_string, NULL);
+    display_invert_text(time_string, TIME_DRAW_X_PX, TIME_DRAW_Y_PX, DISPLAY_FONT_SIZE_LARGE, DISPLAY_FONT_ALIGN_LEFT);
 }
 
 bool spot_check_draw_time() {
@@ -548,6 +504,24 @@ void spot_check_draw_fetching_conditions_text() {
     display_draw_text("Fetching latest conditions...", 400, 300, DISPLAY_FONT_SIZE_SMALL, DISPLAY_FONT_ALIGN_CENTER);
 }
 
+/*
+ * Wrappers for display render funcs so our logic modules don't have a dependency on display driver
+ */
+void spot_check_full_clear() {
+    display_full_clear();
+}
+
+void spot_check_mark_all_lines_dirty() {
+    display_mark_all_lines_dirty();
+}
+
+void spot_check_render(const char *calling_func, uint32_t line) {
+    display_render(calling_func, line);
+}
+
+/*
+ * Main FW init for spot check specific data
+ */
 void spot_check_init() {
     // Init last_time_display with epoch so date update logic always executes to start with
     time_t epoch = 0;

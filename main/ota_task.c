@@ -172,7 +172,7 @@ static bool check_forced_update(esp_app_desc_t *current_image_info, char *versio
 static void ota_task_stop(bool clear_ota_text) {
     if (clear_ota_text) {
         spot_check_clear_ota_start_text();
-        screen_img_handler_render(__func__, __LINE__);
+        spot_check_render(__func__, __LINE__);
     }
 
     // Shouldn't matter as we should be rebooting on success and doing something on failure
@@ -184,7 +184,6 @@ static void ota_task_stop(bool clear_ota_text) {
 
 static void check_ota_update_task(void *args) {
     sleep_handler_set_busy(SYSTEM_IDLE_OTA_BIT);
-    scheduler_set_ota_mode();
     log_printf(LOG_LEVEL_INFO, "Starting OTA task to check update status");
 
 #ifdef CONFIG_DISABLE_OTA
@@ -268,9 +267,11 @@ static void check_ota_update_task(void *args) {
         }
     }
 
-    // Notify user on screen
+    // Notify user on screen and kick scheduler into OTA mode so time updates continue but no other network requests are
+    // made (that would fail anyway since ota is monopolizing http client)
+    scheduler_set_ota_mode();
     spot_check_draw_ota_start_text();
-    screen_img_handler_render(__func__, __LINE__);
+    spot_check_render(__func__, __LINE__);
 
     uint32_t iter_counter = 0;
     uint32_t bytes_received;

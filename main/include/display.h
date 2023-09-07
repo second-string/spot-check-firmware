@@ -54,4 +54,5 @@ void display_get_text_bounds(char                *text,
                              display_font_align_t alignment,
                              uint32_t            *width,
                              uint32_t            *height);
+void display_mark_rect_dirty(uint32_t x_coord, uint32_t y_coord, uint32_t width, uint32_t height);
 void display_mark_all_lines_dirty();

@@ -33,7 +33,3 @@ bool screen_img_handler_download_and_save(screen_img_t screen_img);
 
 bool screen_img_handler_clear_screen_img(screen_img_t screen_img);
 bool screen_img_handler_draw_screen_img(screen_img_t screen_img);
-
-void screen_img_handler_full_clear();
-void screen_img_handler_mark_all_lines_dirty();
-void screen_img_handler_render(const char *calling_func, uint32_t line);
