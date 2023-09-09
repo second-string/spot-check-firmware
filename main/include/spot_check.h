@@ -15,7 +15,7 @@ char *spot_check_get_fw_version();
 char *spot_check_get_hw_version();
 bool  spot_check_download_and_save_conditions(conditions_t *new_conditions);
 
-void spot_check_clear_date(bool force_clear);
+void spot_check_clear_date();
 bool spot_check_draw_date();
 void spot_check_mark_time_dirty();
 void spot_check_clear_time();

@@ -229,34 +229,27 @@ bool spot_check_draw_time() {
 
 /*
  * Clears the date string. Dumb-clear, clears full rect every time instead of determining single digit, month, day of
- * week, etc specific clear area. By default only clears if date has changed since last re-draw, which allows us to call
- * this every time update in conditions_task and not worry about redrawing every time.
- * */
-void spot_check_clear_date(bool force_clear) {
-    struct tm now_local = {0};
-    sntp_time_get_local_time(&now_local);
+ * week, etc specific clear area.
+ */
+void spot_check_clear_date() {
+    char     date_string[64];
+    uint32_t previous_date_width_px;
+    uint32_t previous_date_height_px;
+    sntp_time_get_time_str(&last_time_displayed, NULL, date_string);
+    display_get_text_bounds(date_string,
+                            DATE_DRAW_X_PX,
+                            DATE_DRAW_Y_PX,
+                            DISPLAY_FONT_SIZE_SHMEDIUM,
+                            DISPLAY_FONT_ALIGN_LEFT,
+                            &previous_date_width_px,
+                            &previous_date_height_px);
 
-    // Only clear date if we pass force flag or the date has advanced compared to our last redraw
-    if (force_clear || (now_local.tm_mday != last_time_displayed.tm_mday)) {
-        char     date_string[64];
-        uint32_t previous_date_width_px;
-        uint32_t previous_date_height_px;
-        sntp_time_get_time_str(&last_time_displayed, NULL, date_string);
-        display_get_text_bounds(date_string,
-                                DATE_DRAW_X_PX,
-                                DATE_DRAW_Y_PX,
-                                DISPLAY_FONT_SIZE_SHMEDIUM,
-                                DISPLAY_FONT_ALIGN_LEFT,
-                                &previous_date_width_px,
-                                &previous_date_height_px);
-
-        if (previous_date_width_px > 0 && previous_date_height_px > 0) {
-            // Add 5px buffer for lowercase letters
-            display_clear_area(DATE_DRAW_X_PX - 5,
-                               DATE_DRAW_Y_PX - previous_date_height_px - 5,
-                               previous_date_width_px + 10,
-                               previous_date_height_px + 10);
-        }
+    if (previous_date_width_px > 0 && previous_date_height_px > 0) {
+        // Add 5px buffer for lowercase letters
+        display_clear_area(DATE_DRAW_X_PX - 5,
+                           DATE_DRAW_Y_PX - previous_date_height_px - 5,
+                           previous_date_width_px + 10,
+                           previous_date_height_px + 10);
     }
 }
 

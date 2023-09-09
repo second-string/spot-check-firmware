@@ -11,6 +11,7 @@ typedef enum {
 } scheduler_mode_t;
 
 void             scheduler_trigger_time_update();
+void             scheduler_trigger_date_update();
 void             scheduler_trigger_spot_name_update();
 void             scheduler_trigger_conditions_update();
 void             scheduler_trigger_tide_chart_update();

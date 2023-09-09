@@ -25,7 +25,7 @@
 #define TAG SC_TAG_SCHEDULER
 
 #define NUM_DIFFERENTIAL_UPDATES 3
-#define NUM_DISCRETE_UPDATES 7
+#define NUM_DISCRETE_UPDATES 8
 
 #define OTA_CHECK_INTERVAL_SECONDS (CONFIG_OTA_CHECK_INTERVAL_HOURS * MINS_PER_HOUR * SECS_PER_MIN)
 #define NETWORK_CHECK_INTERVAL_SECONDS (30)
@@ -39,9 +39,13 @@
 #define CHECK_OTA_BIT (1 << 5)
 #define CHECK_NETWORK_BIT (1 << 6)
 #define SEND_MFLT_DATA_BIT (1 << 7)
+#define UPDATE_DATE_BIT (1 << 8)
 
-#define BITS_NEEDING_RENDER \
-    (UPDATE_CONDITIONS_BIT | UPDATE_TIDE_CHART_BIT | UPDATE_SWELL_CHART_BIT | UPDATE_TIME_BIT | UPDATE_SPOT_NAME_BIT)
+// Anything that causes a draw to the  screen needs to be added here. This exists so scheduler doesn't re-render screen
+// for logical update structs like memfault or ota check
+#define BITS_NEEDING_RENDER                                                                                            \
+    (UPDATE_CONDITIONS_BIT | UPDATE_TIDE_CHART_BIT | UPDATE_SWELL_CHART_BIT | UPDATE_TIME_BIT | UPDATE_SPOT_NAME_BIT | \
+     UPDATE_DATE_BIT)
 
 typedef struct {
     char   name[14];
@@ -111,6 +115,17 @@ static discrete_update_t discrete_updates[NUM_DISCRETE_UPDATES] = {
         .minute_last_executed          = 0,
         .active                        = false,
         .execute                       = scheduler_trigger_time_update,
+    },
+    {
+        .name                          = "date",
+        .force_next_update             = false,
+        .force_on_transition_to_online = true,
+        .hour                          = 0,
+        .minute                        = 1,
+        .hour_last_executed            = 0,
+        .minute_last_executed          = 0,
+        .active                        = false,
+        .execute                       = scheduler_trigger_date_update,
     },
     {
         .name                          = "conditions",
@@ -362,12 +377,20 @@ static void scheduler_task(void *args) {
             sleep_handler_set_busy(SYSTEM_IDLE_TIME_BIT);
             if (!full_clear) {
                 spot_check_clear_time();
-                spot_check_clear_date(false);
             }
+
             spot_check_draw_time();
-            spot_check_draw_date();
             spot_check_mark_time_dirty();
-            log_printf(LOG_LEVEL_INFO, "scheduler task updated time");
+            sleep_handler_set_idle(SYSTEM_IDLE_TIME_BIT);
+        }
+
+        if (update_bits & UPDATE_DATE_BIT) {
+            sleep_handler_set_busy(SYSTEM_IDLE_TIME_BIT);
+            if (!full_clear) {
+                spot_check_clear_date();
+            }
+
+            spot_check_draw_date();
             sleep_handler_set_idle(SYSTEM_IDLE_TIME_BIT);
         }
 
@@ -447,6 +470,10 @@ static void scheduler_trigger_network_check() {
 
 void scheduler_trigger_time_update() {
     xTaskNotify(scheduler_task_handle, UPDATE_TIME_BIT, eSetBits);
+}
+
+void scheduler_trigger_date_update() {
+    xTaskNotify(scheduler_task_handle, UPDATE_DATE_BIT, eSetBits);
 }
 
 void scheduler_trigger_spot_name_update() {
@@ -541,8 +568,8 @@ void scheduler_set_ota_mode() {
     }
 
     for (int i = 0; i < NUM_DISCRETE_UPDATES; i++) {
-        // Don't disable time
-        if (strncmp(discrete_updates[i].name, "time", 4) != 0) {
+        // Don't disable time or date
+        if (strncmp(discrete_updates[i].name, "time", 4) != 0 || strncmp(discrete_updates[i].name, "date", 4) != 0) {
             discrete_updates[i].active = false;
             log_printf(LOG_LEVEL_DEBUG, "Deactivated update struct '%s'", discrete_updates[i].name);
         }
