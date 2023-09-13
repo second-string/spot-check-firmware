@@ -24,12 +24,13 @@
 
 #define TAG SC_TAG_SCHEDULER
 
-#define NUM_DIFFERENTIAL_UPDATES 3
+#define NUM_DIFFERENTIAL_UPDATES 4
 #define NUM_DISCRETE_UPDATES 8
 
 #define OTA_CHECK_INTERVAL_SECONDS (CONFIG_OTA_CHECK_INTERVAL_HOURS * MINS_PER_HOUR * SECS_PER_MIN)
 #define NETWORK_CHECK_INTERVAL_SECONDS (30)
 #define MFLT_UPLOAD_INTERVAL_SECONDS (30 * SECS_PER_MIN)
+#define SCREEN_DIRTY_INTERVAL_SECONDS (60 * SECS_PER_MIN)
 
 #define UPDATE_CONDITIONS_BIT (1 << 0)
 #define UPDATE_TIDE_CHART_BIT (1 << 1)
@@ -40,6 +41,7 @@
 #define CHECK_NETWORK_BIT (1 << 6)
 #define SEND_MFLT_DATA_BIT (1 << 7)
 #define UPDATE_DATE_BIT (1 << 8)
+#define MARK_SCREEN_DIRTY_BIT (1 << 9)
 
 // Anything that causes a draw to the  screen needs to be added here. This exists so scheduler doesn't re-render screen
 // for logical update structs like memfault or ota check
@@ -100,6 +102,13 @@ static differential_update_t differential_updates[NUM_DIFFERENTIAL_UPDATES] = {
         .update_interval_secs = MFLT_UPLOAD_INTERVAL_SECONDS,
         .active               = false,
         .execute              = scheduler_trigger_mflt_upload,
+    },
+    {
+        .name                 = "dirty_screen",
+        .force_next_update    = false,
+        .update_interval_secs = SCREEN_DIRTY_INTERVAL_SECONDS,
+        .active               = false,
+        .execute              = scheduler_trigger_screen_dirty,
     },
 };
 
@@ -287,9 +296,10 @@ static void scheduler_task(void *args) {
         timer_local_init("scheduler-polling", scheduler_polling_timer_callback, NULL, MS_PER_SEC);
     timer_reset(scheduler_polling_timer_handle, true);
 
-    uint32_t update_bits       = 0;
-    bool     full_clear        = false;
-    bool     scheduler_success = false;
+    uint32_t update_bits        = 0;
+    bool     full_clear         = false;
+    bool     scheduler_success  = false;
+    bool     force_screen_dirty = false;
     while (1) {
         // Wait forever until a notification received. Clears all bits on exit since we'll handle every set bit in one
         // go
@@ -451,11 +461,23 @@ static void scheduler_task(void *args) {
             sleep_handler_set_idle(SYSTEM_IDLE_SWELL_CHART_BIT);
         }
 
+        if (update_bits & MARK_SCREEN_DIRTY_BIT) {
+            // Manually mark the full framebuffer dirty to prevent long-term gray-in happening on longer-static areas of
+            // the screen (aka everything but the time & conditions)
+            force_screen_dirty = true;
+            log_printf(LOG_LEVEL_INFO,
+                       "Flag to force mark framebuffer dirty received in scheduler, inverting framebuffer to re-render "
+                       "full screen");
+        }
+
         /***************************************
          * Render section
          **************************************/
         if (update_bits & BITS_NEEDING_RENDER) {
-            if (update_bits & ~UPDATE_TIME_BIT) {
+            // If either the force dirty flag is set or ANY bits requiring a screen render besides time are set, mark
+            // entire framebuffer as dirty
+            if (force_screen_dirty || (update_bits & ~UPDATE_TIME_BIT)) {
+                force_screen_dirty = false;
                 spot_check_mark_all_lines_dirty();
             }
 
@@ -502,6 +524,10 @@ void scheduler_trigger_ota_check() {
 
 void scheduler_trigger_mflt_upload() {
     xTaskNotify(scheduler_task_handle, SEND_MFLT_DATA_BIT, eSetBits);
+}
+
+void scheduler_trigger_screen_dirty() {
+    xTaskNotify(scheduler_task_handle, MARK_SCREEN_DIRTY_BIT, eSetBits);
 }
 
 scheduler_mode_t scheduler_get_mode() {
