@@ -70,11 +70,11 @@ bool spot_check_download_and_save_conditions(conditions_t *new_conditions) {
     char                    *server_response    = NULL;
     size_t                   response_data_size = 0;
     esp_http_client_handle_t client;
-    bool                     success = http_client_perform(&request, &client);
+    bool                     success = http_client_perform_with_retries(&request, 1, &client);
 
     // This MUST be here to short circuit execution. If http_client_read_response_to_* is called after a failure of
-    // http_client_perform_request, the inner call to client cleanup function will assert and crash and there's nothing
-    // we can do to wrap or error check it
+    // http_client_perform_with_retries, the inner call to client cleanup function will assert and crash and there's
+    // nothing we can do to wrap or error check it
     if (!success) {
         log_printf(LOG_LEVEL_ERROR,
                    "Received false success trying to perform req before reading response, bailing out of process");

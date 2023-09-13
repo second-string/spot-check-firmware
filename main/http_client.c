@@ -59,85 +59,6 @@ esp_err_t http_event_handler(esp_http_client_event_t *event) {
     return ESP_OK;
 }
 
-void http_client_init() {
-    request_lock = xSemaphoreCreateMutex();
-    MEMFAULT_ASSERT(request_lock);
-
-    failed_http_perform_reqs  = 0;
-    failed_http_perform_posts = 0;
-}
-
-/*
- * Caller passes in endpoint (tides/swell) the values for the 2 query params, a pointer to a block of already-allocated
- * memory for the base url + endpoint, and a pointer to a block of already-allocated memory to hold the query params
- * structs
- */
-http_request_t http_client_build_get_request(char              *endpoint,
-                                             spot_check_config *config,
-                                             char              *url_buf,
-                                             query_param       *params,
-                                             uint8_t            num_params) {
-    http_request_t req = {
-        .req_type = HTTP_REQ_TYPE_GET,
-    };
-
-    if (params && num_params > 0) {
-        query_param temp_params[num_params];
-        if (strcmp(endpoint, "conditions") == 0 || strcmp(endpoint, "screen_update") == 0 ||
-            strcmp(endpoint, "swell_chart") == 0 || strcmp(endpoint, "tides_chart") == 0) {
-            MEMFAULT_ASSERT(num_params == 4);
-            temp_params[0] = (query_param){.key = "device_id", .value = spot_check_get_serial()};
-            temp_params[1] = (query_param){.key = "lat", .value = config->spot_lat};
-            temp_params[2] = (query_param){.key = "lon", .value = config->spot_lon};
-            temp_params[3] = (query_param){.key = "spot_id", .value = config->spot_uid};
-        } else if (strcmp(endpoint, "tides") == 0 || strcmp(endpoint, "swell") == 0) {
-            // backwards compat
-            temp_params[1] = (query_param){.key = "spot_id", .value = config->spot_uid};
-        }
-
-        memcpy(params, temp_params, sizeof(temp_params));
-        req.get_args.num_params = sizeof(temp_params) / sizeof(query_param);
-        req.get_args.params     = params;
-    }
-
-    strcpy(url_buf, URL_BASE);
-    if (endpoint) {
-        strcat(url_buf, endpoint);
-    }
-    req.url = url_buf;
-    log_printf(LOG_LEVEL_DEBUG, "Built request URL: %s", url_buf);
-    log_printf(LOG_LEVEL_DEBUG, "Built %u request query params:", req.get_args.num_params);
-    for (uint8_t i = 0; i < num_params; i++) {
-        log_printf(LOG_LEVEL_DEBUG, "Param %u - %s: %s", i, req.get_args.params[i].key, req.get_args.params[i].value);
-    }
-
-    return req;
-}
-
-/*
- * Caller passes in endpoint, a pointer to a block of already-allocated memory for the base url + endpoint, and the
- * already-built post data string (only used as json for now).
- * Bit of a redundant function in the current request obj format but used for parity with GET flow.
- */
-http_request_t http_client_build_post_request(char *endpoint, char *url_buf, char *post_data, size_t post_data_size) {
-    // Build our url with memcpy (no null term) then strcpy (null term)
-    size_t base_len = strlen(URL_BASE);
-    memcpy(url_buf, URL_BASE, base_len);
-    strcpy(url_buf + base_len, endpoint);
-    http_post_args_t post_args = {
-        .post_data      = post_data,
-        .post_data_size = post_data_size,
-    };
-
-    http_request_t req = {
-        .req_type  = HTTP_REQ_TYPE_POST,
-        .url       = url_buf,
-        .post_args = post_args,
-    };
-
-    return req;
-}
-
 /*
  * Request-type-agnostic function for initiating the actual http contact with server.
  * NOTE: only performs the HTTP request (and in the case of a POST, writes the post data to the socket). Does not read
@@ -145,7 +66,7 @@ http_request_t http_client_build_post_request(char *endpoint, char *url_buf, cha
  * http_client_read_response after this function to read data into buffer and close client, OR manually reading data
  * and closing in the case of maniupulating large responses as they're chunked in.
  */
-bool http_client_perform(http_request_t *request_obj, esp_http_client_handle_t *client) {
+static bool http_client_perform(http_request_t *request_obj, esp_http_client_handle_t *client) {
     MEMFAULT_ASSERT(client);
     MEMFAULT_ASSERT(request_obj);
 
@@ -279,13 +200,99 @@ bool http_client_perform(http_request_t *request_obj, esp_http_client_handle_t *
 
     if (!req_start_success) {
         memfault_metrics_heartbeat_add(memfault_key, 1);
-
-        // Kick into offline mode for any failure case. Best case it was a fluke and the next healthcheck will kick it
-        // back.
-        scheduler_set_offline_mode();
     }
 
     return req_start_success;
+}
+
+bool http_client_perform_with_retries(http_request_t           *request_obj,
+                                      uint8_t                   additional_retries,
+                                      esp_http_client_handle_t *client) {
+    uint8_t attempts = 0;
+    bool    success  = false;
+    while ((attempts <= additional_retries) && !success) {
+        success = http_client_perform(request_obj, client);
+        attempts++;
+    }
+
+    if (!success) {
+        // Kick into offline mode for any failure case. Best case it was a fluke or there's an external http client
+        // running  and the next healthcheck will kick it back.
+        scheduler_set_offline_mode();
+    }
+
+    return success;
+}
+
+/*
+ * Caller passes in endpoint (tides/swell) the values for the 2 query params, a pointer to a block of already-allocated
+ * memory for the base url + endpoint, and a pointer to a block of already-allocated memory to hold the query params
+ * structs
+ */
+http_request_t http_client_build_get_request(char              *endpoint,
+                                             spot_check_config *config,
+                                             char              *url_buf,
+                                             query_param       *params,
+                                             uint8_t            num_params) {
+    http_request_t req = {
+        .req_type = HTTP_REQ_TYPE_GET,
+    };
+
+    if (params && num_params > 0) {
+        query_param temp_params[num_params];
+        if (strcmp(endpoint, "conditions") == 0 || strcmp(endpoint, "screen_update") == 0 ||
+            strcmp(endpoint, "swell_chart") == 0 || strcmp(endpoint, "tides_chart") == 0) {
+            MEMFAULT_ASSERT(num_params == 4);
+            temp_params[0] = (query_param){.key = "device_id", .value = spot_check_get_serial()};
+            temp_params[1] = (query_param){.key = "lat", .value = config->spot_lat};
+            temp_params[2] = (query_param){.key = "lon", .value = config->spot_lon};
+            temp_params[3] = (query_param){.key = "spot_id", .value = config->spot_uid};
+        } else if (strcmp(endpoint, "tides") == 0 || strcmp(endpoint, "swell") == 0) {
+            // backwards compat
+            temp_params[1] = (query_param){.key = "spot_id", .value = config->spot_uid};
+        }
+
+        memcpy(params, temp_params, sizeof(temp_params));
+        req.get_args.num_params = sizeof(temp_params) / sizeof(query_param);
+        req.get_args.params     = params;
+    }
+
+    strcpy(url_buf, URL_BASE);
+    if (endpoint) {
+        strcat(url_buf, endpoint);
+    }
+    req.url = url_buf;
+    log_printf(LOG_LEVEL_DEBUG, "Built request URL: %s", url_buf);
+    log_printf(LOG_LEVEL_DEBUG, "Built %u request query params:", req.get_args.num_params);
+    for (uint8_t i = 0; i < num_params; i++) {
+        log_printf(LOG_LEVEL_DEBUG, "Param %u - %s: %s", i, req.get_args.params[i].key, req.get_args.params[i].value);
+    }
+
+    return req;
+}
+
+/*
+ * Caller passes in endpoint, a pointer to a block of already-allocated memory for the base url + endpoint, and the
+ * already-built post data string (only used as json for now).
+ * Bit of a redundant function in the current request obj format but used for parity with GET flow.
+ */
+http_request_t http_client_build_post_request(char *endpoint, char *url_buf, char *post_data, size_t post_data_size) {
+    // Build our url with memcpy (no null term) then strcpy (null term)
+    size_t base_len = strlen(URL_BASE);
+    memcpy(url_buf, URL_BASE, base_len);
+    strcpy(url_buf + base_len, endpoint);
+    http_post_args_t post_args = {
+        .post_data      = post_data,
+        .post_data_size = post_data_size,
+    };
+
+    http_request_t req = {
+        .req_type  = HTTP_REQ_TYPE_POST,
+        .url       = url_buf,
+        .post_args = post_args,
+    };
+
+    return req;
 }
 
 /*
@@ -336,7 +343,7 @@ bool http_client_check_response(esp_http_client_handle_t *client, int *content_l
 /*
  * Read response from http requeste into caller-supplied buffer. Caller responsible for freeing malloced buffer
  * saved in response_data pointer if return value > 0. Request must have been sent through client using
- * http_client_perform_request.
+ * http_client_perform_with_retries.
  * Returns ESP_OK on success, ESP_FAIL for failure. Returns malloced data and the size of that data in the two pointer
  * args.
  */
@@ -404,7 +411,7 @@ esp_err_t http_client_read_response_to_buffer(esp_http_client_handle_t *client,
 
 /*
  * Read response from http request in chunks into flash partition. Request must have been sent through client using
- * http_client_perform_request. Caller must erase desired location in flash first.
+ * http_client_perform_with_retries. Caller must erase desired location in flash first.
  * Returns ESP_OK on success, ESP_FAIL for failure. Returns total bytes saved to NVS in pointer arg.
  */
 esp_err_t http_client_read_response_to_flash(esp_http_client_handle_t *client,
@@ -505,7 +512,7 @@ bool http_client_check_internet() {
     http_request_t req = http_client_build_get_request((char *)"health", NULL, url, NULL, 0);
 
     esp_http_client_handle_t client;
-    bool                     success = http_client_perform(&req, &client);
+    bool                     success = http_client_perform_with_retries(&req, 0, &client);
     if (success) {
         esp_err_t http_err = http_client_read_response_to_buffer(&client, &res, &bytes_alloced);
         if (http_err == ESP_OK && res && bytes_alloced > 0) {
@@ -517,7 +524,7 @@ bool http_client_check_internet() {
             log_printf(LOG_LEVEL_DEBUG, "http client API healthcheck failed at http_client_read_response_to_buffer");
         }
     } else {
-        log_printf(LOG_LEVEL_DEBUG, "http client API healthcheck failed at http_client_perform_request");
+        log_printf(LOG_LEVEL_DEBUG, "http client API healthcheck failed at http_client_perform_with_retries");
     }
 
     return false;
@@ -526,4 +533,12 @@ bool http_client_check_internet() {
 void http_client_get_failures(uint16_t *get_failures, uint16_t *post_failures) {
     *get_failures  = failed_http_perform_reqs;
     *post_failures = failed_http_perform_posts;
+}
+
+void http_client_init() {
+    request_lock = xSemaphoreCreateMutex();
+    MEMFAULT_ASSERT(request_lock);
+
+    failed_http_perform_reqs  = 0;
+    failed_http_perform_posts = 0;
 }

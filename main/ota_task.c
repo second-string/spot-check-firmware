@@ -133,7 +133,7 @@ static bool check_forced_update(esp_app_desc_t *current_image_info, char *versio
     char                    *response_data;
     size_t                   response_data_size;
     esp_http_client_handle_t client;
-    bool                     http_success = http_client_perform(&request_obj, &client);
+    bool                     http_success = http_client_perform_with_retries(&request_obj, 1, &client);
     if (!http_success) {
         log_printf(LOG_LEVEL_ERROR,
                    "Error in http perform request checking to see if need forced update, defaulting to no update");

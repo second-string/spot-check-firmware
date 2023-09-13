@@ -74,7 +74,7 @@ static void screen_img_handler_get_metadata(screen_img_t screen_img, screen_img_
 
 /*
  * Finished process of saving a screen_img to the proper location in the flash partition. Request must have been built
- * and sent with http_client_build_request and http_client_perform_request already.
+ * and sent with http_client_build_request and http_client_perform_with_retries already.
  */
 static int screen_img_handler_save(esp_http_client_handle_t *client,
                                    screen_img_t              screen_img,
@@ -186,7 +186,7 @@ bool screen_img_handler_download_and_save(screen_img_t screen_img) {
     vTaskDelay(pdMS_TO_TICKS(1000));
 
     esp_http_client_handle_t client;
-    success = http_client_perform(&req, &client);
+    success = http_client_perform_with_retries(&req, 1, &client);
     if (!success) {
         log_printf(LOG_LEVEL_ERROR, "Error making request, aborting");
         return false;

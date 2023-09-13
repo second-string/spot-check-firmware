@@ -313,7 +313,7 @@ static BaseType_t cli_command_api(char *write_buffer, size_t write_buffer_size, 
         char                    *response_data;
         size_t                   response_data_size;
         esp_http_client_handle_t client;
-        bool                     http_success = http_client_perform(&request_obj, &client);
+        bool                     http_success = http_client_perform_with_retries(&request_obj, 0, &client);
         if (!http_success) {
             strcpy(write_buffer,
                    "Error in http perform checking to see if need forced update, defaulting to no update");
@@ -333,7 +333,7 @@ static BaseType_t cli_command_api(char *write_buffer, size_t write_buffer_size, 
         int                      content_len = 0;
         http_request_t           req         = http_client_build_get_request("health", NULL, url_buf, NULL, 0);
         esp_http_client_handle_t client      = NULL;
-        http_client_perform(&req, &client);
+        http_client_perform_with_retries(&req, 0, &client);
         http_client_check_response(&client, &content_len);
         sprintf(write_buffer, "Sent req, content_len returned: %d", content_len);
         return pdFALSE;
@@ -376,7 +376,7 @@ static BaseType_t cli_command_api(char *write_buffer, size_t write_buffer_size, 
         memset(write_buffer, 0x0, write_buffer_size);
 
         esp_http_client_handle_t client;
-        bool                     success = http_client_perform(&req, &client);
+        bool                     success = http_client_perform_with_retries(&req, 0, &client);
         if (!success) {
             log_printf(LOG_LEVEL_ERROR, "Error making request, aborting");
             return pdFALSE;
