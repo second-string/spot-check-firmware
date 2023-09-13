@@ -9,6 +9,7 @@
 
 #include "constants.h"
 #include "http_client.h"
+#include "scheduler_task.h"
 #include "spot_check.h"
 #include "wifi.h"
 
@@ -278,6 +279,10 @@ bool http_client_perform(http_request_t *request_obj, esp_http_client_handle_t *
 
     if (!req_start_success) {
         memfault_metrics_heartbeat_add(memfault_key, 1);
+
+        // Kick into offline mode for any failure case. Best case it was a fluke and the next healthcheck will kick it
+        // back.
+        scheduler_set_offline_mode();
     }
 
     return req_start_success;
@@ -318,6 +323,11 @@ bool http_client_check_response(esp_http_client_handle_t *client, int *content_l
                    "Content-length=%d",
                    status,
                    *content_length);
+    }
+
+    // If something failed and it wasn't on the server side, kick to offline mode
+    if (!success && !(status >= 500 && status <= 599)) {
+        scheduler_set_offline_mode();
     }
 
     return success;
@@ -376,6 +386,9 @@ esp_err_t http_client_read_response_to_buffer(esp_http_client_handle_t *client,
         }
     } while (0);
 
+    // Intentionally not setting offline mode here as it seems unlikely we're actually offline if we performed request,
+    // got a successfully status, and then failed reading out all data. If network really is gone, then offline mode
+    // will get set next request
     esp_err_t cleanup_err = esp_http_client_cleanup(*client);
     if (cleanup_err != ESP_OK) {
         err = cleanup_err;
@@ -464,6 +477,9 @@ esp_err_t http_client_read_response_to_flash(esp_http_client_handle_t *client,
         }
     } while (0);
 
+    // Intentionally not setting offline mode here as it seems unlikely we're actually offline if we performed request,
+    // got a successfully status, and then failed reading out all data. If network really is gone, then offline mode
+    // will get set next request
     esp_err_t cleanup_err = esp_http_client_cleanup(*client);
     if (cleanup_err != ESP_OK) {
         err = cleanup_err;

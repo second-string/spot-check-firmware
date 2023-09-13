@@ -535,6 +535,8 @@ scheduler_mode_t scheduler_get_mode() {
 }
 
 void scheduler_set_offline_mode() {
+    // Once we're in offline mode, every healthcheck will re-execute this function as requests still fail. Prevent
+    // unnecessary looping and updating of the structs
     if (mode == SCHEDULER_MODE_OFFLINE) {
         return;
     }
