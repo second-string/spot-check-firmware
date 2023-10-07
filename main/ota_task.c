@@ -348,7 +348,7 @@ void ota_task_start() {
     // minimal * 3 is the smallest we can go w/o SO
     xTaskCreate(&check_ota_update_task,
                 "check-ota-update",
-                SPOT_CHECK_MINIMAL_STACK_SIZE_BYTES * 4,
+                SPOT_CHECK_MINIMAL_STACK_SIZE_BYTES * 5,
                 NULL,
                 tskIDLE_PRIORITY,
                 &ota_task_handle);
