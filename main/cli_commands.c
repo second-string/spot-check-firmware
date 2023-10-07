@@ -376,7 +376,7 @@ static BaseType_t cli_command_api(char *write_buffer, size_t write_buffer_size, 
         memset(write_buffer, 0x0, write_buffer_size);
 
         esp_http_client_handle_t client;
-        bool                     success = http_client_perform_with_retries(&req, 0, &client);
+        bool                     success = http_client_perform_with_retries(&req, 1, &client);
         if (!success) {
             log_printf(LOG_LEVEL_ERROR, "Error making request, aborting");
             return pdFALSE;

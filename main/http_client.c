@@ -9,7 +9,6 @@
 
 #include "constants.h"
 #include "http_client.h"
-#include "scheduler_task.h"
 #include "spot_check.h"
 #include "wifi.h"
 
@@ -205,6 +204,13 @@ static bool http_client_perform(http_request_t *request_obj, esp_http_client_han
     return req_start_success;
 }
 
+/*
+ * Wrap regular perform call in retry logic.
+ * NOTE: this will only work if  there is no internet connection! If there is a non-success status code from the server,
+ * this will succeed as the status code is not received until later asynchronously. The failure/retry logic in the
+ * http_client_check_status function will catch any server-side failures, but that needs to be bundled into the perform
+ * call somehow for retry logic for the whole request to actually work.
+ */
 bool http_client_perform_with_retries(http_request_t           *request_obj,
                                       uint8_t                   additional_retries,
                                       esp_http_client_handle_t *client) {
@@ -218,7 +224,7 @@ bool http_client_perform_with_retries(http_request_t           *request_obj,
     if (!success) {
         // Kick into offline mode for any failure case. Best case it was a fluke or there's an external http client
         // running  and the next healthcheck will kick it back.
-        scheduler_set_offline_mode();
+        spot_check_set_offline_mode();
     }
 
     return success;
@@ -334,7 +340,7 @@ bool http_client_check_response(esp_http_client_handle_t *client, int *content_l
 
     // If something failed and it wasn't on the server side, kick to offline mode
     if (!success && !(status >= 500 && status <= 599)) {
-        scheduler_set_offline_mode();
+        spot_check_set_offline_mode();
     }
 
     return success;

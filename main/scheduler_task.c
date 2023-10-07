@@ -162,7 +162,7 @@ static discrete_update_t discrete_updates[NUM_DISCRETE_UPDATES] = {
         .name                          = "swell_morning",
         .force_next_update             = false,
         .force_on_transition_to_online = true,
-        .hour                          = 12,
+        .hour                          = 3,
         .minute                        = 0,
         .hour_last_executed            = 0,
         .minute_last_executed          = 0,
@@ -173,7 +173,7 @@ static discrete_update_t discrete_updates[NUM_DISCRETE_UPDATES] = {
         .name                          = "swell_midday",
         .force_next_update             = false,
         .force_on_transition_to_online = false,
-        .hour                          = 21,
+        .hour                          = 12,
         .minute                        = 0,
         .hour_last_executed            = 0,
         .minute_last_executed          = 0,
@@ -205,11 +205,11 @@ static discrete_update_t discrete_updates[NUM_DISCRETE_UPDATES] = {
     },
 };
 
-// The update structs that should run in offline mode
-// TODO :: time should technically be in this, as RTC is accurate enough that we want to keep rendering time even when
-// we go offline. It causes a problem on boot straight to no network or no internet, because then it draws the (usually
-// non-sntp synced) time over the no network/connection message. Figure out how to separate the two cases
+// The update structs that should run in offline mode.
+// TODO :: Re-added time to this with the addition of INIT scheduler mode, but needs further testing to verify it's not
+// rendering in times that it should be.
 const char *const offline_mode_update_names[] = {
+    "time",
     "network_check",
 };
 

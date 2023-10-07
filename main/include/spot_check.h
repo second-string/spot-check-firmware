@@ -37,10 +37,11 @@ void spot_check_draw_fetching_conditions_text();
 void spot_check_draw_fetching_conditions_text();
 
 /*
- * Wrappers for display render funcs so our logic modules don't have a dependency on display driver
+ * Wrappers for different funcs so our logic modules can remain decoupled with only a dependency on the spot_check file
  */
 void spot_check_full_clear();
 void spot_check_mark_all_lines_dirty();
 void spot_check_render(const char *calling_func, uint32_t line);
+void spot_check_set_offline_mode();
 
 void spot_check_init();

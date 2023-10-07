@@ -182,6 +182,8 @@ void app_main(void) {
                 ESP_ERROR_CHECK(esp_wifi_stop());
                 ESP_ERROR_CHECK(esp_wifi_start());
             }
+
+            current_wait_secs++;
         }
 
         // If this is still false, it means we either couldn't find the provisioned network or just couldn't connect to
@@ -297,6 +299,6 @@ void app_main(void) {
     // update, etc) before entering deep sleep
     sleep_handler_block_until_system_idle();
 
-    // yeet the default task, everything runs from conditions task, ota task, and timers
+    // yeet the default task, everything runs from scheduler task, ota task, and timers
     vTaskDelete(NULL);
 }

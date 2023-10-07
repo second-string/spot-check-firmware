@@ -18,6 +18,7 @@
 #include "log.h"
 #include "mdns_local.h"
 #include "scheduler_task.h"
+#include "spot_check.h"
 #include "wifi.h"
 
 #define TAG SC_TAG_WIFI
@@ -78,7 +79,7 @@ void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id
                             "network is found / comes back");
 
                         xEventGroupClearBits(wifi_event_group, WIFI_EVENT_GROUP_CONNECTED_TO_NETWORK_BIT);
-                        scheduler_set_offline_mode();
+                        spot_check_set_offline_mode();
                     }
                 }
                 break;

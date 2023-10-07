@@ -10,11 +10,13 @@
 #include "json.h"
 #include "log.h"
 #include "nvs.h"
+#include "scheduler_task.h"
 #include "sntp_time.h"
 #include "spot_check.h"
 
 #define TAG SC_TAG_SPOT_CHECK
 
+// TODO :: these should all be calc'd off of the display width/height macros
 #define TIME_DRAW_X_PX (75)
 #define TIME_DRAW_Y_PX (120)
 
@@ -26,15 +28,20 @@
 #define CONDITIONS_TEMPERATURE_DRAW_Y_PX (120)
 #define CONDITIONS_WIND_DRAW_Y_PX (150)
 #define CONDITIONS_TIDE_DRAW_Y_PX (180)
+
 #define OTA_DRAW_X_PX (400)
 #define OTA_DRAW_Y_PX \
     (250)  // Draw right in the middle of tide chart - since it only updates every 24hr the likelihood of it updating
            // and re-drawing while we're firmware update is super low
 
+#define OFFLINE_TEXT_DRAW_X_PX (400)
+#define OFFLINE_TEXT_DRAW_Y_PX (30)
+
 #define NUM_BYTES_VERSION_STR (26)
 
 const char *const ota_start_text    = "Firmware update in progress, please do not unplug Spot Check device";
 const char *const ota_finished_text = "Firmware update successful! Rebooting...";
+const char *const offline_text = "Spot Check is having trouble accessing the network, please check your connection";
 
 static struct tm last_time_displayed = {0};
 static char      device_serial[20];
@@ -510,6 +517,28 @@ void spot_check_mark_all_lines_dirty() {
 
 void spot_check_render(const char *calling_func, uint32_t line) {
     display_render(calling_func, line);
+}
+
+/*
+ * Wrapper function for any module to call when device transitions to offline. Handles both updating the scheduler and
+ * drawing necessary updates to the display.
+ */
+void spot_check_set_offline_mode() {
+    log_printf(LOG_LEVEL_WARN, "%s called", __func__);
+
+    // TODO :: need to handle case where offline mode switched back to online mode (which would clear text, also still
+    // not done), but then gets kicked back to offline before this is hit again. This code would assume that offline
+    // text had already been drawn, because it didn't know it was cleared
+    if (scheduler_get_mode() != SCHEDULER_MODE_OFFLINE) {
+        display_draw_text((char *)offline_text,
+                          OFFLINE_TEXT_DRAW_X_PX,
+                          OFFLINE_TEXT_DRAW_Y_PX,
+                          DISPLAY_FONT_SIZE_SMALL,
+                          DISPLAY_FONT_ALIGN_CENTER);
+    }
+
+    scheduler_set_offline_mode();
+    spot_check_render(__func__, __LINE__);
 }
 
 /*
