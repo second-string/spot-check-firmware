@@ -270,6 +270,7 @@ static BaseType_t cli_command_api(char *write_buffer, size_t write_buffer_size, 
     BaseType_t  endpoint_len;
     const char *endpoint = FreeRTOS_CLIGetParameter(cmd_str, 1, &endpoint_len);
 
+    memset(write_buffer, 0x0, write_buffer_size);
     if (endpoint_len == 3 && strncmp(endpoint, "img", endpoint_len) == 0) {
         BaseType_t  screen_img_str_len;
         const char *screen_img_str = FreeRTOS_CLIGetParameter(cmd_str, 2, &screen_img_str_len);
@@ -278,20 +279,16 @@ static BaseType_t cli_command_api(char *write_buffer, size_t write_buffer_size, 
             return pdFALSE;
         }
 
-        screen_img_t screen_img = SCREEN_IMG_COUNT;
         if (screen_img_str_len == 4 && strcmp(screen_img_str, "tide") == 0) {
-            screen_img = SCREEN_IMG_TIDE_CHART;
+            scheduler_trigger_tide_chart_update();
         } else if (screen_img_str_len == 5 && strcmp(screen_img_str, "swell") == 0) {
-            screen_img = SCREEN_IMG_SWELL_CHART;
+            scheduler_trigger_swell_chart_update();
         } else {
             char msg[80];
             sprintf(msg, "Found no matching screen_img_t enum value for img '%s'", screen_img_str);
             strcpy(write_buffer, msg);
             return pdFALSE;
         }
-
-        screen_img_handler_download_and_save(screen_img);
-        memset(write_buffer, 0x0, write_buffer_size);
     } else if (endpoint_len == 3 && strncmp(endpoint, "ota", endpoint_len) == 0) {
         char post_data[100];
         int  err = sprintf(post_data,
@@ -313,14 +310,16 @@ static BaseType_t cli_command_api(char *write_buffer, size_t write_buffer_size, 
         char                    *response_data;
         size_t                   response_data_size;
         esp_http_client_handle_t client;
-        bool                     http_success = http_client_perform_with_retries(&request_obj, 0, &client);
+        int                      content_length = 0;
+        bool http_success = http_client_perform_with_retries(&request_obj, 0, &client, &content_length);
         if (!http_success) {
             strcpy(write_buffer,
                    "Error in http perform checking to see if need forced update, defaulting to no update");
             return pdFALSE;
         }
 
-        esp_err_t http_err = http_client_read_response_to_buffer(&client, &response_data, &response_data_size);
+        esp_err_t http_err =
+            http_client_read_response_to_buffer(&client, content_length, &response_data, &response_data_size);
         if (http_err != ESP_OK) {
             strcpy(write_buffer,
                    "Error in http request readout checking to see if need forced update, defaulting to no update");
@@ -328,65 +327,15 @@ static BaseType_t cli_command_api(char *write_buffer, size_t write_buffer_size, 
         }
 
         memcpy(write_buffer, response_data, response_data_size);
-    } else if (endpoint_len == 5 && strncmp(endpoint, "debug", endpoint_len) == 0) {
-        char                     url_buf[128];
-        int                      content_len = 0;
-        http_request_t           req         = http_client_build_get_request("health", NULL, url_buf, NULL, 0);
-        esp_http_client_handle_t client      = NULL;
-        http_client_perform_with_retries(&req, 0, &client);
-        http_client_check_response(&client, &content_len);
-        sprintf(write_buffer, "Sent req, content_len returned: %d", content_len);
-        return pdFALSE;
+    } else if (endpoint_len == 6 && strncmp(endpoint, "health", endpoint_len) == 0) {
+        scheduler_trigger_network_check();
     } else if (endpoint_len == 8 && strncmp(endpoint, "failures", endpoint_len) == 0) {
         uint16_t get_failures  = 0;
         uint16_t post_failures = 0;
         http_client_get_failures(&get_failures, &post_failures);
         sprintf(write_buffer, "GET failures: %u -- POST failures: %u", get_failures, post_failures);
     } else {
-        const char *const endpoints_with_query_params[] = {
-            "conditions",
-            "screen_update",
-            // NOTE: Make sure to update list of endpoints in http_client_build_get_request if changing this list
-        };
-
-        // If entered endpoint is in list to include config query params, include that data in call to
-        // http_client_build_get_request
-        bool include_params = false;
-        for (uint8_t i = 0; i < sizeof(endpoints_with_query_params) / sizeof(char *); i++) {
-            if (strlen(endpoints_with_query_params[i]) == endpoint_len &&
-                strncmp(endpoints_with_query_params[i], endpoint, endpoint_len) == 0) {
-                include_params = true;
-                log_printf(LOG_LEVEL_DEBUG, "Including normal query params in this CLI API request");
-                break;
-            }
-        }
-
-        char               url[80];
-        char              *res           = NULL;
-        size_t             bytes_alloced = 0;
-        spot_check_config *config        = NULL;
-        query_param        params[4];
-        uint8_t            num_params = 0;
-        if (include_params) {
-            config     = nvs_get_config();
-            num_params = 4;
-        }
-
-        http_request_t req = http_client_build_get_request((char *)endpoint, config, url, params, num_params);
-        memset(write_buffer, 0x0, write_buffer_size);
-
-        esp_http_client_handle_t client;
-        bool                     success = http_client_perform_with_retries(&req, 1, &client);
-        if (!success) {
-            log_printf(LOG_LEVEL_ERROR, "Error making request, aborting");
-            return pdFALSE;
-        }
-        esp_err_t http_err = http_client_read_response_to_buffer(&client, &res, &bytes_alloced);
-        if (http_err == ESP_OK && res && bytes_alloced > 0) {
-            // strncpy up to write_buffer_size since response might be big (shouldn't be since only text though)
-            strncpy(write_buffer, res, MIN(strlen(res), write_buffer_size));
-            free(res);
-        }
+        strcpy(write_buffer, "Unsupported api endpoint");
     }
 
     return pdFALSE;

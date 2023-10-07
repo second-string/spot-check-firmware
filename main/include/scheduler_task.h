@@ -10,6 +10,7 @@ typedef enum {
     SCHEDULER_MODE_OTA,
 } scheduler_mode_t;
 
+void             scheduler_trigger_network_check();
 void             scheduler_trigger_time_update();
 void             scheduler_trigger_date_update();
 void             scheduler_trigger_spot_name_update();

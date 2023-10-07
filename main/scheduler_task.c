@@ -70,8 +70,6 @@ typedef struct {
     bool force_on_transition_to_online;
 } discrete_update_t;
 
-static void scheduler_trigger_network_check();
-
 static TaskHandle_t          scheduler_task_handle;
 static scheduler_mode_t      mode;
 static volatile unsigned int seconds_elapsed;
@@ -206,10 +204,10 @@ static discrete_update_t discrete_updates[NUM_DISCRETE_UPDATES] = {
 };
 
 // The update structs that should run in offline mode.
-// TODO :: Re-added time to this with the addition of INIT scheduler mode, but needs further testing to verify it's not
-// rendering in times that it should be.
+// TODO :: need a way for online -> offline to keep updating time after we've been online and rendered full homescreen
+// once. Can't just add time here though, because if healthcheck or any of the network requests during boot kick into
+// offline mode, then time starts rendering even if it isn't correct
 const char *const offline_mode_update_names[] = {
-    "time",
     "network_check",
 };
 
@@ -316,8 +314,10 @@ static void scheduler_task(void *args) {
 
         /***************************************
          * Network update section
+         * Gate every network request block with a check for scheduler mode so one failed request will short circuit any
+         * remaining ones if their update bits are also set
          **************************************/
-        if (update_bits & UPDATE_CONDITIONS_BIT) {
+        if (update_bits & UPDATE_CONDITIONS_BIT && scheduler_get_mode() != SCHEDULER_MODE_OFFLINE) {
             sleep_handler_set_busy(SYSTEM_IDLE_CONDITIONS_BIT);
             conditions_t new_conditions = {0};
             scheduler_success           = spot_check_download_and_save_conditions(&new_conditions);
@@ -327,13 +327,13 @@ static void scheduler_task(void *args) {
             sleep_handler_set_idle(SYSTEM_IDLE_CONDITIONS_BIT);
         }
 
-        if (update_bits & UPDATE_TIDE_CHART_BIT) {
+        if (update_bits & UPDATE_TIDE_CHART_BIT && scheduler_get_mode() != SCHEDULER_MODE_OFFLINE) {
             sleep_handler_set_busy(SYSTEM_IDLE_TIDE_CHART_BIT);
             screen_img_handler_download_and_save(SCREEN_IMG_TIDE_CHART);
             sleep_handler_set_idle(SYSTEM_IDLE_TIDE_CHART_BIT);
         }
 
-        if (update_bits & UPDATE_SWELL_CHART_BIT) {
+        if (update_bits & UPDATE_SWELL_CHART_BIT && scheduler_get_mode() != SCHEDULER_MODE_OFFLINE) {
             sleep_handler_set_busy(SYSTEM_IDLE_SWELL_CHART_BIT);
             screen_img_handler_download_and_save(SCREEN_IMG_SWELL_CHART);
             sleep_handler_set_idle(SYSTEM_IDLE_SWELL_CHART_BIT);
@@ -349,7 +349,7 @@ static void scheduler_task(void *args) {
             (void)memfault_interface_post_data();
         }
 
-        if (update_bits & CHECK_OTA_BIT) {
+        if (update_bits & CHECK_OTA_BIT && scheduler_get_mode() != SCHEDULER_MODE_OFFLINE) {
             // Just kicks off the task non-blocking so this won't actually disrupt anything with rest of conditions
             // update loop
             ota_task_start();
@@ -486,7 +486,7 @@ static void scheduler_task(void *args) {
     }
 }
 
-static void scheduler_trigger_network_check() {
+void scheduler_trigger_network_check() {
     xTaskNotify(scheduler_task_handle, CHECK_NETWORK_BIT, eSetBits);
 }
 
@@ -586,6 +586,8 @@ void scheduler_set_offline_mode() {
  * ideally then we reboot normally. If OTA fails we have bigger problems
  */
 void scheduler_set_ota_mode() {
+    log_printf(LOG_LEVEL_WARN, "%s called", __func__);
+
     if (mode == SCHEDULER_MODE_OTA) {
         return;
     }
@@ -607,6 +609,8 @@ void scheduler_set_ota_mode() {
 }
 
 void scheduler_set_online_mode() {
+    log_printf(LOG_LEVEL_WARN, "%s called", __func__);
+
     if (mode == SCHEDULER_MODE_ONLINE) {
         return;
     }

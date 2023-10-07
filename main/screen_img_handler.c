@@ -78,7 +78,8 @@ static void screen_img_handler_get_metadata(screen_img_t screen_img, screen_img_
  */
 static int screen_img_handler_save(esp_http_client_handle_t *client,
                                    screen_img_t              screen_img,
-                                   screen_img_metadata_t    *metadata) {
+                                   screen_img_metadata_t    *metadata,
+                                   int                       content_length) {
     const esp_partition_t *part = flash_partition_get_screen_img_partition();
 
     // Erase only the size of the image currently stored (internal spi flash functions will erase to page
@@ -105,8 +106,11 @@ static int screen_img_handler_save(esp_http_client_handle_t *client,
     }
 
     size_t    bytes_saved = 0;
-    esp_err_t err =
-        http_client_read_response_to_flash(client, (esp_partition_t *)part, metadata->screen_img_offset, &bytes_saved);
+    esp_err_t err         = http_client_read_response_to_flash(client,
+                                                       content_length,
+                                                       (esp_partition_t *)part,
+                                                       metadata->screen_img_offset,
+                                                       &bytes_saved);
     if (err == ESP_OK && bytes_saved > 0) {
         // Save metadata as last action to make sure all steps have succeeded and there's a valid image in
         // flash
@@ -186,13 +190,14 @@ bool screen_img_handler_download_and_save(screen_img_t screen_img) {
     vTaskDelay(pdMS_TO_TICKS(1000));
 
     esp_http_client_handle_t client;
-    success = http_client_perform_with_retries(&req, 1, &client);
+    int                      content_length = 0;
+    success                                 = http_client_perform_with_retries(&req, 1, &client, &content_length);
     if (!success) {
         log_printf(LOG_LEVEL_ERROR, "Error making request, aborting");
         return false;
     }
 
-    success = screen_img_handler_save(&client, screen_img, &metadata);
+    success = screen_img_handler_save(&client, screen_img, &metadata, content_length);
     if (!success) {
         log_printf(LOG_LEVEL_ERROR, "Error saving screen img");
         return false;

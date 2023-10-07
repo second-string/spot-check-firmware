@@ -77,7 +77,8 @@ bool spot_check_download_and_save_conditions(conditions_t *new_conditions) {
     char                    *server_response    = NULL;
     size_t                   response_data_size = 0;
     esp_http_client_handle_t client;
-    bool                     success = http_client_perform_with_retries(&request, 1, &client);
+    int                      content_length = 0;
+    bool                     success        = http_client_perform_with_retries(&request, 1, &client, &content_length);
 
     // This MUST be here to short circuit execution. If http_client_read_response_to_* is called after a failure of
     // http_client_perform_with_retries, the inner call to client cleanup function will assert and crash and there's
@@ -88,7 +89,8 @@ bool spot_check_download_and_save_conditions(conditions_t *new_conditions) {
         return false;
     }
 
-    esp_err_t http_err = http_client_read_response_to_buffer(&client, &server_response, &response_data_size);
+    esp_err_t http_err =
+        http_client_read_response_to_buffer(&client, content_length, &server_response, &response_data_size);
 
     if (http_err == ESP_OK && response_data_size != 0) {
         cJSON *json               = parse_json(server_response);
@@ -526,19 +528,23 @@ void spot_check_render(const char *calling_func, uint32_t line) {
 void spot_check_set_offline_mode() {
     log_printf(LOG_LEVEL_WARN, "%s called", __func__);
 
-    // TODO :: need to handle case where offline mode switched back to online mode (which would clear text, also still
-    // not done), but then gets kicked back to offline before this is hit again. This code would assume that offline
-    // text had already been drawn, because it didn't know it was cleared
-    if (scheduler_get_mode() != SCHEDULER_MODE_OFFLINE) {
+    bool draw_and_render_text = scheduler_get_mode() != SCHEDULER_MODE_OFFLINE;
+
+    scheduler_set_offline_mode();
+
+    // TODO :: need to handle case where offline mode switched back to online mode, but then gets kicked back to offline
+    // before this is hit again. This code would assume that offline text had already been drawn, because it didn't know
+    // it was cleared. Not a huge deal, just means the user won't be notified about connection issues but FW logic is
+    // still solid
+    if (draw_and_render_text) {
         display_draw_text((char *)offline_text,
                           OFFLINE_TEXT_DRAW_X_PX,
                           OFFLINE_TEXT_DRAW_Y_PX,
                           DISPLAY_FONT_SIZE_SMALL,
                           DISPLAY_FONT_ALIGN_CENTER);
-    }
 
-    scheduler_set_offline_mode();
-    spot_check_render(__func__, __LINE__);
+        spot_check_render(__func__, __LINE__);
+    }
 }
 
 /*

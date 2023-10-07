@@ -133,14 +133,16 @@ static bool check_forced_update(esp_app_desc_t *current_image_info, char *versio
     char                    *response_data;
     size_t                   response_data_size;
     esp_http_client_handle_t client;
-    bool                     http_success = http_client_perform_with_retries(&request_obj, 1, &client);
+    int                      content_length = 0;
+    bool                     http_success = http_client_perform_with_retries(&request_obj, 1, &client, &content_length);
     if (!http_success) {
         log_printf(LOG_LEVEL_ERROR,
                    "Error in http perform request checking to see if need forced update, defaulting to no update");
         return false;
     }
 
-    esp_err_t http_err = http_client_read_response_to_buffer(&client, &response_data, &response_data_size);
+    esp_err_t http_err =
+        http_client_read_response_to_buffer(&client, content_length, &response_data, &response_data_size);
     if (http_err != ESP_OK) {
         log_printf(LOG_LEVEL_ERROR,
                    "Error in http request readout checking to see if need forced update, defaulting to no update");
@@ -178,7 +180,9 @@ static void ota_task_stop(bool clear_ota_text) {
         spot_check_render(__func__, __LINE__);
     }
 
-    // Shouldn't matter as we should be rebooting on success and doing something on failure
+    // TODO :: technically if we're in offline mode and something starts the ota task, it will kick into online mode on
+    // exit (probably when the first network call fails). The scheduler call to start ota is gated by the mode, but
+    // theoretically OTA could be started from somehwere else in the future so it might matter
     scheduler_set_online_mode();
     sleep_handler_set_idle(SYSTEM_IDLE_OTA_BIT);
     ota_task_handle = NULL;

@@ -54,17 +54,18 @@ http_request_t http_client_build_get_request(char              *endpoint,
 http_request_t http_client_build_post_request(char *endpoint, char *url_buf, char *post_data, size_t post_data_size);
 bool           http_client_perform_with_retries(http_request_t           *request_obj,
                                                 uint8_t                   additional_retries,
-                                                esp_http_client_handle_t *client);
+                                                esp_http_client_handle_t *client,
+                                                int                      *content_length);
 esp_err_t      http_client_read_response_to_buffer(esp_http_client_handle_t *client,
+                                                   int                       content_length,
                                                    char                    **response_data,
                                                    size_t                   *response_data_size);
 esp_err_t      http_client_read_response_to_flash(esp_http_client_handle_t *client,
+                                                  int                       content_length,
                                                   esp_partition_t          *partition,
                                                   uint32_t                  offset_into_partition,
                                                   size_t                   *bytes_saved_size);
 bool           http_client_check_internet();
-
-bool http_client_check_response(esp_http_client_handle_t *client, int *content_length);
 
 // This is for debugging with cli, isn't necessary long term
 void http_client_get_failures(uint16_t *get_failures, uint16_t *post_failures);

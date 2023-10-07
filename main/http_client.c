@@ -9,6 +9,7 @@
 
 #include "constants.h"
 #include "http_client.h"
+#include "scheduler_task.h"
 #include "spot_check.h"
 #include "wifi.h"
 
@@ -129,75 +130,89 @@ static bool http_client_perform(http_request_t *request_obj, esp_http_client_han
         .crt_bundle_attach = esp_crt_bundle_attach,
     };
 
+    BaseType_t lock_success = xSemaphoreTake(request_lock, pdMS_TO_TICKS(5000));
+    if (lock_success == pdFALSE) {
+        log_printf(LOG_LEVEL_ERROR,
+                   "Failed to take http req lock in timeout, returning failure for the request status but http client "
+                   "never opened so no cleanup needed");
+    }
+
     bool req_start_success = true;
-    do {
-        BaseType_t lock_success = xSemaphoreTake(request_lock, pdMS_TO_TICKS(5000));
-        if (lock_success == pdFALSE) {
-            req_start_success = false;
-            log_printf(LOG_LEVEL_ERROR,
-                       "Failed to take http req lock in timeout, returning failure for the request status");
-            break;
-        }
-
-        log_printf(LOG_LEVEL_INFO,
-                   "Initing http client for %s request with url '%s:%d'...",
-                   req_type_str,
-                   http_config.url,
-                   http_config.port);
-        *client = esp_http_client_init(&http_config);
-        if (!(*client)) {
-            log_printf(LOG_LEVEL_INFO, "Error initing http client, returning without sending request");
-            (*failed_error_ptr)++;
-            req_start_success = false;
-            break;
-        }
-
-        size_t open_data_size = 0;
-        ESP_ERROR_CHECK(esp_http_client_set_method(*client, method));
-        ESP_ERROR_CHECK(esp_http_client_set_header(*client, "Content-Type", content_type));
-        if (request_obj->req_type == HTTP_REQ_TYPE_POST) {
-            ESP_ERROR_CHECK(esp_http_client_set_post_field(*client,
-                                                           request_obj->post_args.post_data,
-                                                           request_obj->post_args.post_data_size));
-            open_data_size = request_obj->post_args.post_data_size;
-        }
-
-        esp_err_t err = esp_http_client_open(*client, open_data_size);
-
-        if (err != ESP_OK) {
-            log_printf(LOG_LEVEL_ERROR, "Error opening http client, error: %s", esp_err_to_name(err));
-            (*failed_error_ptr)++;
-
-            err = esp_http_client_cleanup(*client);
-            if (err != ESP_OK) {
-                log_printf(LOG_LEVEL_ERROR, "Error cleaning up http client connection after failure to open!!!");
-            }
-
-            req_start_success = false;
-            break;
-        } else if (request_obj->req_type == HTTP_REQ_TYPE_POST) {
-            // POSTs have an extra step after opening to actually write the data, but we only want to perform it if the
-            // open was successful. GETs are fine with just the open.
-            int write_err =
-                esp_http_client_write(*client, request_obj->post_args.post_data, request_obj->post_args.post_data_size);
-            if (write_err < 0) {
-                log_printf(LOG_LEVEL_ERROR, "Error performing POST in call to esp_http_client_write");
+    if (lock_success) {
+        do {
+            log_printf(LOG_LEVEL_INFO,
+                       "Initing http client for %s request with url '%s:%d'...",
+                       req_type_str,
+                       http_config.url,
+                       http_config.port);
+            *client = esp_http_client_init(&http_config);
+            if (!(*client)) {
+                log_printf(LOG_LEVEL_INFO, "Error initing http client, returning without sending request");
+                (*failed_error_ptr)++;
                 req_start_success = false;
                 break;
             }
 
-            // Preemptively check status here even though it's also checked inthe http_client_check-response function
-            // called after this
-            uint16_t status   = esp_http_client_get_status_code(*client);
-            req_start_success = status <= 200 || status > 299;
-        }
+            size_t open_data_size = 0;
+            ESP_ERROR_CHECK(esp_http_client_set_method(*client, method));
+            ESP_ERROR_CHECK(esp_http_client_set_header(*client, "Content-Type", content_type));
+            if (request_obj->req_type == HTTP_REQ_TYPE_POST) {
+                ESP_ERROR_CHECK(esp_http_client_set_post_field(*client,
+                                                               request_obj->post_args.post_data,
+                                                               request_obj->post_args.post_data_size));
+                open_data_size = request_obj->post_args.post_data_size;
+            }
 
-    } while (0);
+            esp_err_t err = esp_http_client_open(*client, open_data_size);
+
+            if (err != ESP_OK) {
+                log_printf(LOG_LEVEL_ERROR, "Error opening http client, error: %s", esp_err_to_name(err));
+                (*failed_error_ptr)++;
+
+                err = esp_http_client_cleanup(*client);
+                if (err != ESP_OK) {
+                    log_printf(LOG_LEVEL_ERROR, "Error cleaning up http client connection after failure to open!!!");
+                }
+
+                req_start_success = false;
+                break;
+            } else if (request_obj->req_type == HTTP_REQ_TYPE_POST) {
+                // POSTs have an extra step after opening to actually write the data, but we only want to perform it if
+                // the open was successful. GETs are fine with just the open.
+                int write_err = esp_http_client_write(*client,
+                                                      request_obj->post_args.post_data,
+                                                      request_obj->post_args.post_data_size);
+                if (write_err < 0) {
+                    log_printf(LOG_LEVEL_ERROR, "Error performing POST in call to esp_http_client_write");
+                    req_start_success = false;
+                    break;
+                }
+
+                // Preemptively check status here even though it's also checked inthe http_client_check-response
+                // function called after this
+                uint16_t status   = esp_http_client_get_status_code(*client);
+                req_start_success = status <= 200 || status > 299;
+            }
+
+        } while (0);
+    }
 
     // Always give back no matter what happened with the req
     xSemaphoreGive(request_lock);
 
+    // Any false value for req_start_success means the http client needs to be cleaned up
     if (!req_start_success) {
+        if (!(*client)) {
+            esp_err_t cleanup_err = esp_http_client_cleanup(*client);
+            if (cleanup_err != ESP_OK) {
+                log_printf(
+                    LOG_LEVEL_ERROR,
+                    "Call to esp_http_client_cleanup after trying to init connection failed with err: %s. Returning "
+                    "err to caller",
+                    esp_err_to_name(cleanup_err));
+            }
+        }
+
         memfault_metrics_heartbeat_add(memfault_key, 1);
     }
 
@@ -205,25 +220,93 @@ static bool http_client_perform(http_request_t *request_obj, esp_http_client_han
 }
 
 /*
- * Wrap regular perform call in retry logic.
- * NOTE: this will only work if  there is no internet connection! If there is a non-success status code from the server,
- * this will succeed as the status code is not received until later asynchronously. The failure/retry logic in the
- * http_client_check_status function will catch any server-side failures, but that needs to be bundled into the perform
- * call somehow for retry logic for the whole request to actually work.
+ * Check headers and status code to make sure request was successful. Should only be used internally by http request
+ * functions before they read out data in different manners.
+ *
+ * * Returns success, content length returned through last arg.
+ */
+static bool http_client_check_response(esp_http_client_handle_t *client, int *content_length) {
+    MEMFAULT_ASSERT(client);
+    MEMFAULT_ASSERT(content_length);
+
+    bool success = false;
+
+    // Kicks off and blocks until all headers downloaded. Can get remainder of headers (like status_code) from their
+    // helper functions, content_length is returned directly
+    *content_length = esp_http_client_fetch_headers(*client);
+
+    // Check status to make sure we have actual good data to read out
+    int status = esp_http_client_get_status_code(*client);
+    if (status >= 200 && status <= 299) {
+        if (*content_length < 0) {
+            log_printf(LOG_LEVEL_WARN,
+                       "Status code successful (%d), but error fetching headers with negative content-length, bailing",
+                       status);
+        } else if (content_length == 0) {
+            log_printf(LOG_LEVEL_ERROR,
+                       "Status code successful (%d), but content length of zero after fetching headers, bailing");
+        } else {
+            success = true;
+            log_printf(LOG_LEVEL_INFO, "Request success! Status=%d, Content-length=%d", status, *content_length);
+        }
+    } else {
+        log_printf(LOG_LEVEL_INFO,
+                   "Request failed: status=%d, "
+                   "Content-length=%d",
+                   status,
+                   *content_length);
+    }
+
+    // If something failed, even on the server side (aka everything reads success but status code is 5XX), clean up but
+    // DON'T kick to offline because the perform_with_retries func will handle that when it's finished with all retries
+    if (!success) {
+        esp_err_t cleanup_err = esp_http_client_cleanup(*client);
+        if (cleanup_err != ESP_OK) {
+            log_printf(
+                LOG_LEVEL_ERROR,
+                "Call to esp_http_client_cleanup after checking response status code failed with err: %s. Returning "
+                "err to caller",
+                esp_err_to_name(cleanup_err));
+        }
+    }
+
+    return success;
+}
+
+/*
+ * Wrap regular perform call in retry logic. This checks for failures both in initial request (no internet connection
+ * period) and in comms with the server (receiving a 502 or other error status code). NOTE: That means this is blocking
+ * until full headers are received!
+ *
+ * Returns content length header value through content_length pointer arg.
  */
 bool http_client_perform_with_retries(http_request_t           *request_obj,
                                       uint8_t                   additional_retries,
-                                      esp_http_client_handle_t *client) {
+                                      esp_http_client_handle_t *client,
+                                      int                      *content_length) {
     uint8_t attempts = 0;
     bool    success  = false;
     while ((attempts <= additional_retries) && !success) {
+        // This typically succeeds even with no internet connection, I think it only fails if there's no network
+        // connection period
         success = http_client_perform(request_obj, client);
+
+        if (success) {
+            // This is the main failure when no access to server, as this is the blocking call that actually waits for
+            // full HTTP response w/ headers
+            success = http_client_check_response(client, content_length);
+        } else {
+            *content_length = 0;
+        }
+
         attempts++;
     }
 
-    if (!success) {
-        // Kick into offline mode for any failure case. Best case it was a fluke or there's an external http client
-        // running  and the next healthcheck will kick it back.
+    // Only Kick into offline mode if this is not a network request associated with boot (so for now just healthcheck).
+    // This allows init logic in main.c to render the proper info screens based on logic surrounding different possible
+    // states with or without prov info, network connection, and internet connection
+    // TODO :: scheduler shouldn't be a dependency in here, so theoretically this logic should be somewhere else
+    if (!success && scheduler_get_mode() != SCHEDULER_MODE_INIT) {
         spot_check_set_offline_mode();
     }
 
@@ -302,58 +385,15 @@ http_request_t http_client_build_post_request(char *endpoint, char *url_buf, cha
 }
 
 /*
- * Check headers and status code to make sure request was successful. Should only be used internally by http request
- * functions before they read out data in different manners (not static because cli needs access for debugging).
- * Returns success, content length returned through last arg.
- */
-bool http_client_check_response(esp_http_client_handle_t *client, int *content_length) {
-    MEMFAULT_ASSERT(client);
-    MEMFAULT_ASSERT(content_length);
-
-    bool success = false;
-
-    // Kicks off and blocks until all headers downloaded. Can get remainder of headers (like status_code) from their
-    // helper functions, content_length is returned directly
-    *content_length = esp_http_client_fetch_headers(*client);
-
-    // Check status to make sure we have actual good data to read out
-    int status = esp_http_client_get_status_code(*client);
-    if (status >= 200 && status <= 299) {
-        if (*content_length < 0) {
-            log_printf(LOG_LEVEL_WARN,
-                       "Status code successful (%d), but error fetching headers with negative content-length, bailing",
-                       status);
-        } else if (content_length == 0) {
-            log_printf(LOG_LEVEL_ERROR,
-                       "Status code successful (%d), but content length of zero after fetching headers, bailing");
-        } else {
-            success = true;
-            log_printf(LOG_LEVEL_INFO, "Request success! Status=%d, Content-length=%d", status, *content_length);
-        }
-    } else {
-        log_printf(LOG_LEVEL_INFO,
-                   "Request failed: status=%d, "
-                   "Content-length=%d",
-                   status,
-                   *content_length);
-    }
-
-    // If something failed and it wasn't on the server side, kick to offline mode
-    if (!success && !(status >= 500 && status <= 599)) {
-        spot_check_set_offline_mode();
-    }
-
-    return success;
-}
-
-/*
- * Read response from http requeste into caller-supplied buffer. Caller responsible for freeing malloced buffer
- * saved in response_data pointer if return value > 0. Request must have been sent through client using
- * http_client_perform_with_retries.
+ * Read response from http requeste into caller-supplied buffer. Assumed that response has been checked before this with
+ * http_client_check_response! Caller responsible for freeing malloced buffer saved in response_data pointer if return
+ * value > 0. Request must have been sent through client using http_client_perform_with_retries.
+ *
  * Returns ESP_OK on success, ESP_FAIL for failure. Returns malloced data and the size of that data in the two pointer
  * args.
  */
 esp_err_t http_client_read_response_to_buffer(esp_http_client_handle_t *client,
+                                              int                       content_length,
                                               char                    **response_data,
                                               size_t                   *response_data_size) {
     MEMFAULT_ASSERT(client);
@@ -363,12 +403,6 @@ esp_err_t http_client_read_response_to_buffer(esp_http_client_handle_t *client,
     esp_err_t err            = ESP_FAIL;
     size_t    bytes_received = 0;
     do {
-        int  content_length = 0;
-        bool success        = http_client_check_response(client, &content_length);
-        if (!success || content_length == 0) {
-            break;
-        }
-
         if (content_length < MAX_READ_BUFFER_SIZE) {
             *response_data = malloc(content_length + 1);
             if (!response_data) {
@@ -421,6 +455,7 @@ esp_err_t http_client_read_response_to_buffer(esp_http_client_handle_t *client,
  * Returns ESP_OK on success, ESP_FAIL for failure. Returns total bytes saved to NVS in pointer arg.
  */
 esp_err_t http_client_read_response_to_flash(esp_http_client_handle_t *client,
+                                             int                       content_length,
                                              esp_partition_t          *partition,
                                              uint32_t                  offset_into_partition,
                                              size_t                   *bytes_saved_size) {
@@ -430,11 +465,7 @@ esp_err_t http_client_read_response_to_flash(esp_http_client_handle_t *client,
     esp_err_t err            = ESP_FAIL;
     size_t    bytes_received = 0;
     do {
-        int  content_length = 0;
-        bool success        = http_client_check_response(client, &content_length);
-        if (!success) {
-            break;
-        } else if (content_length == 0) {
+        if (content_length == 0) {
             // Not an error, but no reason to continue with logic
             err = ESP_OK;
             break;
@@ -518,9 +549,10 @@ bool http_client_check_internet() {
     http_request_t req = http_client_build_get_request((char *)"health", NULL, url, NULL, 0);
 
     esp_http_client_handle_t client;
-    bool                     success = http_client_perform_with_retries(&req, 0, &client);
+    int                      content_length = 0;
+    bool                     success        = http_client_perform_with_retries(&req, 0, &client, &content_length);
     if (success) {
-        esp_err_t http_err = http_client_read_response_to_buffer(&client, &res, &bytes_alloced);
+        esp_err_t http_err = http_client_read_response_to_buffer(&client, content_length, &res, &bytes_alloced);
         if (http_err == ESP_OK && res && bytes_alloced > 0) {
             // Don't care about response, just want to check network connection
             log_printf(LOG_LEVEL_DEBUG, "http client API healthcheck successful");
