@@ -517,8 +517,8 @@ void spot_check_mark_all_lines_dirty() {
     display_mark_all_lines_dirty();
 }
 
-void spot_check_render(const char *calling_func, uint32_t line) {
-    display_render(calling_func, line);
+void spot_check_render() {
+    display_render();
 }
 
 /*
@@ -543,7 +543,7 @@ void spot_check_set_offline_mode() {
                           DISPLAY_FONT_SIZE_SMALL,
                           DISPLAY_FONT_ALIGN_CENTER);
 
-        spot_check_render(__func__, __LINE__);
+        spot_check_render();
     }
 }
 

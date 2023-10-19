@@ -110,7 +110,7 @@ static void render_release_lock() {
     log_printf(LOG_LEVEL_DEBUG, "released lock");
 }
 
-static void display_render_mode(enum EpdDrawMode mode, const char *calling_func, uint32_t line) {
+static void display_render_mode(enum EpdDrawMode mode) {
     if (!render_acquire_lock(__func__, __LINE__)) {
         return;
     }
@@ -146,8 +146,8 @@ void display_start() {
     display_full_clear_cycles(3);
 }
 
-void display_render(const char *calling_func, uint32_t line) {
-    display_render_mode(MODE_GC16, calling_func, line);
+void display_render() {
+    display_render_mode(MODE_GC16);
 }
 
 void display_full_clear_cycles(uint8_t cycles) {
@@ -249,7 +249,7 @@ void display_render_splash_screen(char *fw_version, char *hw_version) {
                       DISPLAY_FONT_ALIGN_CENTER);
 
     log_printf(LOG_LEVEL_DEBUG, "Rendering splash screen on display");
-    display_render(__func__, __LINE__);
+    display_render();
 }
 
 void display_draw_text(char                *text,

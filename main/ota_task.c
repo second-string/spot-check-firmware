@@ -177,7 +177,7 @@ static bool check_forced_update(esp_app_desc_t *current_image_info, char *versio
 static void ota_task_stop(bool clear_ota_text) {
     if (clear_ota_text) {
         spot_check_clear_ota_start_text();
-        spot_check_render(__func__, __LINE__);
+        spot_check_render();
     }
 
     // TODO :: technically if we're in offline mode and something starts the ota task, it will kick into online mode on
@@ -278,7 +278,7 @@ static void check_ota_update_task(void *args) {
     // made (that would fail anyway since ota is monopolizing http client)
     scheduler_set_ota_mode();
     spot_check_draw_ota_start_text();
-    spot_check_render(__func__, __LINE__);
+    spot_check_render();
 
     uint32_t iter_counter = 0;
     uint32_t bytes_received;

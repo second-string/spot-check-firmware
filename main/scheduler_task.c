@@ -481,7 +481,7 @@ static void scheduler_task(void *args) {
                 spot_check_mark_all_lines_dirty();
             }
 
-            spot_check_render(__func__, __LINE__);
+            spot_check_render();
         }
     }
 }
@@ -619,7 +619,7 @@ void scheduler_set_online_mode() {
     // and kick everything off.
     spot_check_full_clear();
     spot_check_draw_fetching_conditions_text();
-    spot_check_render(__func__, __LINE__);
+    spot_check_render();
 
     // Only have one update struct that shouldn't run in online mode so just hardcode it
     char *offline_only_update_name = "network_check";
