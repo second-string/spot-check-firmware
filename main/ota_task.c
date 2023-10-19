@@ -165,7 +165,7 @@ static bool check_forced_update(esp_app_desc_t *current_image_info, char *versio
     if (response_data_size && response_data) {
         free(response_data);
     }
-    cJSON_free(response_json);
+    cJSON_Delete(response_json);
 
     return force_update;
 }
