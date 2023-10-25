@@ -575,10 +575,7 @@ static BaseType_t cli_command_scheduler(char *write_buffer, size_t write_buffer_
         scheduler_trigger_time_update();
         strcpy(write_buffer, "Triggered time update");
     } else if (type_len == 4 && strncmp(type, "date", type_len) == 0) {
-        // No scheduler trigger for this since it's bundled with updating time. Functions are only exposed
-        // for debugging here
-        spot_check_clear_date();
-        spot_check_draw_date();
+        scheduler_trigger_date_update();
     } else if (type_len == 10 && strncmp(type, "conditions", type_len) == 0) {
         scheduler_trigger_conditions_update();
         strcpy(write_buffer, "Triggered conditions update");
