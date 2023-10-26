@@ -59,12 +59,11 @@ typedef struct {
 } differential_update_t;
 
 typedef struct {
-    char    name[14];
-    uint8_t hour;
-    uint8_t minute;
-    uint8_t hour_last_executed;
-    uint8_t minute_last_executed;
-    bool    active;
+    char      name[14];
+    uint8_t   hour;
+    uint8_t   minute;
+    struct tm last_executed;
+    bool      active;
     void (*execute)(void);
     bool force_next_update;
     bool force_on_transition_to_online;
@@ -118,8 +117,7 @@ static discrete_update_t discrete_updates[NUM_DISCRETE_UPDATES] = {
         .force_on_transition_to_online = true,
         .hour                          = 0xFF,  // wildcards, should update every minute every hour
         .minute                        = 0xFF,
-        .hour_last_executed            = 0,
-        .minute_last_executed          = 0,
+        .last_executed                 = {0},
         .active                        = false,
         .execute                       = scheduler_trigger_time_update,
     },
@@ -129,8 +127,7 @@ static discrete_update_t discrete_updates[NUM_DISCRETE_UPDATES] = {
         .force_on_transition_to_online = true,
         .hour                          = 0,
         .minute                        = 1,
-        .hour_last_executed            = 0,
-        .minute_last_executed          = 0,
+        .last_executed                 = {0},
         .active                        = false,
         .execute                       = scheduler_trigger_date_update,
     },
@@ -140,8 +137,7 @@ static discrete_update_t discrete_updates[NUM_DISCRETE_UPDATES] = {
         .force_on_transition_to_online = true,
         .hour                          = 0xFF,  // wildcard, runs on 5th minute of every hours
         .minute                        = 5,
-        .hour_last_executed            = 0,
-        .minute_last_executed          = 0,
+        .last_executed                 = {0},
         .active                        = false,
         .execute                       = scheduler_trigger_conditions_update,
     },
@@ -151,8 +147,7 @@ static discrete_update_t discrete_updates[NUM_DISCRETE_UPDATES] = {
         .force_on_transition_to_online = true,
         .hour                          = 3,
         .minute                        = 0,
-        .hour_last_executed            = 0,
-        .minute_last_executed          = 0,
+        .last_executed                 = {0},
         .active                        = false,
         .execute                       = scheduler_trigger_tide_chart_update,
     },
@@ -162,8 +157,7 @@ static discrete_update_t discrete_updates[NUM_DISCRETE_UPDATES] = {
         .force_on_transition_to_online = true,
         .hour                          = 3,
         .minute                        = 0,
-        .hour_last_executed            = 0,
-        .minute_last_executed          = 0,
+        .last_executed                 = {0},
         .active                        = false,
         .execute                       = scheduler_trigger_swell_chart_update,
     },
@@ -173,8 +167,7 @@ static discrete_update_t discrete_updates[NUM_DISCRETE_UPDATES] = {
         .force_on_transition_to_online = false,
         .hour                          = 12,
         .minute                        = 0,
-        .hour_last_executed            = 0,
-        .minute_last_executed          = 0,
+        .last_executed                 = {0},
         .active                        = false,
         .execute                       = scheduler_trigger_swell_chart_update,
     },
@@ -184,8 +177,7 @@ static discrete_update_t discrete_updates[NUM_DISCRETE_UPDATES] = {
         .force_on_transition_to_online = false,
         .hour                          = 17,
         .minute                        = 0,
-        .hour_last_executed            = 0,
-        .minute_last_executed          = 0,
+        .last_executed                 = {0},
         .active                        = false,
         .execute                       = scheduler_trigger_swell_chart_update,
     },
@@ -196,8 +188,7 @@ static discrete_update_t discrete_updates[NUM_DISCRETE_UPDATES] = {
         .force_on_transition_to_online = true,
         .hour                          = 0xEE,  // this hour will obviously never be hit
         .minute                        = 0xEE,  // this minute will obviously never be hit
-        .hour_last_executed            = 0,
-        .minute_last_executed          = 0,
+        .last_executed                 = {0},
         .active                        = false,
         .execute                       = scheduler_trigger_spot_name_update,
     },
@@ -217,6 +208,16 @@ const char *const offline_mode_update_names[] = {
  */
 static inline bool discrete_time_matches(int current, uint8_t check) {
     return (current == check) || (check == 0xFF);
+}
+
+/*
+ * Returns true if the two tm structs match from day to minutes granularity inclusive. Used to prevent discrete checks
+ * from executing for every second of a time matching their min/hour fields, but also allow for the advancement of a day
+ * to differentiate between last_executed times so it once again triggers the next day
+ */
+static inline bool discrete_time_not_yet_executed_today(struct tm now, struct tm last_executed) {
+    return now.tm_wday != last_executed.tm_wday || now.tm_hour != last_executed.tm_hour ||
+           now.tm_min != last_executed.tm_min;
 }
 
 /*
@@ -262,12 +263,11 @@ static void scheduler_polling_timer_callback(void *timer_args) {
             continue;
         }
 
-        // If (matching time has arrived AND the update has not yet been executed this minute) OR force execute flag
-        // set, execute.
+        // If (matching time has arrived AND the update has not yet been executed today (necessary for preventing
+        // multiple executions in the same minute)) OR force execute flag set, execute.
         if ((discrete_time_matches(now_local.tm_hour, discrete_check->hour) &&
              discrete_time_matches(now_local.tm_min, discrete_check->minute) &&
-             (now_local.tm_hour != discrete_check->hour_last_executed ||
-              now_local.tm_min != discrete_check->minute_last_executed)) ||
+             discrete_time_not_yet_executed_today(now_local, discrete_check->last_executed)) ||
             discrete_check->force_next_update) {
             log_printf(LOG_LEVEL_DEBUG,
                        "Executing discrete update '%s' (curr hr: %u, curr min: %u, check hr: %u, check min: %u, "
@@ -280,9 +280,8 @@ static void scheduler_polling_timer_callback(void *timer_args) {
                        discrete_check->force_next_update);
 
             discrete_check->execute();
-            discrete_check->hour_last_executed   = now_local.tm_hour;
-            discrete_check->minute_last_executed = now_local.tm_min;
-            discrete_check->force_next_update    = false;
+            discrete_check->last_executed     = now_local;
+            discrete_check->force_next_update = false;
         }
     }
 }
