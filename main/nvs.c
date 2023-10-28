@@ -209,7 +209,7 @@ spot_check_config *nvs_get_config() {
         case ESP_OK:
             break;
         case ESP_ERR_NVS_NOT_FOUND:;
-            char *tz_str = "CET-1CEST,M3.4.0/2,M10.4.0/2";
+            char *tz_str = "CET-1CEST,M3.5.0/2,M10.5.0/2";
             log_printf(LOG_LEVEL_DEBUG,
                        "The value is not initialized yet, defaulting to default Berlin tz  '%s'",
                        tz_str);
