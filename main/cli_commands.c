@@ -290,43 +290,7 @@ static BaseType_t cli_command_api(char *write_buffer, size_t write_buffer_size, 
             return pdFALSE;
         }
     } else if (endpoint_len == 3 && strncmp(endpoint, "ota", endpoint_len) == 0) {
-        char post_data[100];
-        int  err = sprintf(post_data,
-                          "{\"current_version\": \"%s\", \"device_id\": \"%s\"}",
-                          spot_check_get_fw_version(),
-                          spot_check_get_serial());
-        if (err < 0) {
-            strcpy(write_buffer, "Error sprintfing version string into version_info endpoint post body");
-            return pdFALSE;
-        }
-
-        char           version_info_path[] = "ota/version_info";
-        size_t         base_len            = strlen(URL_BASE);
-        size_t         path_len            = strlen(version_info_path);
-        char           url[base_len + path_len + 1];
-        http_request_t request_obj =
-            http_client_build_post_request(version_info_path, url, post_data, strlen(post_data));
-
-        char                    *response_data;
-        size_t                   response_data_size;
-        esp_http_client_handle_t client;
-        int                      content_length = 0;
-        bool http_success = http_client_perform_with_retries(&request_obj, 0, &client, &content_length);
-        if (!http_success) {
-            strcpy(write_buffer,
-                   "Error in http perform checking to see if need forced update, defaulting to no update");
-            return pdFALSE;
-        }
-
-        esp_err_t http_err =
-            http_client_read_response_to_buffer(&client, content_length, &response_data, &response_data_size);
-        if (http_err != ESP_OK) {
-            strcpy(write_buffer,
-                   "Error in http request readout checking to see if need forced update, defaulting to no update");
-            return pdFALSE;
-        }
-
-        memcpy(write_buffer, response_data, response_data_size);
+        ota_task_start();
     } else if (endpoint_len == 6 && strncmp(endpoint, "health", endpoint_len) == 0) {
         scheduler_trigger_network_check();
     } else if (endpoint_len == 8 && strncmp(endpoint, "failures", endpoint_len) == 0) {

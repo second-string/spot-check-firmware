@@ -111,7 +111,7 @@ bool spot_check_download_and_save_conditions(conditions_t *new_conditions) {
             log_printf(LOG_LEVEL_ERROR,
                        "Parsed at least one field to a null cJSON object. That means the field wasn't in the response "
                        "at all but a successful request response "
-                       "code (usually  a wifi login portal default login page)");
+                       "code (could be a wifi login portal default login page)");
             return false;
         }
 

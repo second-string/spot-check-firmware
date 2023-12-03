@@ -10,7 +10,7 @@
 
 // Needs trailing slash!
 #define URL_BASE "https://spotcheck.brianteam.com/"
-// #define URL_BASE "http://192.168.1.76:9080/"
+// #define URL_BASE "http://192.168.2.134:9080/"
 
 typedef enum {
     HTTP_REQ_TYPE_GET,
