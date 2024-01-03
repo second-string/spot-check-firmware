@@ -13,6 +13,7 @@
 #include "nvs.h"
 #include "scheduler_task.h"
 #include "sntp_time.h"
+#include "spot_check.h"
 
 #define TAG SC_TAG_HTTP_SERVER
 
@@ -91,6 +92,26 @@ static bool http_server_parse_post_body(httpd_req_t *req, cJSON **payload) {
     return true;
 }
 
+static void http_server_parse_json_string(cJSON *payload,
+                                          char **field_to_set,
+                                          size_t max_field_length,
+                                          char  *fallback) {
+    cJSON *json_obj = cJSON_GetObjectItem(payload, "spot_name");
+    if (cJSON_IsString(json_obj)) {
+        *field_to_set = cJSON_GetStringValue(json_obj);
+        if (strlen(*field_to_set) > max_field_length) {
+            log_printf(LOG_LEVEL_INFO,
+                       "Received value > %d chars, invalid. Defaulting to %s",
+                       max_field_length,
+                       fallback);
+            *field_to_set = fallback;
+        }
+    } else {
+        log_printf(LOG_LEVEL_INFO, "Unable to parse param, defaulting to %s", fallback);
+        *field_to_set = fallback;
+    }
+}
+
 static esp_err_t health_get_handler(httpd_req_t *req) {
     httpd_resp_send(req, "Surviving not thriving", HTTPD_RESP_USE_STRLEN);
     return ESP_OK;
@@ -110,98 +131,20 @@ static esp_err_t configure_post_handler(httpd_req_t *req) {
     char               *default_spot_uid        = "5842041f4e65fad6a770882b";
     char               *default_tz_str          = "CET-1CEST,M3.4.0/2,M10.4.0/2";
     char               *default_tz_display_name = "Europe/Berlin";
+    char               *default_mode            = (char *)spot_check_mode_to_string(SPOT_CHECK_MODE_WEATHER);
 
-    cJSON *json_spot_name = cJSON_GetObjectItem(payload, "spot_name");
-    if (cJSON_IsString(json_spot_name)) {
-        config.spot_name = cJSON_GetStringValue(json_spot_name);
-        if (strlen(config.spot_name) > MAX_LENGTH_SPOT_NAME_PARAM) {
-            log_printf(LOG_LEVEL_INFO,
-                       "Received spot_name > %d chars, invalid. Defaulting to %s",
-                       MAX_LENGTH_SPOT_NAME_PARAM,
-                       default_spot_name);
-            config.spot_name = default_spot_name;
-        }
-    } else {
-        log_printf(LOG_LEVEL_INFO, "Unable to parse spot_name param, defaulting to %s", default_spot_name);
-        config.spot_name = default_spot_name;
-    }
-
-    cJSON *json_spot_lat = cJSON_GetObjectItem(payload, "spot_lat");
-    if (cJSON_IsString(json_spot_lat)) {
-        config.spot_lat = cJSON_GetStringValue(json_spot_lat);
-        if (strlen(config.spot_lat) > MAX_LENGTH_SPOT_LAT_PARAM) {
-            log_printf(LOG_LEVEL_INFO,
-                       "Received spot_lat > %d chars, invalid. Defaulting to %s",
-                       MAX_LENGTH_SPOT_LAT_PARAM,
-                       default_spot_lat);
-            config.spot_lat = default_spot_lat;
-        }
-    } else {
-        log_printf(LOG_LEVEL_INFO, "Unable to parse spot_lat param, defaulting to %s", default_spot_lat);
-        config.spot_lat = default_spot_lat;
-    }
-
-    cJSON *json_spot_lon = cJSON_GetObjectItem(payload, "spot_lon");
-    if (cJSON_IsString(json_spot_lon)) {
-        config.spot_lon = cJSON_GetStringValue(json_spot_lon);
-        if (strlen(config.spot_lon) > MAX_LENGTH_SPOT_LON_PARAM) {
-            log_printf(LOG_LEVEL_INFO,
-                       "Received spot_lon > %d chars, invalid. Defaulting to %s",
-                       MAX_LENGTH_SPOT_LON_PARAM,
-                       default_spot_lon);
-            config.spot_lon = default_spot_lon;
-        }
-    } else {
-        log_printf(LOG_LEVEL_INFO, "Unable to parse spot_lon param, defaulting to %s", default_spot_lon);
-        config.spot_lon = default_spot_lon;
-    }
-
-    cJSON *json_spot_uid = cJSON_GetObjectItem(payload, "spot_uid");
-    if (cJSON_IsString(json_spot_uid)) {
-        config.spot_uid = cJSON_GetStringValue(json_spot_uid);
-        if (strlen(config.spot_uid) > MAX_LENGTH_SPOT_UID_PARAM) {
-            log_printf(LOG_LEVEL_INFO,
-                       "Received spot_uid > %d chars, invalid. Defaulting to wedge uid (%s)",
-                       MAX_LENGTH_SPOT_UID_PARAM,
-                       default_spot_uid);
-            config.spot_uid = default_spot_uid;
-        }
-    } else {
-        log_printf(LOG_LEVEL_INFO, "Unable to parse spot_uid param, defaulting to wedge uid (%s)", default_spot_uid);
-        config.spot_uid = default_spot_uid;
-    }
-
-    cJSON *json_tz_str = cJSON_GetObjectItem(payload, "tz_str");
-    if (cJSON_IsString(json_tz_str)) {
-        config.tz_str = cJSON_GetStringValue(json_tz_str);
-        if (strlen(config.tz_str) > MAX_LENGTH_TZ_STR_PARAM) {
-            log_printf(LOG_LEVEL_INFO,
-                       "Received tz_str > %d chars, invalid. Defaulting to Berlin (%s)",
-                       MAX_LENGTH_TZ_STR_PARAM,
-                       default_tz_str);
-            config.tz_str = default_tz_str;
-        }
-    } else {
-        log_printf(LOG_LEVEL_INFO, "Unable to parse tz_str param, defaulting to Berlin (%s)", default_tz_str);
-        config.tz_str = default_tz_str;
-    }
-
-    cJSON *json_tz_display_name = cJSON_GetObjectItem(payload, "tz_display_name");
-    if (cJSON_IsString(json_tz_display_name)) {
-        config.tz_display_name = cJSON_GetStringValue(json_tz_display_name);
-        if (strlen(config.tz_display_name) > MAX_LENGTH_TZ_DISPLAY_NAME_PARAM) {
-            log_printf(LOG_LEVEL_INFO,
-                       "Received tz_display_name > %d chars, invalid. Defaulting to '%s'",
-                       MAX_LENGTH_TZ_DISPLAY_NAME_PARAM,
-                       default_tz_display_name);
-            config.tz_display_name = default_tz_display_name;
-        }
-    } else {
-        log_printf(LOG_LEVEL_INFO,
-                   "Unable to parse tz_display_name param, defaulting to Berlin (%s)",
-                   default_tz_display_name);
-        config.tz_display_name = default_tz_display_name;
-    }
+    http_server_parse_json_string(payload, &config.spot_name, MAX_LENGTH_SPOT_NAME_PARAM, default_spot_name);
+    http_server_parse_json_string(payload, &config.spot_lat, MAX_LENGTH_SPOT_LAT_PARAM, default_spot_lat);
+    http_server_parse_json_string(payload, &config.spot_lon, MAX_LENGTH_SPOT_LON_PARAM, default_spot_lon);
+    http_server_parse_json_string(payload, &config.spot_uid, MAX_LENGTH_SPOT_UID_PARAM, default_spot_uid);
+    http_server_parse_json_string(payload, &config.tz_str, MAX_LENGTH_TZ_STR_PARAM, default_tz_str);
+    http_server_parse_json_string(payload,
+                                  &config.tz_display_name,
+                                  MAX_LENGTH_TZ_DISPLAY_NAME_PARAM,
+                                  default_tz_display_name);
+    char temp_mode_str[MAX_LENGTH_OPERATING_MODE_PARAM];
+    http_server_parse_json_string(payload, (char **)&temp_mode_str, MAX_LENGTH_OPERATING_MODE_PARAM, default_mode);
+    config.operating_mode = spot_check_string_to_mode(temp_mode_str);
 
     nvs_save_config(&config);
 
@@ -225,12 +168,14 @@ static esp_err_t current_config_get_handler(httpd_req_t *req) {
     cJSON *spot_uid_json        = cJSON_CreateString(current_config->spot_uid);
     cJSON *tz_str_json          = cJSON_CreateString(current_config->tz_str);
     cJSON *tz_display_name_json = cJSON_CreateString(current_config->tz_display_name);
+    cJSON *operating_mode       = cJSON_CreateString(spot_check_mode_to_string(current_config->operating_mode));
     cJSON_AddItemToObject(root, "spot_name", spot_name_json);
     cJSON_AddItemToObject(root, "spot_lat", spot_lat_json);
     cJSON_AddItemToObject(root, "spot_lon", spot_lon_json);
     cJSON_AddItemToObject(root, "spot_uid", spot_uid_json);
     cJSON_AddItemToObject(root, "tz_str", tz_str_json);
     cJSON_AddItemToObject(root, "tz_display_name", tz_display_name_json);
+    cJSON_AddItemToObject(root, "operating_mode", operating_mode);
 
     char *response_json = cJSON_Print(root);
     httpd_resp_send(req, response_json, HTTPD_RESP_USE_STRLEN);

@@ -26,6 +26,7 @@ char             *spot_check_get_hw_version();
 bool              spot_check_download_and_save_conditions(conditions_t *new_conditions);
 void              spot_check_set_mode(spot_check_mode_t new_mode);
 spot_check_mode_t spot_check_string_to_mode(char *in_str);
+const char       *spot_check_mode_to_string(spot_check_mode_t mode);
 void              spot_check_init();
 
 /*

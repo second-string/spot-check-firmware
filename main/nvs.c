@@ -26,6 +26,9 @@ static char _operating_mode[MAX_LENGTH_OPERATING_MODE_PARAM + 1]   = {0};
 
 static spot_check_config_t current_config;
 
+/*
+ * Loads the config vales in NVS into the in-mem representation for easy access
+ */
 static spot_check_config_t *nvs_load_config() {
     if (handle == 0) {
         log_printf(LOG_LEVEL_ERROR, "Attempting to retrieve from NVS before calling nvs_init(), returning null ptr");
@@ -59,7 +62,7 @@ static spot_check_config_t *nvs_load_config() {
     current_config.spot_lon        = _spot_lon;
     current_config.tz_str          = _tz_str;
     current_config.tz_display_name = _tz_display_name;
-    current_config.operating_mode  = _operating_mode;
+    current_config.operating_mode  = spot_check_string_to_mode(_operating_mode);
 
     return &current_config;
 }
@@ -246,7 +249,7 @@ void nvs_save_config(spot_check_config_t *config) {
     MEMFAULT_ASSERT(nvs_set_string("spot_lon", config->spot_lon));
     MEMFAULT_ASSERT(nvs_set_string("tz_str", config->tz_str));
     MEMFAULT_ASSERT(nvs_set_string("tz_display_name", config->tz_display_name));
-    MEMFAULT_ASSERT(nvs_set_string("operating_mode", config->operating_mode));
+    MEMFAULT_ASSERT(nvs_set_string("operating_mode", (char *)spot_check_mode_to_string(config->operating_mode)));
 
     ESP_ERROR_CHECK(nvs_commit(handle));
 }

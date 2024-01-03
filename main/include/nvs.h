@@ -6,17 +6,18 @@
 #include "esp_err.h"
 
 #include "http_server.h"
+#include "spot_check.h"
 
 // number fields should be stored as strings to not need to alloc and pass around a new buff. Easier to go str -> int
 // vs. other direction
 typedef struct {
-    char *spot_name;
-    char *spot_uid;
-    char *spot_lat;
-    char *spot_lon;
-    char *tz_str;
-    char *tz_display_name;
-    char *operating_mode;
+    char             *spot_name;
+    char             *spot_uid;
+    char             *spot_lat;
+    char             *spot_lon;
+    char             *tz_str;
+    char             *tz_display_name;
+    spot_check_mode_t operating_mode;
 } spot_check_config_t;
 
 void                 nvs_init();

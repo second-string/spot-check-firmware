@@ -574,6 +574,13 @@ spot_check_mode_t spot_check_string_to_mode(char *in_str) {
 }
 
 /*
+ * Converts the mode enum to the string representation (for NVS storage or config settings).
+ */
+const char *spot_check_mode_to_string(spot_check_mode_t mode) {
+    return spot_check_mode_strs[mode];
+}
+
+/*
  * Main FW init for spot check specific data
  */
 void spot_check_init() {
