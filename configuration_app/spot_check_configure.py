@@ -130,6 +130,7 @@ def configure():
     print()
 
     # TODO :: include 'manual' option to manually set time)
+    # TODO :: offline mode?
     tz_str = ""
     tz_display_name = ""
     while tz_str == "":
@@ -192,7 +193,6 @@ def configure():
 
     cursor.close()
     db_conn.close()
-    # TODO :: where to put offline mode option?
 
 
 def provision():

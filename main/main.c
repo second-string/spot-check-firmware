@@ -146,6 +146,7 @@ void app_main(void) {
     app_start();
 
     spot_check_config_t *config = nvs_get_config();
+    log_printf(LOG_LEVEL_INFO, "Operating mode: '%s'", spot_check_mode_to_string(config->operating_mode));
     sntp_set_tz_str(config->tz_str);
     display_render_splash_screen(spot_check_get_fw_version(), spot_check_get_hw_version());
 
@@ -230,6 +231,9 @@ void app_main(void) {
         // make it less likely we render the epoch before it syncs correctly. Sometimes SNTP gets a new value within
         // a second, sometimes it takes 45 seconds. If sntp doesn't report fully synced,  we also check the date and
         // as long as it's not 1970 we call it synced to help speed up the process.
+        // This could theoretically be skipped in custom mode since that doesn't display the time, but also opens us up
+        // to stepping on https requests if sntp sync succeeds and launches time forward a huge amount while were
+        // already doing the initial custom endpoint request after entering online mode.
         bool     sntp_time_set = false;
         uint32_t start_ticks   = xTaskGetTickCount();
         uint32_t now_ticks     = start_ticks;
@@ -258,8 +262,7 @@ void app_main(void) {
         spot_check_clear_checking_connection_screen();
         scheduler_set_online_mode();
 
-        log_printf(LOG_LEVEL_INFO,
-                   "Boot successful, showing time + last saved conditions / charts and kicked off conditions task");
+        log_printf(LOG_LEVEL_INFO, "Boot successful, kicking scheduler taks into online mode");
     } while (0);
 
     // Delay a minute before we run the on-boot delayed actions. This is because both mflt's http client and the

@@ -24,7 +24,7 @@
 
 #define TAG SC_TAG_SCHEDULER
 
-#define NUM_DIFFERENTIAL_UPDATES 4
+#define NUM_DIFFERENTIAL_UPDATES 5
 #define NUM_DISCRETE_UPDATES 8
 
 #define OTA_CHECK_INTERVAL_SECONDS (CONFIG_OTA_CHECK_INTERVAL_HOURS * MINS_PER_HOUR * SECS_PER_MIN)
@@ -42,35 +42,38 @@
 #define SEND_MFLT_DATA_BIT (1 << 7)
 #define UPDATE_DATE_BIT (1 << 8)
 #define MARK_SCREEN_DIRTY_BIT (1 << 9)
+#define CUSTOM_SCREEN_UPDATE_BIT (1 << 10)
 
 // Anything that causes a draw to the  screen needs to be added here. This exists so scheduler doesn't re-render screen
 // for logical update structs like memfault or ota check
 #define BITS_NEEDING_RENDER                                                                                            \
     (UPDATE_CONDITIONS_BIT | UPDATE_TIDE_CHART_BIT | UPDATE_SWELL_CHART_BIT | UPDATE_TIME_BIT | UPDATE_SPOT_NAME_BIT | \
-     UPDATE_DATE_BIT)
+     UPDATE_DATE_BIT | CUSTOM_SCREEN_UPDATE_BIT)
 
 typedef struct {
-    char   name[14];
-    time_t update_interval_secs;
-    time_t last_executed_epoch_secs;
-    bool   force_next_update;
-    bool   active;
+    char              name[21];
+    time_t            update_interval_secs;
+    time_t            last_executed_epoch_secs;
+    bool              force_next_update;
+    bool              active;
+    spot_check_mode_t active_operating_mode;
     void (*execute)(void);
 } differential_update_t;
 
 typedef struct {
-    char      name[14];
-    uint8_t   hour;
-    uint8_t   minute;
-    struct tm last_executed;
-    bool      active;
+    char              name[14];
+    uint8_t           hour;
+    uint8_t           minute;
+    struct tm         last_executed;
+    bool              active;
+    spot_check_mode_t active_operating_mode;
     void (*execute)(void);
     bool force_next_update;
     bool force_on_transition_to_online;
 } discrete_update_t;
 
 static TaskHandle_t          scheduler_task_handle;
-static scheduler_mode_t      mode;
+static scheduler_mode_t      scheduler_mode;
 static volatile unsigned int seconds_elapsed;
 static conditions_t          last_retrieved_conditions;
 
@@ -80,34 +83,45 @@ static differential_update_t *spot_name_differential_update;
 // Execute function cannot be blocking! Will execute from 1 sec timer interrupt callback
 static differential_update_t differential_updates[NUM_DIFFERENTIAL_UPDATES] = {
     {
-        .name                 = "ota",
-        .force_next_update    = false,
-        .update_interval_secs = OTA_CHECK_INTERVAL_SECONDS,
-        .active               = false,
-        .execute              = scheduler_trigger_ota_check,
+        .name                  = "ota",
+        .force_next_update     = false,
+        .update_interval_secs  = OTA_CHECK_INTERVAL_SECONDS,
+        .active                = false,
+        .active_operating_mode = 0xFF,
+        .execute               = scheduler_trigger_ota_check,
     },
     {
-        .name                 = "network_check",
-        .force_next_update    = false,
-        .update_interval_secs = NETWORK_CHECK_INTERVAL_SECONDS,
-        .active               = false,
-        .execute              = scheduler_trigger_network_check,
+        .name                  = "network_check",
+        .force_next_update     = false,
+        .update_interval_secs  = NETWORK_CHECK_INTERVAL_SECONDS,
+        .active                = false,
+        .active_operating_mode = 0xFF,
+        .execute               = scheduler_trigger_network_check,
     },
     {
-        .name                 = "mflt_upload",
-        .force_next_update    = false,
-        .update_interval_secs = MFLT_UPLOAD_INTERVAL_SECONDS,
-        .active               = false,
-        .execute              = scheduler_trigger_mflt_upload,
+        .name                  = "mflt_upload",
+        .force_next_update     = false,
+        .update_interval_secs  = MFLT_UPLOAD_INTERVAL_SECONDS,
+        .active                = false,
+        .active_operating_mode = 0xFF,
+        .execute               = scheduler_trigger_mflt_upload,
     },
     {
-        .name                 = "dirty_screen",
-        .force_next_update    = false,
-        .update_interval_secs = SCREEN_DIRTY_INTERVAL_SECONDS,
-        .active               = false,
-        .execute              = scheduler_trigger_screen_dirty,
+        .name                  = "dirty_screen",
+        .force_next_update     = false,
+        .update_interval_secs  = SCREEN_DIRTY_INTERVAL_SECONDS,
+        .active                = false,
+        .active_operating_mode = SPOT_CHECK_MODE_WEATHER,
+        .execute               = scheduler_trigger_screen_dirty,
     },
-};
+    {
+        .name                  = "custom_screen_update",
+        .force_next_update     = false,
+        .update_interval_secs  = 0,  // set from config value in scheduler init fun
+        .active                = false,
+        .active_operating_mode = SPOT_CHECK_MODE_CUSTOM,
+        .execute               = scheduler_trigger_custom_screen_update,
+    }};
 
 // Execute function cannot be blocking! Will execute from 1 sec timer interrupt callback
 static discrete_update_t discrete_updates[NUM_DISCRETE_UPDATES] = {
@@ -119,6 +133,7 @@ static discrete_update_t discrete_updates[NUM_DISCRETE_UPDATES] = {
         .minute                        = 0xFF,
         .last_executed                 = {0},
         .active                        = false,
+        .active_operating_mode         = SPOT_CHECK_MODE_WEATHER,
         .execute                       = scheduler_trigger_time_update,
     },
     {
@@ -129,6 +144,7 @@ static discrete_update_t discrete_updates[NUM_DISCRETE_UPDATES] = {
         .minute                        = 1,
         .last_executed                 = {0},
         .active                        = false,
+        .active_operating_mode         = SPOT_CHECK_MODE_WEATHER,
         .execute                       = scheduler_trigger_date_update,
     },
     {
@@ -139,6 +155,7 @@ static discrete_update_t discrete_updates[NUM_DISCRETE_UPDATES] = {
         .minute                        = 5,
         .last_executed                 = {0},
         .active                        = false,
+        .active_operating_mode         = SPOT_CHECK_MODE_WEATHER,
         .execute                       = scheduler_trigger_conditions_update,
     },
     {
@@ -149,6 +166,7 @@ static discrete_update_t discrete_updates[NUM_DISCRETE_UPDATES] = {
         .minute                        = 0,
         .last_executed                 = {0},
         .active                        = false,
+        .active_operating_mode         = SPOT_CHECK_MODE_WEATHER,
         .execute                       = scheduler_trigger_tide_chart_update,
     },
     {
@@ -159,6 +177,7 @@ static discrete_update_t discrete_updates[NUM_DISCRETE_UPDATES] = {
         .minute                        = 0,
         .last_executed                 = {0},
         .active                        = false,
+        .active_operating_mode         = SPOT_CHECK_MODE_WEATHER,
         .execute                       = scheduler_trigger_swell_chart_update,
     },
     {
@@ -169,6 +188,7 @@ static discrete_update_t discrete_updates[NUM_DISCRETE_UPDATES] = {
         .minute                        = 0,
         .last_executed                 = {0},
         .active                        = false,
+        .active_operating_mode         = SPOT_CHECK_MODE_WEATHER,
         .execute                       = scheduler_trigger_swell_chart_update,
     },
     {
@@ -179,6 +199,7 @@ static discrete_update_t discrete_updates[NUM_DISCRETE_UPDATES] = {
         .minute                        = 0,
         .last_executed                 = {0},
         .active                        = false,
+        .active_operating_mode         = SPOT_CHECK_MODE_WEATHER,
         .execute                       = scheduler_trigger_swell_chart_update,
     },
     {
@@ -190,6 +211,7 @@ static discrete_update_t discrete_updates[NUM_DISCRETE_UPDATES] = {
         .minute                        = 0xEE,  // this minute will obviously never be hit
         .last_executed                 = {0},
         .active                        = false,
+        .active_operating_mode         = SPOT_CHECK_MODE_WEATHER,
         .execute                       = scheduler_trigger_spot_name_update,
     },
 };
@@ -208,6 +230,15 @@ const char *const offline_mode_update_names[] = {
  */
 static inline bool discrete_time_matches(int current, uint8_t check) {
     return (current == check) || (check == 0xFF);
+}
+
+/*
+ * Similar to the discrete time check, this returns true if the two modes match, or if the structs active_operating_mode
+ * is the 0xFF wildcard indicating that it should execute regardless of the operating mode (like memfault for example)
+ */
+static inline bool active_operating_mode_matches(spot_check_mode_t current_mode,
+                                                 spot_check_mode_t active_operating_mode) {
+    return (current_mode == active_operating_mode) || (active_operating_mode == 0xFF);
 }
 
 /*
@@ -373,6 +404,10 @@ static void scheduler_task(void *args) {
             }
         }
 
+        if (update_bits & CUSTOM_SCREEN_UPDATE_BIT) {
+            // TODO :: fetch custom image
+        }
+
         /***************************************
          * Framebuffer update section
          **************************************/
@@ -469,6 +504,10 @@ static void scheduler_task(void *args) {
                        "full screen");
         }
 
+        if (update_bits & CUSTOM_SCREEN_UPDATE_BIT) {
+            // TODO :: clear and re-draw custom image
+        }
+
         /***************************************
          * Render section
          **************************************/
@@ -529,14 +568,18 @@ void scheduler_trigger_screen_dirty() {
     xTaskNotify(scheduler_task_handle, MARK_SCREEN_DIRTY_BIT, eSetBits);
 }
 
+void scheduler_trigger_custom_screen_update() {
+    xTaskNotify(scheduler_task_handle, CUSTOM_SCREEN_UPDATE_BIT, eSetBits);
+}
+
 scheduler_mode_t scheduler_get_mode() {
-    return mode;
+    return scheduler_mode;
 }
 
 void scheduler_set_offline_mode() {
     // Once we're in offline mode, every healthcheck will re-execute this function as requests still fail. Prevent
     // unnecessary looping and updating of the structs
-    if (mode == SCHEDULER_MODE_OFFLINE) {
+    if (scheduler_mode == SCHEDULER_MODE_OFFLINE) {
         return;
     }
 
@@ -577,7 +620,7 @@ void scheduler_set_offline_mode() {
         activate = false;
     }
 
-    mode = SCHEDULER_MODE_OFFLINE;
+    scheduler_mode = SCHEDULER_MODE_OFFLINE;
 }
 
 /*
@@ -587,7 +630,7 @@ void scheduler_set_offline_mode() {
 void scheduler_set_ota_mode() {
     log_printf(LOG_LEVEL_WARN, "%s called", __func__);
 
-    if (mode == SCHEDULER_MODE_OTA) {
+    if (scheduler_mode == SCHEDULER_MODE_OTA) {
         return;
     }
 
@@ -604,18 +647,18 @@ void scheduler_set_ota_mode() {
         }
     }
 
-    mode = SCHEDULER_MODE_OTA;
+    scheduler_mode = SCHEDULER_MODE_OTA;
 }
 
 void scheduler_set_online_mode() {
     log_printf(LOG_LEVEL_WARN, "%s called", __func__);
 
-    if (mode == SCHEDULER_MODE_ONLINE) {
+    if (scheduler_mode == SCHEDULER_MODE_ONLINE) {
         return;
     }
 
     bool respect_force_flags = true;
-    if (mode == SCHEDULER_MODE_OTA) {
+    if (scheduler_mode == SCHEDULER_MODE_OTA) {
         // If we're returning to online from OTA, don't allow any update structs to force an update. We know that OTA is
         // a short blip, so this prevents running all the forces for discrete/diff structs after popping into OTA for
         // max a minute or so.
@@ -636,26 +679,28 @@ void scheduler_set_online_mode() {
     sntp_time_get_local_time(&now_local);
     time_t now_epoch_secs = mktime(&now_local);
 
+    spot_check_config_t *config = nvs_get_config();
     for (int i = 0; i < NUM_DIFFERENTIAL_UPDATES; i++) {
         if (strcmp(offline_only_update_name, differential_updates[i].name) == 0) {
             differential_updates[i].active = false;
             log_printf(LOG_LEVEL_DEBUG, "Deactivated diff update struct '%s'", differential_updates[i].name);
         } else {
-            // Set 'last execd' time to now. Diff updates are fundamentally low prio, so we always want to reset timer
-            // to when we come online. Edge case bug here if device keeps losing and regaining connection before the
-            // full period of each diff update has happened at least once. If we didn't do this, every one of these
-            // would trigger when coming online for the first time because of the massive time delta. That results in
-            // OTA triggering and fucking with the other network requests since it's not gated by lock.
-            differential_updates[i].active            = true;
+            // Only activate the struct if it matches with the currently active operating mode
+            differential_updates[i].active =
+                active_operating_mode_matches(config->operating_mode, differential_updates[i].active_operating_mode);
             differential_updates[i].force_next_update = false;
 
             // Only reset the base diff time if we're coming from offline or init - from OTA we want to seamlessly
-            // transition back to same state
+            // transition back to same state. Edge case bug here if device keeps losing and regaining connection before
+            // the full period of each diff update has happened at least once.
             if (respect_force_flags) {
                 differential_updates[i].last_executed_epoch_secs = now_epoch_secs;
             }
 
-            log_printf(LOG_LEVEL_DEBUG, "Activated diff update struct '%s'", differential_updates[i].name);
+            log_printf(LOG_LEVEL_DEBUG,
+                       "%s diff update struct '%s'",
+                       differential_updates[i].active ? "Activated" : "Did not active",
+                       differential_updates[i].name);
         }
     }
 
@@ -664,20 +709,23 @@ void scheduler_set_online_mode() {
             discrete_updates[i].active = false;
             log_printf(LOG_LEVEL_DEBUG, "Deactivated discrete update struct '%s'", discrete_updates[i].name);
         } else {
-            discrete_updates[i].active = true;
+            // Only activate the struct if it matches with the currently active operating mode
+            discrete_updates[i].active =
+                active_operating_mode_matches(config->operating_mode, discrete_updates[i].active_operating_mode);
 
             // Don't force specific discrete updates on activation. Otherwise we'd trigger things like all three swell
             // updates back to back (and an unnecessary time update but that's a bit less intrusive)
             discrete_updates[i].force_next_update =
                 respect_force_flags && discrete_updates[i].force_on_transition_to_online;
             log_printf(LOG_LEVEL_DEBUG,
-                       "Activated %s discrete update struct '%s'",
+                       "%s %s discrete update struct '%s'",
+                       discrete_updates[i].active ? "Activated" : "Did not activate",
                        discrete_updates[i].force_on_transition_to_online ? "and forced" : "but did not force",
                        discrete_updates[i].name);
         }
     }
 
-    mode = SCHEDULER_MODE_ONLINE;
+    scheduler_mode = SCHEDULER_MODE_ONLINE;
 }
 
 UBaseType_t scheduler_task_get_stack_high_water() {
@@ -686,7 +734,23 @@ UBaseType_t scheduler_task_get_stack_high_water() {
 }
 
 void scheduler_task_init() {
-    mode = SCHEDULER_MODE_INIT;
+    scheduler_mode = SCHEDULER_MODE_INIT;
+
+    // If we're running in custom mode, set the update_interval_secs field of the custom screen update diff struct since
+    // it's dynamic from the config and not a preprocessor macro like all others
+    spot_check_config_t *config = nvs_get_config();
+    if (config->operating_mode == SPOT_CHECK_MODE_CUSTOM) {
+        differential_update_t *diff_check = NULL;
+        for (int i = 0; i < NUM_DIFFERENTIAL_UPDATES; i++) {
+            diff_check = &differential_updates[i];
+            if (strcmp("custom_screen_update", diff_check->name) == 0) {
+                diff_check->update_interval_secs = config->custom_update_interval_secs;
+                log_printf(LOG_LEVEL_DEBUG,
+                           "Updated custom screen update diff stuct update_interval_secs to %u",
+                           diff_check->update_interval_secs);
+            }
+        }
+    }
 }
 
 void scheduler_task_start() {

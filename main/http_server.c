@@ -205,13 +205,17 @@ static esp_err_t configure_post_handler(httpd_req_t *req) {
 
     nvs_save_config(&config);
 
-    // Update new time and trigger redraw immediately
-    sntp_set_tz_str(config.tz_str);
-    scheduler_trigger_time_update();
-
     // End response
     cJSON_Delete(payload);
     httpd_resp_send(req, NULL, 0);
+
+    // TODO : previously we were setting the tz str and forcing a time redraw through scheduler, but that wouldn't
+    // properly re render everything else if the spot changed right? For now, reboot in all cases to make things super
+    // simple, but in the future this could be smarter to only reboot on mode change or gracefully handle all cases
+    esp_restart();
+    while (1) {
+    }
+
     return ESP_OK;
 }
 
