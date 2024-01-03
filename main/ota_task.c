@@ -24,15 +24,39 @@
 
 #define TAG SC_TAG_OTA
 
+typedef enum {
+    OTA_RESULT_NOT_NEEDED,  // Any reason we bail before actual download of image (version compare the same, ota
+                            // disabled, etc)
+    OTA_RESULT_FAIL,        // Download of image was started but failed somewhere before we try to reboot into it
+    OTA_RESULT_SUCCESS,     // Download and validate of new image successful, full process succeeded
+} ota_result_t;
+
 // Global OTA and task handles
+// TODO :: these should all be in our own OTA handle I'm just being lazy
 static esp_https_ota_handle_t ota_handle;
-static TaskHandle_t           ota_task_handle = NULL;
+static TaskHandle_t           ota_task_handle    = NULL;
+static scheduler_mode_t       mode_at_task_start = SCHEDULER_MODE_INIT;
 
 static esp_err_t http_client_init_callback(esp_http_client_handle_t http_client) {
     esp_err_t err = ESP_OK;
     /* Uncomment to add custom headers to HTTP request */
     // err = esp_http_client_set_header(http_client, "Custom-Header", "Value");
     return err;
+}
+
+static void ota_task_revert_scheduler_mode() {
+    switch (mode_at_task_start) {
+        case SCHEDULER_MODE_ONLINE:
+            scheduler_set_online_mode();
+            break;
+        case SCHEDULER_MODE_OFFLINE:
+            scheduler_set_offline_mode();
+            break;
+        default:
+            log_printf(LOG_LEVEL_ERROR, "Reverting back to this mode in OTA task not supported!");
+            configASSERT(0);
+            break;
+    }
 }
 
 // Sets up  OTA binary URL and queries to see if OTA image accessible (no version checking)
@@ -171,19 +195,28 @@ static bool check_forced_update(esp_app_desc_t *current_image_info, char *versio
 }
 
 /*
- * Proper task teardown. I don't know if the call to vTaskDelete immediately deletes the executing task, so always call
- * return up to root of callstack after calling this function.
+ * Proper task teardown depending on how it went
  */
-static void ota_task_stop(bool clear_ota_text) {
-    if (clear_ota_text) {
-        spot_check_clear_ota_start_text();
-        spot_check_render();
+static void ota_task_stop(ota_result_t result) {
+    switch (result) {
+        case OTA_RESULT_NOT_NEEDED:
+            spot_check_clear_ota_start_text();
+            break;
+        case OTA_RESULT_FAIL:
+            // TODO :: write failure text? It would persist until next OTA check or reboot
+            spot_check_clear_ota_start_text();
+            break;
+        case OTA_RESULT_SUCCESS:
+            // TODO :: success text briefly?
+            log_printf(LOG_LEVEL_INFO, "OTA update successful, rebooting in 3 seconds...");
+            vTaskDelay(3000 / portTICK_PERIOD_MS);
+            esp_restart();
+            break;
     }
 
-    // TODO :: technically if we're in offline mode and something starts the ota task, it will kick into online mode on
-    // exit (probably when the first network call fails). The scheduler call to start ota is gated by the mode, but
-    // theoretically OTA could be started from somehwere else in the future so it might matter
-    scheduler_set_online_mode();
+    // Common actions whether OTA was not needed or failed (success won't reach here with the restart)
+    spot_check_render();
+    ota_task_revert_scheduler_mode();
     sleep_handler_set_idle(SYSTEM_IDLE_OTA_BIT);
     ota_task_handle = NULL;
     vTaskDelete(NULL);
@@ -264,8 +297,8 @@ static void check_ota_update_task(void *args) {
             memcpy(forced_version_url + ota_url_size, query_str, strlen(query_str));
             strcpy(forced_version_url + ota_url_size + strlen(query_str), version_to_download);
 
-            log_printf(LOG_LEVEL_INFO, "Attempting to restart OTA with specific version url: %s", forced_version_url);
             // Restart OTA process with new url specific to forced version
+            log_printf(LOG_LEVEL_INFO, "Attempting to restart OTA with specific version url: %s", forced_version_url);
             ota_start_ota(forced_version_url);
         } else {
             log_printf(LOG_LEVEL_INFO, "Still got no go-ahead from force OTA endpoint, deleting OTA task");
@@ -311,12 +344,7 @@ static void check_ota_update_task(void *args) {
     }
 
     error = esp_https_ota_finish(ota_handle);
-    if (error == ESP_OK) {
-        // TODO :: success text briefly
-        log_printf(LOG_LEVEL_INFO, "OTA update successful, rebooting in 3 seconds...");
-        vTaskDelay(3000 / portTICK_PERIOD_MS);
-        esp_restart();
-    } else {
+    if (error != ESP_OK) {
         if (error == ESP_ERR_OTA_VALIDATE_FAILED) {
             log_printf(LOG_LEVEL_ERROR, "OTA failed in esp_https_ota_finish, image validation unsuccessful.");
         } else {
@@ -327,7 +355,7 @@ static void check_ota_update_task(void *args) {
     }
 
     // Catch-all to clear OTA text and clean up task
-    ota_task_stop(true);
+    ota_task_stop(OTA_RESULT_SUCCESS);
 }
 
 UBaseType_t ota_task_get_stack_high_water() {
