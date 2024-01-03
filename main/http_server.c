@@ -92,11 +92,15 @@ static bool http_server_parse_post_body(httpd_req_t *req, cJSON **payload) {
     return true;
 }
 
+/*
+ * Generic function for parsing out a string value from a json key with built-in error handling and fallback value
+ */
 static void http_server_parse_json_string(cJSON *payload,
+                                          char  *json_key,
                                           char **field_to_set,
                                           size_t max_field_length,
                                           char  *fallback) {
-    cJSON *json_obj = cJSON_GetObjectItem(payload, "spot_name");
+    cJSON *json_obj = cJSON_GetObjectItem(payload, json_key);
     if (cJSON_IsString(json_obj)) {
         *field_to_set = cJSON_GetStringValue(json_obj);
         if (strlen(*field_to_set) > max_field_length) {
@@ -133,17 +137,26 @@ static esp_err_t configure_post_handler(httpd_req_t *req) {
     char               *default_tz_display_name = "Europe/Berlin";
     char               *default_mode            = (char *)spot_check_mode_to_string(SPOT_CHECK_MODE_WEATHER);
 
-    http_server_parse_json_string(payload, &config.spot_name, MAX_LENGTH_SPOT_NAME_PARAM, default_spot_name);
-    http_server_parse_json_string(payload, &config.spot_lat, MAX_LENGTH_SPOT_LAT_PARAM, default_spot_lat);
-    http_server_parse_json_string(payload, &config.spot_lon, MAX_LENGTH_SPOT_LON_PARAM, default_spot_lon);
-    http_server_parse_json_string(payload, &config.spot_uid, MAX_LENGTH_SPOT_UID_PARAM, default_spot_uid);
-    http_server_parse_json_string(payload, &config.tz_str, MAX_LENGTH_TZ_STR_PARAM, default_tz_str);
     http_server_parse_json_string(payload,
+                                  "spot_name",
+                                  &config.spot_name,
+                                  MAX_LENGTH_SPOT_NAME_PARAM,
+                                  default_spot_name);
+    http_server_parse_json_string(payload, "spot_lat", &config.spot_lat, MAX_LENGTH_SPOT_LAT_PARAM, default_spot_lat);
+    http_server_parse_json_string(payload, "spot_lon", &config.spot_lon, MAX_LENGTH_SPOT_LON_PARAM, default_spot_lon);
+    http_server_parse_json_string(payload, "spot_uid", &config.spot_uid, MAX_LENGTH_SPOT_UID_PARAM, default_spot_uid);
+    http_server_parse_json_string(payload, "tz_str", &config.tz_str, MAX_LENGTH_TZ_STR_PARAM, default_tz_str);
+    http_server_parse_json_string(payload,
+                                  "tz_display_name",
                                   &config.tz_display_name,
                                   MAX_LENGTH_TZ_DISPLAY_NAME_PARAM,
                                   default_tz_display_name);
     char temp_mode_str[MAX_LENGTH_OPERATING_MODE_PARAM];
-    http_server_parse_json_string(payload, (char **)&temp_mode_str, MAX_LENGTH_OPERATING_MODE_PARAM, default_mode);
+    http_server_parse_json_string(payload,
+                                  "operating_mode",
+                                  (char **)&temp_mode_str,
+                                  MAX_LENGTH_OPERATING_MODE_PARAM,
+                                  default_mode);
     config.operating_mode = spot_check_string_to_mode(temp_mode_str);
 
     nvs_save_config(&config);
