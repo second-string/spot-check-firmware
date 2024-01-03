@@ -77,16 +77,22 @@ def configure_custom_mode(current_config):
     else:
         custom_screen_url = temp_custom_screen_url
 
-    temp_update_interval_secs = input(f"Enter the length of time the device should wait in between requests to the API endpoint in seconds (press enter to keep as '{current_config['custom_update_interval_secs']}'): ")
-    if not temp_update_interval_secs or temp_update_interval_secs == "":
-        custom_update_interval_secs = current_config["custom_update_interval_secs"]
-    else:
-        custom_update_interval_secs = int(temp_update_interval_secs)
 
-        return {
-            "custom_screen_url": custom_screen_url,
-            "custom_update_interval_secs": custom_update_interval_secs,
-        }
+    while 1:
+        print()
+        temp_update_interval_secs = input(f"Enter the length of time the device should wait in between requests to the API endpoint in seconds, minimum 900 seconds / 15 minutes (press enter to keep as '{current_config['custom_update_interval_secs']}'): ")
+        if not temp_update_interval_secs or temp_update_interval_secs == "":
+            custom_update_interval_secs = current_config["custom_update_interval_secs"]
+        elif int(temp_update_interval_secs) < 900:
+            print("Value too low, minimum is 900 seconds (15 minutes)")
+        else:
+            custom_update_interval_secs = int(temp_update_interval_secs)
+            break
+
+    return {
+        "custom_screen_url": custom_screen_url,
+        "custom_update_interval_secs": custom_update_interval_secs,
+    }
 
 def configure():
     db_conn = sqlite3.connect("timezones.db")
