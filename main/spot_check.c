@@ -39,14 +39,21 @@
 
 #define NUM_BYTES_VERSION_STR (26)
 
-const char *const ota_start_text    = "Firmware update in progress, please do not unplug Spot Check device";
-const char *const ota_finished_text = "Firmware update successful! Rebooting...";
-const char *const offline_text = "Spot Check is having trouble accessing the network, please check your connection";
+static const char *const ota_start_text    = "Firmware update in progress, please do not unplug Spot Check device";
+static const char *const ota_finished_text = "Firmware update successful! Rebooting...";
+static const char *const offline_text =
+    "Spot Check is having trouble accessing the network, please check your connection";
+
+static const char *spot_check_mode_strs[SPOT_CHECK_MODE_COUNT] = {
+    [SPOT_CHECK_MODE_WEATHER] = "weather",
+    [SPOT_CHECK_MODE_CUSTOM]  = "custom",
+};
 
 static struct tm last_time_displayed = {0};
 static char      device_serial[20];
 static char      firmware_version[NUM_BYTES_VERSION_STR + 1];  // 5-8 bytes for version, 1 for dash, 16 msb of elf hash.
 static char      hw_version[10];                               // always less, hardcoded below in ifdefs
+                                                               //
 
 char *spot_check_get_serial() {
     return device_serial;
@@ -68,11 +75,11 @@ bool spot_check_download_and_save_conditions(conditions_t *new_conditions) {
         return false;
     }
 
-    spot_check_config *config = nvs_get_config();
-    char               url_buf[strlen(URL_BASE) + 80];
-    uint8_t            num_params = 4;
-    query_param        params[num_params];
-    http_request_t     request = http_client_build_get_request("conditions", config, url_buf, params, num_params);
+    spot_check_config_t *config = nvs_get_config();
+    char                 url_buf[strlen(URL_BASE) + 80];
+    uint8_t              num_params = 4;
+    query_param          params[num_params];
+    http_request_t       request = http_client_build_get_request("conditions", config, url_buf, params, num_params);
 
     char                    *server_response    = NULL;
     size_t                   response_data_size = 0;
@@ -545,6 +552,25 @@ void spot_check_set_offline_mode() {
 
         spot_check_render();
     }
+}
+
+// void              spot_check_set_mode(spot_check_mode_t new_mode) {
+//     nvs_set
+// }
+
+/*
+ * Converts the string representation of a mode (for NVS storage or config setting) to the mode enum. Input string must
+ * be null terminated. Crashes if no matching mode found.
+ */
+spot_check_mode_t spot_check_string_to_mode(char *in_str) {
+    for (int i = 0; i < SPOT_CHECK_MODE_COUNT; i++) {
+        if (strcmp(spot_check_mode_strs[i], in_str) == 0) {
+            return (spot_check_mode_t)i;
+        }
+    }
+
+    log_printf(LOG_LEVEL_ERROR, "Could not find a matching operating mode for string '%s' - fatal error!");
+    MEMFAULT_ASSERT(0);
 }
 
 /*

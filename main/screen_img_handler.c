@@ -180,11 +180,11 @@ bool screen_img_handler_download_and_save(screen_img_t screen_img) {
     screen_img_metadata_t metadata = {0};
     screen_img_handler_get_metadata(screen_img, &metadata);
 
-    bool               success = true;
-    char               url[80];
-    spot_check_config *config     = nvs_get_config();
-    const uint8_t      num_params = 4;
-    query_param        params[num_params];
+    bool                 success = true;
+    char                 url[80];
+    spot_check_config_t *config     = nvs_get_config();
+    const uint8_t        num_params = 4;
+    query_param          params[num_params];
 
     http_request_t req = http_client_build_get_request(metadata.endpoint, config, url, params, num_params);
     vTaskDelay(pdMS_TO_TICKS(1000));

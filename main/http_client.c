@@ -318,11 +318,11 @@ bool http_client_perform_with_retries(http_request_t           *request_obj,
  * memory for the base url + endpoint, and a pointer to a block of already-allocated memory to hold the query params
  * structs
  */
-http_request_t http_client_build_get_request(char              *endpoint,
-                                             spot_check_config *config,
-                                             char              *url_buf,
-                                             query_param       *params,
-                                             uint8_t            num_params) {
+http_request_t http_client_build_get_request(char                *endpoint,
+                                             spot_check_config_t *config,
+                                             char                *url_buf,
+                                             query_param         *params,
+                                             uint8_t              num_params) {
     http_request_t req = {
         .req_type = HTTP_REQ_TYPE_GET,
     };

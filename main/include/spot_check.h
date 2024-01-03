@@ -3,6 +3,13 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+typedef enum {
+    SPOT_CHECK_MODE_WEATHER,
+    SPOT_CHECK_MODE_CUSTOM,
+
+    SPOT_CHECK_MODE_COUNT,
+} spot_check_mode_t;
+
 typedef struct {
     int8_t  temperature;
     uint8_t wind_speed;
@@ -10,11 +17,20 @@ typedef struct {
     char    tide_height[7];  // minus sign, two digits, decimal point, two digits, null
 } conditions_t;
 
-char *spot_check_get_serial();
-char *spot_check_get_fw_version();
-char *spot_check_get_hw_version();
-bool  spot_check_download_and_save_conditions(conditions_t *new_conditions);
+/*
+ * System functions
+ */
+char             *spot_check_get_serial();
+char             *spot_check_get_fw_version();
+char             *spot_check_get_hw_version();
+bool              spot_check_download_and_save_conditions(conditions_t *new_conditions);
+void              spot_check_set_mode(spot_check_mode_t new_mode);
+spot_check_mode_t spot_check_string_to_mode(char *in_str);
+void              spot_check_init();
 
+/*
+ * Rendering functions
+ */
 void spot_check_clear_date();
 bool spot_check_draw_date();
 void spot_check_mark_time_dirty();
@@ -43,5 +59,3 @@ void spot_check_full_clear();
 void spot_check_mark_all_lines_dirty();
 void spot_check_render();
 void spot_check_set_offline_mode();
-
-void spot_check_init();

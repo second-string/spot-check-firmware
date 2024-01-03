@@ -117,6 +117,7 @@ static void app_init() {
 }
 
 static void app_start() {
+    nvs_start();
     i2c_start(&bq24196_i2c_handle);
     bq24196_start();
     display_start();
@@ -144,7 +145,7 @@ void app_main(void) {
 
     app_start();
 
-    spot_check_config *config = nvs_get_config();
+    spot_check_config_t *config = nvs_get_config();
     sntp_set_tz_str(config->tz_str);
     display_render_splash_screen(spot_check_get_fw_version(), spot_check_get_hw_version());
 

@@ -46,11 +46,11 @@ typedef struct {
 // Expose event handler so OTA task can callback to it
 esp_err_t      http_event_handler(esp_http_client_event_t *event);
 void           http_client_init();
-http_request_t http_client_build_get_request(char              *endpoint,
-                                             spot_check_config *config,
-                                             char              *url_buf,
-                                             query_param       *params,
-                                             uint8_t            num_params);
+http_request_t http_client_build_get_request(char                *endpoint,
+                                             spot_check_config_t *config,
+                                             char                *url_buf,
+                                             query_param         *params,
+                                             uint8_t              num_params);
 http_request_t http_client_build_post_request(char *endpoint, char *url_buf, char *post_data, size_t post_data_size);
 bool           http_client_perform_with_retries(http_request_t           *request_obj,
                                                 uint8_t                   additional_retries,

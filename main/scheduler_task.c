@@ -406,7 +406,7 @@ static void scheduler_task(void *args) {
         if (update_bits & UPDATE_SPOT_NAME_BIT) {
             // Slightly unique case as in it requires no network update, just used as a display update trigger
             sleep_handler_set_busy(SYSTEM_IDLE_CONDITIONS_BIT);
-            spot_check_config *config = nvs_get_config();
+            spot_check_config_t *config = nvs_get_config();
 
             // TODO :: would be nice to have a 'previous_spot_name' key in config so we could pass to clear function
             // to smart erase with text inverse instead of block erasing max spot name width
@@ -614,11 +614,20 @@ void scheduler_set_online_mode() {
         return;
     }
 
-    // Who knows what error, OTA, random state screen was in from offline mode. Full clear, show fetching conditions,
-    // and kick everything off.
-    spot_check_full_clear();
-    spot_check_draw_fetching_conditions_text();
-    spot_check_render();
+    bool respect_force_flags = true;
+    if (mode == SCHEDULER_MODE_OTA) {
+        // If we're returning to online from OTA, don't allow any update structs to force an update. We know that OTA is
+        // a short blip, so this prevents running all the forces for discrete/diff structs after popping into OTA for
+        // max a minute or so.
+        respect_force_flags = false;
+    } else {
+        // Who knows what error or random state screen was in from init/offline mode. Full clear, show fetching
+        // conditions, and kick everything off.
+        spot_check_full_clear();
+        spot_check_draw_fetching_conditions_text();
+        spot_check_render();
+        respect_force_flags = true;
+    }
 
     // Only have one update struct that shouldn't run in online mode so just hardcode it
     char *offline_only_update_name = "network_check";
@@ -637,9 +646,15 @@ void scheduler_set_online_mode() {
             // full period of each diff update has happened at least once. If we didn't do this, every one of these
             // would trigger when coming online for the first time because of the massive time delta. That results in
             // OTA triggering and fucking with the other network requests since it's not gated by lock.
-            differential_updates[i].active                   = true;
-            differential_updates[i].force_next_update        = false;
-            differential_updates[i].last_executed_epoch_secs = now_epoch_secs;
+            differential_updates[i].active            = true;
+            differential_updates[i].force_next_update = false;
+
+            // Only reset the base diff time if we're coming from offline or init - from OTA we want to seamlessly
+            // transition back to same state
+            if (respect_force_flags) {
+                differential_updates[i].last_executed_epoch_secs = now_epoch_secs;
+            }
+
             log_printf(LOG_LEVEL_DEBUG, "Activated diff update struct '%s'", differential_updates[i].name);
         }
     }
@@ -653,7 +668,8 @@ void scheduler_set_online_mode() {
 
             // Don't force specific discrete updates on activation. Otherwise we'd trigger things like all three swell
             // updates back to back (and an unnecessary time update but that's a bit less intrusive)
-            discrete_updates[i].force_next_update = discrete_updates[i].force_on_transition_to_online;
+            discrete_updates[i].force_next_update =
+                respect_force_flags && discrete_updates[i].force_on_transition_to_online;
             log_printf(LOG_LEVEL_DEBUG,
                        "Activated %s discrete update struct '%s'",
                        discrete_updates[i].force_on_transition_to_online ? "and forced" : "but did not force",
@@ -674,10 +690,8 @@ void scheduler_task_init() {
 }
 
 void scheduler_task_start() {
-    // Print out all update structs and set them all to inactive. This lets the main.c boot process run unfettered
-    // without the scheduler in offline mode testing a healthcheck before the main code is ready for it an mucking
-    // everything up. main.c init function responsible for setting scheduler into offline or online mode no matter what,
-    // otherwise scheduler will never run.
+    // Print out all update structs and set them all to inactive. main.c init function responsible for setting scheduler
+    // into offline or online mode no matter what, otherwise scheduler will never run.
     log_printf(LOG_LEVEL_DEBUG, "List of all time differential updates:");
     differential_update_t *diff_check = NULL;
     for (int i = 0; i < NUM_DIFFERENTIAL_UPDATES; i++) {

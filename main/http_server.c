@@ -103,13 +103,13 @@ static esp_err_t configure_post_handler(httpd_req_t *req) {
     // Load all our values into here to save to nvs. No need to alloc
     // any more memory than the json takes because nvs will use those
     // pointers to write directly to flash
-    spot_check_config config                  = {0};
-    char             *default_spot_name       = "The Wedge";
-    char             *default_spot_lat        = "33.5930302087";
-    char             *default_spot_lon        = "-117.8819918632";
-    char             *default_spot_uid        = "5842041f4e65fad6a770882b";
-    char             *default_tz_str          = "CET-1CEST,M3.4.0/2,M10.4.0/2";
-    char             *default_tz_display_name = "Europe/Berlin";
+    spot_check_config_t config                  = {0};
+    char               *default_spot_name       = "The Wedge";
+    char               *default_spot_lat        = "33.5930302087";
+    char               *default_spot_lon        = "-117.8819918632";
+    char               *default_spot_uid        = "5842041f4e65fad6a770882b";
+    char               *default_tz_str          = "CET-1CEST,M3.4.0/2,M10.4.0/2";
+    char               *default_tz_display_name = "Europe/Berlin";
 
     cJSON *json_spot_name = cJSON_GetObjectItem(payload, "spot_name");
     if (cJSON_IsString(json_spot_name)) {
@@ -216,7 +216,7 @@ static esp_err_t configure_post_handler(httpd_req_t *req) {
 }
 
 static esp_err_t current_config_get_handler(httpd_req_t *req) {
-    spot_check_config *current_config = nvs_get_config();
+    spot_check_config_t *current_config = nvs_get_config();
 
     cJSON *root                 = cJSON_CreateObject();
     cJSON *spot_name_json       = cJSON_CreateString(current_config->spot_name);

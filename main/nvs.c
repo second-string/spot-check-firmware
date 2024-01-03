@@ -22,8 +22,48 @@ static char _spot_lat[MAX_LENGTH_SPOT_LAT_PARAM + 1]               = {0};
 static char _spot_lon[MAX_LENGTH_SPOT_LON_PARAM + 1]               = {0};
 static char _tz_str[MAX_LENGTH_TZ_STR_PARAM + 1]                   = {0};
 static char _tz_display_name[MAX_LENGTH_TZ_DISPLAY_NAME_PARAM + 1] = {0};
+static char _operating_mode[MAX_LENGTH_OPERATING_MODE_PARAM + 1]   = {0};
 
-static spot_check_config current_config;
+static spot_check_config_t current_config;
+
+static spot_check_config_t *nvs_load_config() {
+    if (handle == 0) {
+        log_printf(LOG_LEVEL_ERROR, "Attempting to retrieve from NVS before calling nvs_init(), returning null ptr");
+        return NULL;
+    }
+
+    size_t bytes_used;
+    nvs_get_string("spot_name", _spot_name, &bytes_used, "Wedge");
+    MEMFAULT_ASSERT(bytes_used < MAX_LENGTH_SPOT_NAME_PARAM);
+
+    nvs_get_string("spot_lat", _spot_lat, &bytes_used, "33.5930302087");
+    MEMFAULT_ASSERT(bytes_used < MAX_LENGTH_SPOT_LAT_PARAM);
+
+    nvs_get_string("spot_lon", _spot_lon, &bytes_used, "-117.8819918632");
+    MEMFAULT_ASSERT(bytes_used < MAX_LENGTH_SPOT_LON_PARAM);
+
+    nvs_get_string("spot_uid", _spot_uid, &bytes_used, "5842041f4e65fad6a770882b");
+    MEMFAULT_ASSERT(bytes_used < MAX_LENGTH_SPOT_UID_PARAM);
+
+    nvs_get_string("tz_str", _tz_str, &bytes_used, "CET-1CEST,M3.5.0/2,M10.5.0/2");
+    MEMFAULT_ASSERT(bytes_used < MAX_LENGTH_TZ_STR_PARAM);
+
+    nvs_get_string("tz_display_name", _tz_display_name, &bytes_used, "Europe/Berlin");
+    MEMFAULT_ASSERT(bytes_used < MAX_LENGTH_TZ_DISPLAY_NAME_PARAM);
+
+    nvs_get_string("operating_mode", _operating_mode, &bytes_used, "weather");
+    MEMFAULT_ASSERT(bytes_used < MAX_LENGTH_OPERATING_MODE_PARAM);
+
+    current_config.spot_name       = _spot_name;
+    current_config.spot_uid        = _spot_uid;
+    current_config.spot_lat        = _spot_lat;
+    current_config.spot_lon        = _spot_lon;
+    current_config.tz_str          = _tz_str;
+    current_config.tz_display_name = _tz_display_name;
+    current_config.operating_mode  = _operating_mode;
+
+    return &current_config;
+}
 
 void nvs_init() {
     esp_err_t ret = nvs_flash_init();
@@ -38,6 +78,10 @@ void nvs_init() {
     handle = h;
 
     log_printf(LOG_LEVEL_INFO, "NVS successfully inited and opened");
+}
+
+void nvs_start() {
+    nvs_load_config();
 }
 
 bool nvs_get_uint32(char *key, uint32_t *val) {
@@ -116,7 +160,59 @@ bool nvs_set_uint32(char *key, uint32_t val) {
     return retval;
 }
 
-void nvs_save_config(spot_check_config *config) {
+bool nvs_get_string(char *key, char *val, size_t *val_size, char *fallback) {
+    bool retval = false;
+    MEMFAULT_ASSERT(handle);
+
+    esp_err_t err = nvs_get_str(handle, key, val, val_size);
+    switch (err) {
+        case ESP_OK:
+            retval = true;
+            break;
+        case ESP_ERR_NVS_NOT_FOUND:
+            log_printf(LOG_LEVEL_INFO,
+                       "The NVS value for key '%s' is not initialized yet, returing fallback value '%s'",
+                       key,
+                       fallback);
+            strcpy(val, fallback);
+            break;
+        default:
+            log_printf(LOG_LEVEL_ERROR,
+                       "Error (%s) reading value for key '%s' from NVS, returing fallback value '%s'",
+                       esp_err_to_name(err),
+                       key,
+                       fallback);
+            strcpy(val, fallback);
+    }
+
+    return retval;
+}
+
+bool nvs_set_string(char *key, char *val) {
+    bool retval = false;
+    MEMFAULT_ASSERT(handle);
+
+    esp_err_t err = nvs_set_str(handle, key, val);
+    if (err == ESP_OK) {
+        retval = true;
+    } else {
+        log_printf(LOG_LEVEL_ERROR,
+                   "Error (%s) setting strng value '%s' for key '%s' in NVS",
+                   esp_err_to_name(err),
+                   val,
+                   key);
+    }
+
+    return retval;
+}
+
+spot_check_config_t *nvs_get_config() {
+    MEMFAULT_ASSERT(handle);
+
+    return &current_config;
+}
+
+void nvs_save_config(spot_check_config_t *config) {
     if (handle == 0) {
         log_printf(LOG_LEVEL_ERROR, "Attempting to save to NVS before calling nvs_init(), not saving values");
         return;
@@ -131,117 +227,15 @@ void nvs_save_config(spot_check_config *config) {
         scheduler_trigger_both_charts_update();
     }
 
-    ESP_ERROR_CHECK(nvs_set_str(handle, "spot_name", config->spot_name));
-    ESP_ERROR_CHECK(nvs_set_str(handle, "spot_uid", config->spot_uid));
-    ESP_ERROR_CHECK(nvs_set_str(handle, "spot_lat", config->spot_lat));
-    ESP_ERROR_CHECK(nvs_set_str(handle, "spot_lon", config->spot_lon));
-    ESP_ERROR_CHECK(nvs_set_str(handle, "tz_str", config->tz_str));
-    ESP_ERROR_CHECK(nvs_set_str(handle, "tz_display_name", config->tz_display_name));
-    ESP_ERROR_CHECK(nvs_set_str(handle, "tz_display_name", config->tz_display_name));
+    MEMFAULT_ASSERT(nvs_set_string("spot_name", config->spot_name));
+    MEMFAULT_ASSERT(nvs_set_string("spot_uid", config->spot_uid));
+    MEMFAULT_ASSERT(nvs_set_string("spot_lat", config->spot_lat));
+    MEMFAULT_ASSERT(nvs_set_string("spot_lon", config->spot_lon));
+    MEMFAULT_ASSERT(nvs_set_string("tz_str", config->tz_str));
+    MEMFAULT_ASSERT(nvs_set_string("tz_display_name", config->tz_display_name));
+    MEMFAULT_ASSERT(nvs_set_string("operating_mode", config->operating_mode));
 
     ESP_ERROR_CHECK(nvs_commit(handle));
-}
-
-spot_check_config *nvs_get_config() {
-    if (handle == 0) {
-        log_printf(LOG_LEVEL_ERROR, "Attempting to retrieve from NVS before calling nvs_init(), returning null ptr");
-        return NULL;
-    }
-
-    size_t max_length_spot_name_param       = MAX_LENGTH_SPOT_NAME_PARAM;
-    size_t max_length_spot_uid_param        = MAX_LENGTH_SPOT_UID_PARAM;
-    size_t max_length_spot_lat_param        = MAX_LENGTH_SPOT_LAT_PARAM;
-    size_t max_length_spot_lon_param        = MAX_LENGTH_SPOT_LON_PARAM;
-    size_t max_length_tz_str_param          = MAX_LENGTH_TZ_STR_PARAM;
-    size_t max_length_tz_display_name_param = MAX_LENGTH_TZ_DISPLAY_NAME_PARAM;
-
-    esp_err_t err = nvs_get_str(handle, "spot_name", _spot_name, &max_length_spot_name_param);
-    switch (err) {
-        case ESP_OK:
-            break;
-        case ESP_ERR_NVS_NOT_FOUND:
-            log_printf(LOG_LEVEL_DEBUG, "The value is not initialized yet, defaulting to wedge!");
-            strcpy(_spot_name, "Wedge");
-            break;
-        default:
-            log_printf(LOG_LEVEL_DEBUG, "Error (%s) reading spot_name from flash!", esp_err_to_name(err));
-    }
-
-    err = nvs_get_str(handle, "spot_lat", _spot_lat, &max_length_spot_lat_param);
-    switch (err) {
-        case ESP_OK:
-            break;
-        case ESP_ERR_NVS_NOT_FOUND:
-            log_printf(LOG_LEVEL_DEBUG, "The value is not initialized yet, defaulting to 33.5930302087!");
-            strcpy(_spot_lat, "33.5930302087");
-            break;
-        default:
-            log_printf(LOG_LEVEL_DEBUG, "Error (%s) reading spot_lat from flash!", esp_err_to_name(err));
-    }
-
-    err = nvs_get_str(handle, "spot_lon", _spot_lon, &max_length_spot_lon_param);
-    switch (err) {
-        case ESP_OK:
-            break;
-        case ESP_ERR_NVS_NOT_FOUND:
-            log_printf(LOG_LEVEL_DEBUG, "The value is not initialized yet, defaulting to -117.8819918632!");
-            strcpy(_spot_lon, "-117.8819918632");
-            break;
-        default:
-            log_printf(LOG_LEVEL_DEBUG, "Error (%s) reading spot_lon from flash!", esp_err_to_name(err));
-    }
-
-    err = nvs_get_str(handle, "spot_uid", _spot_uid, &max_length_spot_uid_param);
-    switch (err) {
-        case ESP_OK:
-            break;
-        case ESP_ERR_NVS_NOT_FOUND:;
-            char *wedge_uid = "5842041f4e65fad6a770882b";
-            log_printf(LOG_LEVEL_DEBUG, "The value is not initialized yet, defaulting to wedge's uid (%s)", wedge_uid);
-            strcpy(_spot_uid, wedge_uid);
-            break;
-        default:
-            log_printf(LOG_LEVEL_DEBUG, "Error (%s) reading spot_uid from flash!", esp_err_to_name(err));
-    }
-
-    err = nvs_get_str(handle, "tz_str", _tz_str, &max_length_tz_str_param);
-    switch (err) {
-        case ESP_OK:
-            break;
-        case ESP_ERR_NVS_NOT_FOUND:;
-            char *tz_str = "CET-1CEST,M3.5.0/2,M10.5.0/2";
-            log_printf(LOG_LEVEL_DEBUG,
-                       "The value is not initialized yet, defaulting to default Berlin tz  '%s'",
-                       tz_str);
-            strcpy(_tz_str, tz_str);
-            break;
-        default:
-            log_printf(LOG_LEVEL_DEBUG, "Error (%s) reading tz_str from flash!", esp_err_to_name(err));
-    }
-
-    err = nvs_get_str(handle, "tz_display_name", _tz_display_name, &max_length_tz_display_name_param);
-    switch (err) {
-        case ESP_OK:
-            break;
-        case ESP_ERR_NVS_NOT_FOUND:;
-            char *display_name = "Europe/Berlin";
-            log_printf(LOG_LEVEL_DEBUG,
-                       "The value is not initialized yet, defaulting to default Berlin tz  '%s'",
-                       display_name);
-            strcpy(_tz_display_name, display_name);
-            break;
-        default:
-            log_printf(LOG_LEVEL_DEBUG, "Error (%s) reading tz_display_name from flash!", esp_err_to_name(err));
-    }
-
-    current_config.spot_name       = _spot_name;
-    current_config.spot_uid        = _spot_uid;
-    current_config.spot_lat        = _spot_lat;
-    current_config.spot_lon        = _spot_lon;
-    current_config.tz_str          = _tz_str;
-    current_config.tz_display_name = _tz_display_name;
-
-    return &current_config;
 }
 
 esp_err_t nvs_full_erase() {
