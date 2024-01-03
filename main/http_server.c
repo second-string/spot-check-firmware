@@ -193,7 +193,16 @@ static esp_err_t configure_post_handler(httpd_req_t *req) {
                                           (char **)&temp_interval_str,
                                           MAX_LENGTH_CUSTOM_UPDATE_INTERVAL_SECS_PARAM,
                                           default_custom_update_interval_secs);
-            config.custom_update_interval_secs = strtoul(temp_interval_str, NULL, 10);
+            uint32_t temp_interval = strtoul(temp_interval_str, NULL, 10);
+            if (temp_interval < 900) {
+                log_printf(LOG_LEVEL_WARN,
+                           "Attempt to set custom_update_interval_secs to a value too low (%u) - defaulting to 900 "
+                           "secs (15 min)",
+                           temp_interval);
+                temp_interval = 900;
+            }
+
+            config.custom_update_interval_secs = temp_interval;
             break;
         }
         default:
