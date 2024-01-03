@@ -211,6 +211,20 @@ spot_check_config_t *nvs_get_config() {
     return &current_config;
 }
 
+/*
+ * Helper func to print out all the key/vals in current config
+ */
+void nvs_print_config() {
+    log_printf(LOG_LEVEL_INFO, "CURRENT IN-MEM SPOT CHECK CONFIG");
+    log_printf(LOG_LEVEL_INFO, "spot_name: %s", current_config.spot_name);
+    log_printf(LOG_LEVEL_INFO, "spot_uid: %s", current_config.spot_uid);
+    log_printf(LOG_LEVEL_INFO, "spot_lat: %s", current_config.spot_lat);
+    log_printf(LOG_LEVEL_INFO, "spot_lon: %s", current_config.spot_lon);
+    log_printf(LOG_LEVEL_INFO, "tz_str: %s", current_config.tz_str);
+    log_printf(LOG_LEVEL_INFO, "tz_display_name: %s", current_config.tz_display_name);
+    log_printf(LOG_LEVEL_INFO, "operating_mode: %s", current_config.operating_mode);
+}
+
 void nvs_save_config(spot_check_config_t *config) {
     if (handle == 0) {
         log_printf(LOG_LEVEL_ERROR, "Attempting to save to NVS before calling nvs_init(), not saving values");

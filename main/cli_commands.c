@@ -479,28 +479,32 @@ static BaseType_t cli_command_nvs(char *write_buffer, size_t write_buffer_size, 
     BaseType_t  action_len;
     const char *action = FreeRTOS_CLIGetParameter(cmd_str, 1, &action_len);
     if (action == NULL) {
-        strcpy(write_buffer, "Error: usage is '<action> <key> [<number>]'");
+        strcpy(write_buffer, "Error: usage is '<action> [<key>] [<number>]'");
         return pdFALSE;
     }
 
     BaseType_t  key_len;
     const char *key_str = FreeRTOS_CLIGetParameter(cmd_str, 2, &key_len);
-    if (key_str == NULL) {
-        strcpy(write_buffer, "Error: usage is '<action> <key> [<number>]'");
-        return pdFALSE;
-    }
 
     // Have to copy to new buffer to add a null term, otherwise key_str contains value string with no term between
     char key[key_len + 1];
-    strncpy(key, key_str, key_len);
+    if (key_str) {
+        strncpy(key, key_str, key_len);
+    }
 
     if (action_len == 3 && strncmp(action, "get", action_len) == 0) {
-        uint32_t val     = 0;
-        bool     success = nvs_get_uint32(key, &val);
+        if (key_str == NULL) {
+            strcpy(write_buffer, "Error: usage is '<action> [<key>] [<number>]'");
+            return pdFALSE;
+        }
+
+        // Most of the max val lengths are 64 bytes
+        char   val[64];
+        size_t size    = 0;
+        bool   success = nvs_get_string(key, val, &size, "");
+        MEMFAULT_ASSERT(size > 0 && size < 64);
         if (success) {
-            char msg[50];
-            sprintf(msg, "%s: %lu", key, val);
-            strcpy(write_buffer, msg);
+            sprintf(write_buffer, "%s: %s", key, val);
         } else {
             strcpy(write_buffer, "Failed to get value from NVS");
         }
@@ -512,15 +516,20 @@ static BaseType_t cli_command_nvs(char *write_buffer, size_t write_buffer_size, 
             return pdFALSE;
         }
 
-        uint32_t val     = strtoul(val_str, NULL, 10);
-        bool     success = nvs_set_uint32(key, val);
+        bool success = nvs_set_string(key, (char *)val_str);
         if (success) {
-            char msg[50];
-            sprintf(msg, "SET %s: %lu", key, val);
-            strcpy(write_buffer, msg);
+            sprintf(write_buffer, "SET %s: %s", key, val_str);
         } else {
             strcpy(write_buffer, "Failed to write value to NVS");
         }
+    } else if (action_len == 5 && strncmp(action, "config", action_len) == 0) {
+        nvs_print_config();
+
+        // Yield so hopefully the logger unblocks and prints its out before the CLI task prints OK and returns
+        vTaskDelay(pdMS_TO_TICKS(100));
+        strcpy(write_buffer, "OK");
+    } else {
+        strcpy(write_buffer, "Unknown nvs command");
     }
 
     return pdFALSE;
@@ -895,10 +904,8 @@ void cli_command_register_all() {
     static const CLI_Command_Definition_t nvs_cmd = {
         .pcCommand = "nvs",
         .pcHelpString =
-            "nvs:\n\tget <key>: get the uint32 value stored for the key\n\tset <key> <number>: set a uint32 value "
-            "in "
-            "NVS for a "
-            "given key",
+            "nvs:\n\tget <key>: get the string value stored for the key\n\tset <key> <str>: set a string value in NVS "
+            "for a given key\n\tconfig: print the current config",
         .pxCommandInterpreter        = cli_command_nvs,
         .cExpectedNumberOfParameters = -1,
     };
