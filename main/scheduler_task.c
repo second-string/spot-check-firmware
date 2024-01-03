@@ -337,10 +337,22 @@ static void scheduler_task(void *args) {
                    "scheduler task received task notification of value 0x%02X, updating accordingly",
                    update_bits);
 
-        // If these three are all set, it means scheduler just got kicked back into online mode. Whether or not this is
-        // from a boot, a discon/recon, or a first connection after boot error, do a full erase and redraw
-        full_clear = (update_bits & UPDATE_CONDITIONS_BIT) && (update_bits & UPDATE_TIDE_CHART_BIT) &&
-                     (update_bits & UPDATE_SWELL_CHART_BIT);
+        spot_check_config_t *config = nvs_get_config();
+        switch (config->operating_mode) {
+            case SPOT_CHECK_MODE_WEATHER:
+                // If these three are all set, it means scheduler just got kicked back into online mode. Whether or not
+                // this is from a boot, a discon/recon, or a first connection after boot error, do a full erase and
+                // redraw
+                full_clear = (update_bits & UPDATE_CONDITIONS_BIT) && (update_bits & UPDATE_TIDE_CHART_BIT) &&
+                             (update_bits & UPDATE_SWELL_CHART_BIT);
+                break;
+            case SPOT_CHECK_MODE_CUSTOM:
+                // For now we always full clear in custom screen mode
+                full_clear = true;
+                break;
+            default:
+                MEMFAULT_ASSERT(0);
+        }
 
         /***************************************
          * Network update section
@@ -404,16 +416,17 @@ static void scheduler_task(void *args) {
             }
         }
 
-        if (update_bits & CUSTOM_SCREEN_UPDATE_BIT) {
-            // TODO :: fetch custom image
+        if (update_bits & CUSTOM_SCREEN_UPDATE_BIT && scheduler_get_mode() != SCHEDULER_MODE_OFFLINE) {
+            sleep_handler_set_busy(SYSTEM_IDLE_CUSTOM_SCREEN_BIT);
+            screen_img_handler_download_and_save(SCREEN_IMG_SWELL_CHART);
+            sleep_handler_set_idle(SYSTEM_IDLE_CUSTOM_SCREEN_BIT);
         }
 
         /***************************************
          * Framebuffer update section
          **************************************/
         if (full_clear) {
-            log_printf(LOG_LEVEL_DEBUG,
-                       "Performing full screen clear from scheduler_task since every piece was updated");
+            log_printf(LOG_LEVEL_DEBUG, "Performing full screen clear from scheduler_task");
             spot_check_full_clear();
         }
 
@@ -441,7 +454,6 @@ static void scheduler_task(void *args) {
         if (update_bits & UPDATE_SPOT_NAME_BIT) {
             // Slightly unique case as in it requires no network update, just used as a display update trigger
             sleep_handler_set_busy(SYSTEM_IDLE_CONDITIONS_BIT);
-            spot_check_config_t *config = nvs_get_config();
 
             // TODO :: would be nice to have a 'previous_spot_name' key in config so we could pass to clear function
             // to smart erase with text inverse instead of block erasing max spot name width
@@ -505,7 +517,13 @@ static void scheduler_task(void *args) {
         }
 
         if (update_bits & CUSTOM_SCREEN_UPDATE_BIT) {
-            // TODO :: clear and re-draw custom image
+            sleep_handler_set_busy(SYSTEM_IDLE_CUSTOM_SCREEN_BIT);
+            if (!full_clear) {
+                screen_img_handler_clear_screen_img(SCREEN_IMG_CUSTOM_SCREEN);
+            }
+            screen_img_handler_draw_screen_img(SCREEN_IMG_CUSTOM_SCREEN);
+            log_printf(LOG_LEVEL_INFO, "scheduler task updated custom screen");
+            sleep_handler_set_idle(SYSTEM_IDLE_CUSTOM_SCREEN_BIT);
         }
 
         /***************************************

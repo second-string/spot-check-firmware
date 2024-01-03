@@ -17,6 +17,7 @@
 #include "nvs.h"
 #include "screen_img_handler.h"
 #include "sntp_time.h"
+#include "spot_check.h"
 
 #define TAG SC_TAG_SCREEN_IMG_HANDLER
 
@@ -53,6 +54,18 @@ static void screen_img_handler_get_metadata(screen_img_t screen_img, screen_img_
             metadata->screen_img_height_key = SCREEN_IMG_SWELL_CHART_HEIGHT_PX_NVS_KEY;
             metadata->screen_img_offset     = SCREEN_IMG_SWELL_CHART_OFFSET;
             metadata->endpoint              = "swell_chart";
+            break;
+        case SCREEN_IMG_CUSTOM_SCREEN:
+            metadata->x_coord               = 0;
+            metadata->y_coord               = 0;
+            metadata->screen_img_size_key   = SCREEN_IMG_CUSTOM_SCREEN_SIZE_NVS_KEY;
+            metadata->screen_img_width_key  = SCREEN_IMG_CUSTOM_SCREEN_WIDTH_PX_NVS_KEY;
+            metadata->screen_img_height_key = SCREEN_IMG_CUSTOM_SCREEN_HEIGHT_PX_NVS_KEY;
+            metadata->screen_img_offset     = SCREEN_IMG_CUSTOM_SCREEN_OFFSET;
+
+            // Making an assumption this will never be called before nvs is inited and loaded into mem
+            spot_check_config_t *config = nvs_get_config();
+            metadata->endpoint          = config->custom_screen_url;
             break;
         default:
             MEMFAULT_ASSERT(0);

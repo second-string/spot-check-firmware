@@ -10,6 +10,9 @@
 #define SCREEN_IMG_SWELL_CHART_SIZE_NVS_KEY "swell_img_sz"
 #define SCREEN_IMG_SWELL_CHART_WIDTH_PX_NVS_KEY "swell_img_w"
 #define SCREEN_IMG_SWELL_CHART_HEIGHT_PX_NVS_KEY "swell_img_h"
+#define SCREEN_IMG_CUSTOM_SCREEN_SIZE_NVS_KEY "cstm_img_sz"
+#define SCREEN_IMG_CUSTOM_SCREEN_WIDTH_PX_NVS_KEY "cstm_img_w"
+#define SCREEN_IMG_CUSTOM_SCREEN_HEIGHT_PX_NVS_KEY "cstm_img_h"
 
 // Start byte of each image saved inthe screen_img partition. Assumes the partition is 512K, which puts the second image
 // at the halfway point. If each image is 700x200 px, each takes up 140kb, so we've got a fair amount of
@@ -18,12 +21,16 @@
 #define SCREEN_IMG_TIDE_CHART_OFFSET 0x0
 #define SCREEN_IMG_SWELL_CHART_OFFSET 0x40000
 
+// Allow the fullscreen custom screen image to occupy the same space as they'll never be used together
+#define SCREEN_IMG_CUSTOM_SCREEN_OFFSET 0x0
+
 // Name of the NVS partition that the screen data bytes are saved. Generic since it holds multiple images
 #define SCREEN_IMG_PARTITION_LABEL "screen_img"
 
 typedef enum {
     SCREEN_IMG_TIDE_CHART,
     SCREEN_IMG_SWELL_CHART,
+    SCREEN_IMG_CUSTOM_SCREEN,
 
     SCREEN_IMG_COUNT,
 } screen_img_t;
