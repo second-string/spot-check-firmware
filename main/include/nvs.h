@@ -8,8 +8,6 @@
 #include "http_server.h"
 #include "spot_check.h"
 
-// number fields should be stored as strings to not need to alloc and pass around a new buff. Easier to go str -> int
-// vs. other direction
 typedef struct {
     char             *spot_name;
     char             *spot_uid;
@@ -18,6 +16,8 @@ typedef struct {
     char             *tz_str;
     char             *tz_display_name;
     spot_check_mode_t operating_mode;
+    char             *custom_screen_url;
+    uint32_t          custom_update_interval_secs;
 } spot_check_config_t;
 
 void                 nvs_init();

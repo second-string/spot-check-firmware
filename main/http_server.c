@@ -8,6 +8,7 @@
 #include "memfault/panics/assert.h"
 
 #include "constants.h"
+#include "http_client.h"
 #include "http_server.h"
 #include "json.h"
 #include "nvs.h"
@@ -129,22 +130,11 @@ static esp_err_t configure_post_handler(httpd_req_t *req) {
     // any more memory than the json takes because nvs will use those
     // pointers to write directly to flash
     spot_check_config_t config                  = {0};
-    char               *default_spot_name       = "The Wedge";
-    char               *default_spot_lat        = "33.5930302087";
-    char               *default_spot_lon        = "-117.8819918632";
-    char               *default_spot_uid        = "5842041f4e65fad6a770882b";
     char               *default_tz_str          = "CET-1CEST,M3.4.0/2,M10.4.0/2";
     char               *default_tz_display_name = "Europe/Berlin";
     char               *default_mode            = (char *)spot_check_mode_to_string(SPOT_CHECK_MODE_WEATHER);
 
-    http_server_parse_json_string(payload,
-                                  "spot_name",
-                                  &config.spot_name,
-                                  MAX_LENGTH_SPOT_NAME_PARAM,
-                                  default_spot_name);
-    http_server_parse_json_string(payload, "spot_lat", &config.spot_lat, MAX_LENGTH_SPOT_LAT_PARAM, default_spot_lat);
-    http_server_parse_json_string(payload, "spot_lon", &config.spot_lon, MAX_LENGTH_SPOT_LON_PARAM, default_spot_lon);
-    http_server_parse_json_string(payload, "spot_uid", &config.spot_uid, MAX_LENGTH_SPOT_UID_PARAM, default_spot_uid);
+    // Parse default fields first which are always included, then parse specific fields based on rxd mode
     http_server_parse_json_string(payload, "tz_str", &config.tz_str, MAX_LENGTH_TZ_STR_PARAM, default_tz_str);
     http_server_parse_json_string(payload,
                                   "tz_display_name",
@@ -158,6 +148,60 @@ static esp_err_t configure_post_handler(httpd_req_t *req) {
                                   MAX_LENGTH_OPERATING_MODE_PARAM,
                                   default_mode);
     config.operating_mode = spot_check_string_to_mode(temp_mode_str);
+
+    switch (config.operating_mode) {
+        case SPOT_CHECK_MODE_WEATHER: {
+            char *default_spot_name = "The Wedge";
+            char *default_spot_lat  = "33.5930302087";
+            char *default_spot_lon  = "-117.8819918632";
+            char *default_spot_uid  = "5842041f4e65fad6a770882b";
+            http_server_parse_json_string(payload,
+                                          "spot_name",
+                                          &config.spot_name,
+                                          MAX_LENGTH_SPOT_NAME_PARAM,
+                                          default_spot_name);
+            http_server_parse_json_string(payload,
+                                          "spot_lat",
+                                          &config.spot_lat,
+                                          MAX_LENGTH_SPOT_LAT_PARAM,
+                                          default_spot_lat);
+            http_server_parse_json_string(payload,
+                                          "spot_lon",
+                                          &config.spot_lon,
+                                          MAX_LENGTH_SPOT_LON_PARAM,
+                                          default_spot_lon);
+            http_server_parse_json_string(payload,
+                                          "spot_uid",
+                                          &config.spot_uid,
+                                          MAX_LENGTH_SPOT_UID_PARAM,
+                                          default_spot_uid);
+            break;
+        }
+        case SPOT_CHECK_MODE_CUSTOM: {
+            // Example default image already on server, default update interval 1 hour
+            char *default_custom_screen_url           = URL_BASE "";
+            char *default_custom_update_interval_secs = "3600";
+            http_server_parse_json_string(payload,
+                                          "custom_screen_url",
+                                          &config.custom_screen_url,
+                                          MAX_LENGTH_CUSTOM_SCREEN_URL_PARAM,
+                                          default_custom_screen_url);
+
+            char temp_interval_str[MAX_LENGTH_CUSTOM_UPDATE_INTERVAL_SECS_PARAM];
+            http_server_parse_json_string(payload,
+                                          "custom_update_interval_seconds",
+                                          (char **)&temp_interval_str,
+                                          MAX_LENGTH_CUSTOM_UPDATE_INTERVAL_SECS_PARAM,
+                                          default_custom_update_interval_secs);
+            config.custom_update_interval_secs = strtoul(temp_interval_str, NULL, 10);
+            break;
+        }
+        default:
+            log_printf(LOG_LEVEL_ERROR,
+                       "spot_check_mode_t enum value '%u' not supported in %s",
+                       config.operating_mode,
+                       __func__);
+    }
 
     nvs_save_config(&config);
 
@@ -174,14 +218,16 @@ static esp_err_t configure_post_handler(httpd_req_t *req) {
 static esp_err_t current_config_get_handler(httpd_req_t *req) {
     spot_check_config_t *current_config = nvs_get_config();
 
-    cJSON *root                 = cJSON_CreateObject();
-    cJSON *spot_name_json       = cJSON_CreateString(current_config->spot_name);
-    cJSON *spot_lat_json        = cJSON_CreateString(current_config->spot_lat);
-    cJSON *spot_lon_json        = cJSON_CreateString(current_config->spot_lon);
-    cJSON *spot_uid_json        = cJSON_CreateString(current_config->spot_uid);
-    cJSON *tz_str_json          = cJSON_CreateString(current_config->tz_str);
-    cJSON *tz_display_name_json = cJSON_CreateString(current_config->tz_display_name);
-    cJSON *operating_mode       = cJSON_CreateString(spot_check_mode_to_string(current_config->operating_mode));
+    cJSON *root                        = cJSON_CreateObject();
+    cJSON *spot_name_json              = cJSON_CreateString(current_config->spot_name);
+    cJSON *spot_lat_json               = cJSON_CreateString(current_config->spot_lat);
+    cJSON *spot_lon_json               = cJSON_CreateString(current_config->spot_lon);
+    cJSON *spot_uid_json               = cJSON_CreateString(current_config->spot_uid);
+    cJSON *tz_str_json                 = cJSON_CreateString(current_config->tz_str);
+    cJSON *tz_display_name_json        = cJSON_CreateString(current_config->tz_display_name);
+    cJSON *operating_mode              = cJSON_CreateString(spot_check_mode_to_string(current_config->operating_mode));
+    cJSON *custom_screen_url           = cJSON_CreateString(current_config->custom_screen_url);
+    cJSON *custom_update_interval_secs = cJSON_CreateNumber(current_config->custom_update_interval_secs);
     cJSON_AddItemToObject(root, "spot_name", spot_name_json);
     cJSON_AddItemToObject(root, "spot_lat", spot_lat_json);
     cJSON_AddItemToObject(root, "spot_lon", spot_lon_json);
@@ -189,6 +235,8 @@ static esp_err_t current_config_get_handler(httpd_req_t *req) {
     cJSON_AddItemToObject(root, "tz_str", tz_str_json);
     cJSON_AddItemToObject(root, "tz_display_name", tz_display_name_json);
     cJSON_AddItemToObject(root, "operating_mode", operating_mode);
+    cJSON_AddItemToObject(root, "custom_screen_url", custom_screen_url);
+    cJSON_AddItemToObject(root, "custom_update_interval_secs", custom_update_interval_secs);
 
     char *response_json = cJSON_Print(root);
     httpd_resp_send(req, response_json, HTTPD_RESP_USE_STRLEN);

@@ -16,13 +16,14 @@
 static nvs_handle_t handle = 0;
 
 // Allocate backing field buffers for our settings
-static char _spot_name[MAX_LENGTH_SPOT_NAME_PARAM + 1]             = {0};
-static char _spot_uid[MAX_LENGTH_SPOT_UID_PARAM + 1]               = {0};
-static char _spot_lat[MAX_LENGTH_SPOT_LAT_PARAM + 1]               = {0};
-static char _spot_lon[MAX_LENGTH_SPOT_LON_PARAM + 1]               = {0};
-static char _tz_str[MAX_LENGTH_TZ_STR_PARAM + 1]                   = {0};
-static char _tz_display_name[MAX_LENGTH_TZ_DISPLAY_NAME_PARAM + 1] = {0};
-static char _operating_mode[MAX_LENGTH_OPERATING_MODE_PARAM + 1]   = {0};
+static char _spot_name[MAX_LENGTH_SPOT_NAME_PARAM + 1]                 = {0};
+static char _spot_uid[MAX_LENGTH_SPOT_UID_PARAM + 1]                   = {0};
+static char _spot_lat[MAX_LENGTH_SPOT_LAT_PARAM + 1]                   = {0};
+static char _spot_lon[MAX_LENGTH_SPOT_LON_PARAM + 1]                   = {0};
+static char _tz_str[MAX_LENGTH_TZ_STR_PARAM + 1]                       = {0};
+static char _tz_display_name[MAX_LENGTH_TZ_DISPLAY_NAME_PARAM + 1]     = {0};
+static char _operating_mode[MAX_LENGTH_OPERATING_MODE_PARAM + 1]       = {0};
+static char _custom_screen_url[MAX_LENGTH_CUSTOM_SCREEN_URL_PARAM + 1] = {0};
 
 static spot_check_config_t current_config;
 
@@ -56,13 +57,21 @@ static spot_check_config_t *nvs_load_config() {
     max_bytes_to_write = MAX_LENGTH_OPERATING_MODE_PARAM;
     nvs_get_string("operating_mode", _operating_mode, &max_bytes_to_write, "weather");
 
-    current_config.spot_name       = _spot_name;
-    current_config.spot_uid        = _spot_uid;
-    current_config.spot_lat        = _spot_lat;
-    current_config.spot_lon        = _spot_lon;
-    current_config.tz_str          = _tz_str;
-    current_config.tz_display_name = _tz_display_name;
-    current_config.operating_mode  = spot_check_string_to_mode(_operating_mode);
+    nvs_get_string("custom_screen_url", _custom_screen_url, &bytes_used, "custom_screen_url");
+    MEMFAULT_ASSERT(bytes_used < MAX_LENGTH_CUSTOM_SCREEN_URL_PARAM);
+
+    uint32_t temp_custom_update_interval_secs = 0;
+    nvs_get_uint32("custom_update_interval_secs", &temp_custom_update_interval_secs);
+
+    current_config.spot_name                   = _spot_name;
+    current_config.spot_uid                    = _spot_uid;
+    current_config.spot_lat                    = _spot_lat;
+    current_config.spot_lon                    = _spot_lon;
+    current_config.tz_str                      = _tz_str;
+    current_config.tz_display_name             = _tz_display_name;
+    current_config.operating_mode              = spot_check_string_to_mode(_operating_mode);
+    current_config.custom_screen_url           = _custom_screen_url;
+    current_config.custom_update_interval_secs = temp_custom_update_interval_secs;
 
     return &current_config;
 }
@@ -226,6 +235,8 @@ void nvs_print_config() {
     log_printf(LOG_LEVEL_INFO, "tz_str: %s", current_config.tz_str);
     log_printf(LOG_LEVEL_INFO, "tz_display_name: %s", current_config.tz_display_name);
     log_printf(LOG_LEVEL_INFO, "operating_mode: %s", current_config.operating_mode);
+    log_printf(LOG_LEVEL_INFO, "custom_screen_url: %s", current_config.custom_screen_url);
+    log_printf(LOG_LEVEL_INFO, "custom_update_interval_secs: %lu", current_config.custom_update_interval_secs);
 }
 
 void nvs_save_config(spot_check_config_t *config) {
@@ -250,6 +261,8 @@ void nvs_save_config(spot_check_config_t *config) {
     MEMFAULT_ASSERT(nvs_set_string("tz_str", config->tz_str));
     MEMFAULT_ASSERT(nvs_set_string("tz_display_name", config->tz_display_name));
     MEMFAULT_ASSERT(nvs_set_string("operating_mode", (char *)spot_check_mode_to_string(config->operating_mode)));
+    MEMFAULT_ASSERT(nvs_set_string("custom_screen_url", config->custom_screen_url));
+    MEMFAULT_ASSERT(nvs_set_uint32("custom_update_interval_secs", config->custom_update_interval_secs));
 
     ESP_ERROR_CHECK(nvs_commit(handle));
 }
