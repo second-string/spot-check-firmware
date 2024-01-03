@@ -92,36 +92,29 @@ def configure():
     db_conn = sqlite3.connect("timezones.db")
     cursor = db_conn.cursor()
 
-    # print("Searching for Spot Check device on the network...")
-    # success = False
-    # while not success:
-    #     try:
-    #         res = requests.get("http://spot-check.local./health", headers={"Content-type": "application/json"}, timeout=0.2)
-    #         res.raise_for_status()
-    #         success = True
-    #     except Exception as e:
-    #         success = False
-    #         print("Could not find Spot Check device on the network. Make sure you you have connected the device to the network using step 1 in the main menu, and that this computer is connected to the same network.")
-    #         print("Retrying in 5 seconds...")
-    #         sleep(5)
+    print("Searching for Spot Check device on the network...")
+    success = False
+    while not success:
+        try:
+            res = requests.get("http://spot-check.local./health", headers={"Content-type": "application/json"}, timeout=0.2)
+            res.raise_for_status()
+            success = True
+        except Exception as e:
+            success = False
+            print("Could not find Spot Check device on the network. Make sure you you have connected the device to the network using step 1 in the main menu, and that this computer is connected to the same network.")
+            print("Retrying in 5 seconds...")
+            sleep(5)
 
     print("Found device!")
     print()
     print("Fetching device current configuration...")
-    # try:
-    #     res = requests.get("http://spot-check.local./current_configuration", headers={"Content-type": "application/json"}, timeout=0.2)
-    #     res.raise_for_status()
-    # except Exception as e:
-    #     raise e
+    try:
+        res = requests.get("http://spot-check.local./current_configuration", headers={"Content-type": "application/json"}, timeout=0.2)
+        res.raise_for_status()
+    except Exception as e:
+        raise e
 
-    # current_config = res.json()
-    current_config = {
-        "tz_display_name": "",
-        "operating_mode": "custom",
-        "spot_name": "",
-        "custom_screen_url": "",
-        "custom_update_interval_secs": "0",
-    }
+    current_config = res.json()
 
     print()
     print("Current configuration stored on device:")
