@@ -253,6 +253,7 @@ static esp_err_t current_config_get_handler(httpd_req_t *req) {
 
     char *response_json = cJSON_Print(root);
     httpd_resp_send(req, response_json, HTTPD_RESP_USE_STRLEN);
+    log_printf(LOG_LEVEL_DEBUG, "HTTP server response: %s", response_json);
 
     cJSON_Delete(root);
     cJSON_free(response_json);

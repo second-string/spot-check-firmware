@@ -57,8 +57,8 @@ static spot_check_config_t *nvs_load_config() {
     max_bytes_to_write = MAX_LENGTH_OPERATING_MODE_PARAM;
     nvs_get_string("operating_mode", _operating_mode, &max_bytes_to_write, "weather");
 
-    nvs_get_string("custom_screen_url", _custom_screen_url, &bytes_used, "custom_screen_url");
-    MEMFAULT_ASSERT(bytes_used < MAX_LENGTH_CUSTOM_SCREEN_URL_PARAM);
+    max_bytes_to_write = MAX_LENGTH_OPERATING_MODE_PARAM;
+    nvs_get_string("custom_screen_url", _custom_screen_url, &max_bytes_to_write, "custom_screen_url");
 
     uint32_t temp_custom_update_interval_secs = 0;
     nvs_get_uint32("custom_update_interval_secs", &temp_custom_update_interval_secs);
