@@ -25,10 +25,10 @@
 #define TAG SC_TAG_OTA
 
 typedef enum {
-    OTA_RESULT_NOT_NEEDED,  // Any reason we bail before actual download of image (version compare the same, ota
-                            // disabled, etc)
-    OTA_RESULT_FAIL,        // Download of image was started but failed somewhere before we try to reboot into it
-    OTA_RESULT_SUCCESS,     // Download and validate of new image successful, full process succeeded
+    OTA_RESULT_NOT_STARTED,  // Any reason we bail before actual download of image (version compare the same, ota
+                             // disabled, even any failures that occur before we actually start/draw start text)
+    OTA_RESULT_FAIL,         // Download of image was started but failed somewhere before we try to reboot into it
+    OTA_RESULT_SUCCESS,      // Download and validate of new image successful, full process succeeded
 } ota_result_t;
 
 // Global OTA and task handles
@@ -54,7 +54,7 @@ static void ota_task_revert_scheduler_mode() {
             break;
         default:
             log_printf(LOG_LEVEL_ERROR, "Reverting back to this mode in OTA task not supported!");
-            configASSERT(0);
+            MEMFAULT_ASSERT(0);
             break;
     }
 }
@@ -199,12 +199,13 @@ static bool check_forced_update(esp_app_desc_t *current_image_info, char *versio
  */
 static void ota_task_stop(ota_result_t result) {
     switch (result) {
-        case OTA_RESULT_NOT_NEEDED:
-            spot_check_clear_ota_start_text();
+        case OTA_RESULT_NOT_STARTED:
+            log_printf(LOG_LEVEL_INFO, "OTA task exiting before any download occurred, no screen changes needed");
             break;
         case OTA_RESULT_FAIL:
             // TODO :: write failure text? It would persist until next OTA check or reboot
             spot_check_clear_ota_start_text();
+            spot_check_render();
             break;
         case OTA_RESULT_SUCCESS:
             // TODO :: success text briefly?
@@ -214,8 +215,7 @@ static void ota_task_stop(ota_result_t result) {
             break;
     }
 
-    // Common actions whether OTA was not needed or failed (success won't reach here with the restart)
-    spot_check_render();
+    // Common actions whether OTA was not needed or failed. Success case won't reach here with the restart)
     ota_task_revert_scheduler_mode();
     sleep_handler_set_idle(SYSTEM_IDLE_OTA_BIT);
     ota_task_handle = NULL;
@@ -226,9 +226,12 @@ static void check_ota_update_task(void *args) {
     sleep_handler_set_busy(SYSTEM_IDLE_OTA_BIT);
     log_printf(LOG_LEVEL_INFO, "Starting OTA task to check update status");
 
+    // Store mode so we can properly revert once OTA is done no matter what state it finishes in
+    mode_at_task_start = scheduler_get_mode();
+
 #ifdef CONFIG_DISABLE_OTA
     log_printf(LOG_LEVEL_INFO, "FW compiled with ENABLE_OTA menuconfig option disabled, bailing out of OTA task");
-    ota_task_stop(false);
+    ota_task_stop(OTA_RESULT_NOT_STARTED);
     return;
 #endif
 
@@ -239,7 +242,7 @@ static void check_ota_update_task(void *args) {
         log_printf(LOG_LEVEL_INFO, "Not connected to wifi, waiting for 30 seconds then bailing out of OTA task");
         if (!wifi_block_until_connected_timeout(30 * MS_PER_SEC)) {
             log_printf(LOG_LEVEL_INFO, "No connection received, bailing out of OTA task");
-            ota_task_stop(false);
+            ota_task_stop(OTA_RESULT_NOT_STARTED);
             return;
         }
         log_printf(LOG_LEVEL_INFO, "Got connection, continuing with OTA check");
@@ -248,7 +251,7 @@ static void check_ota_update_task(void *args) {
     // Start our OTA process with the default binary URL first
     bool success = ota_start_ota(CONFIG_OTA_URL);
     if (!success) {
-        ota_task_stop(false);
+        ota_task_stop(OTA_RESULT_NOT_STARTED);
     }
 
     // Get our current version
@@ -261,7 +264,7 @@ static void check_ota_update_task(void *args) {
     esp_err_t      error = esp_https_ota_get_img_desc(ota_handle, &ota_image_desc);
     if (error != ESP_OK) {
         log_printf(LOG_LEVEL_ERROR, "OTA failed at esp_https_ota_get_img_desc: %s", esp_err_to_name(error));
-        ota_task_stop(false);
+        ota_task_stop(OTA_RESULT_FAIL);
         return;
     }
 
@@ -278,7 +281,7 @@ static void check_ota_update_task(void *args) {
                        "Error cleaning up OTA handle to manually check our force endpoint. Giving up on OTA right now "
                        "and deleting task, but socket lock from ota internal http_client in unknown state, rest of app "
                        "might be broken.");
-            ota_task_stop(false);
+            ota_task_stop(OTA_RESULT_FAIL);
             return;
         }
 
@@ -302,7 +305,7 @@ static void check_ota_update_task(void *args) {
             ota_start_ota(forced_version_url);
         } else {
             log_printf(LOG_LEVEL_INFO, "Still got no go-ahead from force OTA endpoint, deleting OTA task");
-            ota_task_stop(false);
+            ota_task_stop(OTA_RESULT_NOT_STARTED);
             return;
         }
     }
@@ -339,7 +342,7 @@ static void check_ota_update_task(void *args) {
     bool received_full_image = esp_https_ota_is_complete_data_received(ota_handle);
     if (!received_full_image) {
         log_printf(LOG_LEVEL_ERROR, "Did not receive full image package from server, aborting.");
-        ota_task_stop(true);
+        ota_task_stop(OTA_RESULT_FAIL);
         return;
     }
 
