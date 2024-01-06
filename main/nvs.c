@@ -32,27 +32,26 @@ static spot_check_config_t *nvs_load_config() {
         return NULL;
     }
 
-    size_t bytes_used;
-    nvs_get_string("spot_name", _spot_name, &bytes_used, "Wedge");
-    MEMFAULT_ASSERT(bytes_used < MAX_LENGTH_SPOT_NAME_PARAM);
+    size_t max_bytes_to_write = MAX_LENGTH_SPOT_NAME_PARAM;
+    nvs_get_string("spot_name", _spot_name, &max_bytes_to_write, "Wedge");
 
-    nvs_get_string("spot_lat", _spot_lat, &bytes_used, "33.5930302087");
-    MEMFAULT_ASSERT(bytes_used < MAX_LENGTH_SPOT_LAT_PARAM);
+    max_bytes_to_write = MAX_LENGTH_SPOT_LAT_PARAM;
+    nvs_get_string("spot_lat", _spot_lat, &max_bytes_to_write, "33.5930302087");
 
-    nvs_get_string("spot_lon", _spot_lon, &bytes_used, "-117.8819918632");
-    MEMFAULT_ASSERT(bytes_used < MAX_LENGTH_SPOT_LON_PARAM);
+    max_bytes_to_write = MAX_LENGTH_SPOT_LON_PARAM;
+    nvs_get_string("spot_lon", _spot_lon, &max_bytes_to_write, "-117.8819918632");
 
-    nvs_get_string("spot_uid", _spot_uid, &bytes_used, "5842041f4e65fad6a770882b");
-    MEMFAULT_ASSERT(bytes_used < MAX_LENGTH_SPOT_UID_PARAM);
+    max_bytes_to_write = MAX_LENGTH_SPOT_UID_PARAM;
+    nvs_get_string("spot_uid", _spot_uid, &max_bytes_to_write, "5842041f4e65fad6a770882b");
 
-    nvs_get_string("tz_str", _tz_str, &bytes_used, "CET-1CEST,M3.5.0/2,M10.5.0/2");
-    MEMFAULT_ASSERT(bytes_used < MAX_LENGTH_TZ_STR_PARAM);
+    max_bytes_to_write = MAX_LENGTH_TZ_STR_PARAM;
+    nvs_get_string("tz_str", _tz_str, &max_bytes_to_write, "CET-1CEST,M3.5.0/2,M10.5.0/2");
 
-    nvs_get_string("tz_display_name", _tz_display_name, &bytes_used, "Europe/Berlin");
-    MEMFAULT_ASSERT(bytes_used < MAX_LENGTH_TZ_DISPLAY_NAME_PARAM);
+    max_bytes_to_write = MAX_LENGTH_TZ_DISPLAY_NAME_PARAM;
+    nvs_get_string("tz_display_name", _tz_display_name, &max_bytes_to_write, "Europe/Berlin");
 
-    nvs_get_string("operating_mode", _operating_mode, &bytes_used, "weather");
-    MEMFAULT_ASSERT(bytes_used < MAX_LENGTH_OPERATING_MODE_PARAM);
+    max_bytes_to_write = MAX_LENGTH_OPERATING_MODE_PARAM;
+    nvs_get_string("operating_mode", _operating_mode, &max_bytes_to_write, "weather");
 
     current_config.spot_name       = _spot_name;
     current_config.spot_uid        = _spot_uid;
