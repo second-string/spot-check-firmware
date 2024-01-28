@@ -4,6 +4,7 @@ import asyncio
 import requests
 import sqlite3
 import urllib.parse
+import json
 
 from time import sleep
 
@@ -69,7 +70,7 @@ def configure_weather_mode(current_config):
 
 def configure_custom_mode(current_config):
     custom_screen_url = ""
-    custom_update_interval_secs = 0
+    custom_update_interval_secs_str = "0" # send json numbers by string still!
 
     temp_custom_screen_url = input(f"Enter a URL to an API endpoint that returns a custom image for the screen (press enter keep as '{current_config['custom_screen_url']}'): ")
     if not temp_custom_screen_url or temp_custom_screen_url == "":
@@ -78,20 +79,26 @@ def configure_custom_mode(current_config):
         custom_screen_url = temp_custom_screen_url
 
 
+    # num repr. of interval secs param for ease of reuse
+    current_update_interval_secs_num = int(current_config["custom_update_interval_secs"])
+    print()
+    print("Enter the length of time the device should wait in between requests to the API endpoint in minutes (minimum is 15 minutes and maximum is 4320, or 3 days)")
     while 1:
-        print()
-        temp_update_interval_secs = input(f"Enter the length of time the device should wait in between requests to the API endpoint in seconds, minimum 900 seconds / 15 minutes (press enter to keep as '{current_config['custom_update_interval_secs']}'): ")
-        if not temp_update_interval_secs or temp_update_interval_secs == "":
-            custom_update_interval_secs = current_config["custom_update_interval_secs"]
-        elif int(temp_update_interval_secs) < 900:
-            print("Value too low, minimum is 900 seconds (15 minutes)")
+        temp_update_interval_mins = input(f"Update interval in minutes (press enter to keep as '{current_update_interval_secs_num / 60} min.'): ")
+        if not temp_update_interval_mins or temp_update_interval_mins == "":
+            custom_update_interval_secs_str = str(current_update_interval_secs_num)
+            break
+        elif int(temp_update_interval_mins) < 15:
+            print("Value too low, minimum is 15 minutes")
+        elif int(temp_update_interval_mins) > 4320:
+            print("Value too high, maximum is 4320 minutes (3 days)")
         else:
-            custom_update_interval_secs = int(temp_update_interval_secs)
+            custom_update_interval_secs_str = str(int(temp_update_interval_mins) * 60)
             break
 
     return {
         "custom_screen_url": custom_screen_url,
-        "custom_update_interval_secs": custom_update_interval_secs,
+        "custom_update_interval_secs": custom_update_interval_secs_str,
     }
 
 def configure():
@@ -164,18 +171,20 @@ def configure():
     choice = None
     mode = ""
     print()
+    # TODO :: add 'enter for existing value' here
     print("Select device mode:")
-    while choice != "1" and choice != "2":
+    while choice != "1" and choice != "2" and (choice or choice != ""):
         print("1) Weather mode: display the time, current weather conditions, and two weather charts on the screen")
         print("2) Custom mode: display custom data on the screen hosted on your own external API")
-        choice = input("(1/2): ")
+        choice = input(f"Mode (press enter to keep as {current_config['operating_mode']}): ")
         print()
 
     extra_vals = {}
-    if choice == "1":
+    use_existing = not choice or choice == ""
+    if choice == "1" or (use_existing and current_config['operating_mode'] == "weather"):
         mode = "weather"
         extra_vals = configure_weather_mode(current_config)
-    elif choice == "2":
+    elif choice == "2" or (use_existing and current_config['operating_mode'] == "custom"):
         mode = "custom"
         extra_vals = configure_custom_mode(current_config)
 
@@ -184,13 +193,13 @@ def configure():
         "operating_mode": mode,
         "tz_str": tz_str,
         "tz_display_name": tz_display_name,
-        # TODO :: how to merge extra_vals dict with this one
+        **extra_vals,
     }
 
     print()
     print("Saving new configuration to device...")
     try:
-        res = requests.post("http://spot-check.local./configure", data=body, headers={"Content-type": "application/json"}, timeout=0.2)
+        res = requests.post("http://spot-check.local./configure", data=json.dumps(body), headers={"Content-type": "application/json"}, timeout=0.2)
         res.raise_for_status()
     except Exception as e:
         raise e
@@ -210,9 +219,6 @@ def provision():
     ssid = input("Enter the SSID of the wifi network to connect the device to: ")
     pw = input(f"Enter the password to the '{ssid}' network (if there is no password, just press enter): ")
     print()
-
-    # ssid = "PYUR 19ACA"
-    # pw = "NK77H76Gprxe"
 
     sys.argv[1:] = [
         "--transport", "softap",
