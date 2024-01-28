@@ -50,8 +50,7 @@ void spot_check_show_no_network_screen();
 void spot_check_clear_checking_connection_screen();
 void spot_check_show_checking_connection_screen();
 void spot_check_show_no_internet_screen();
-void spot_check_draw_fetching_conditions_text();
-void spot_check_draw_fetching_conditions_text();
+void spot_check_draw_fetching_data_text();
 
 /*
  * Wrappers for different funcs so our logic modules can remain decoupled with only a dependency on the spot_check file

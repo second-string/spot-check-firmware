@@ -695,7 +695,7 @@ void scheduler_set_online_mode() {
         // Who knows what error or random state screen was in from init/offline mode. Full clear, show fetching
         // conditions, and kick everything off.
         spot_check_full_clear();
-        spot_check_draw_fetching_conditions_text();
+        spot_check_draw_fetching_data_text();
         spot_check_render();
         respect_force_flags = true;
     }

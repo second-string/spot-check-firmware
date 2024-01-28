@@ -506,11 +506,29 @@ void spot_check_show_no_internet_screen() {
         DISPLAY_FONT_ALIGN_CENTER);
 }
 
-void spot_check_draw_fetching_conditions_text() {
+/*
+ * Mode-agnostic function to show text saying we're getting stuff from somewhere else. Different specific text depending
+ * on the mode
+ */
+void spot_check_draw_fetching_data_text() {
+    spot_check_config_t *config = nvs_get_config();
+    switch (config->operating_mode) {
+        case SPOT_CHECK_MODE_WEATHER:
+            display_draw_text("Fetching latest conditions...",
+                              400,
+                              300,
+                              DISPLAY_FONT_SIZE_SMALL,
+                              DISPLAY_FONT_ALIGN_CENTER);
+            break;
+        case SPOT_CHECK_MODE_CUSTOM:
+            display_draw_text("Fetching screen image...", 400, 300, DISPLAY_FONT_SIZE_SMALL, DISPLAY_FONT_ALIGN_CENTER);
+            break;
+        default:
+            MEMFAULT_ASSERT(0);
+    }
     log_printf(
         LOG_LEVEL_INFO,
         "Connection to network successful, showing 'fetching data' screen while waiting for scheduler to full update");
-    display_draw_text("Fetching latest conditions...", 400, 300, DISPLAY_FONT_SIZE_SMALL, DISPLAY_FONT_ALIGN_CENTER);
 }
 
 /*
