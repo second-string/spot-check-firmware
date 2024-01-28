@@ -6,6 +6,7 @@
 #include "esp_err.h"
 
 #include "http_server.h"
+#include "log.h"
 #include "spot_check.h"
 
 typedef struct {
@@ -29,7 +30,7 @@ bool                 nvs_set_int8(char *key, int8_t val);
 bool                 nvs_get_string(char *key, char *val, size_t *val_size, char *fallback);
 bool                 nvs_set_string(char *key, char *val);
 void                 nvs_save_config(spot_check_config_t *config);
-void                 nvs_print_config();
+void                 nvs_print_config(log_level_t level);
 esp_err_t            nvs_full_erase();
 spot_check_config_t *nvs_get_config();
 

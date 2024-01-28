@@ -195,12 +195,16 @@ bool screen_img_handler_download_and_save(screen_img_t screen_img) {
 
     bool                 success = true;
     char                 url[80];
-    spot_check_config_t *config     = nvs_get_config();
-    const uint8_t        num_params = 4;
-    query_param          params[num_params];
+    http_request_t       req    = {0};
+    spot_check_config_t *config = nvs_get_config();
 
-    http_request_t req = http_client_build_get_request(metadata.endpoint, config, url, params, num_params);
-    vTaskDelay(pdMS_TO_TICKS(1000));
+    if (config->operating_mode == SPOT_CHECK_MODE_CUSTOM) {
+        req = http_client_build_external_get_request(metadata.endpoint, url);
+    } else {
+        uint8_t     num_params = 4;
+        query_param params[num_params];
+        req = http_client_build_get_request(metadata.endpoint, config, url, params, num_params);
+    }
 
     esp_http_client_handle_t client;
     int                      content_length = 0;

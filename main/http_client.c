@@ -339,6 +339,9 @@ http_request_t http_client_build_get_request(char                *endpoint,
         } else if (strcmp(endpoint, "tides") == 0 || strcmp(endpoint, "swell") == 0) {
             // backwards compat
             temp_params[1] = (query_param){.key = "spot_id", .value = config->spot_uid};
+        } else {
+            log_printf(LOG_LEVEL_ERROR, "Unsupported endpoint '%s' in %s!", endpoint, __func__);
+            MEMFAULT_ASSERT(0);
         }
 
         memcpy(params, temp_params, sizeof(temp_params));
@@ -350,12 +353,27 @@ http_request_t http_client_build_get_request(char                *endpoint,
     if (endpoint) {
         strcat(url_buf, endpoint);
     }
+
     req.url = url_buf;
     log_printf(LOG_LEVEL_DEBUG, "Built request URL: %s", url_buf);
     log_printf(LOG_LEVEL_DEBUG, "Built %u request query params:", req.get_args.num_params);
     for (uint8_t i = 0; i < num_params; i++) {
         log_printf(LOG_LEVEL_DEBUG, "Param %u - %s: %s", i, req.get_args.params[i].key, req.get_args.params[i].value);
     }
+
+    return req;
+}
+
+http_request_t http_client_build_external_get_request(char *custom_url, char *url_buf) {
+    http_request_t req = {
+        .req_type = HTTP_REQ_TYPE_GET,
+    };
+
+    // TODO :: should enforce custom url length here with assert (b/c we should soft enforce when user tries to set
+    // it with config script/app)
+    strcpy(url_buf, custom_url);
+    req.url = url_buf;
+    log_printf(LOG_LEVEL_DEBUG, "Built request URL: %s", url_buf);
 
     return req;
 }

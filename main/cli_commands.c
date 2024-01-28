@@ -522,8 +522,8 @@ static BaseType_t cli_command_nvs(char *write_buffer, size_t write_buffer_size, 
         } else {
             strcpy(write_buffer, "Failed to write value to NVS");
         }
-    } else if (action_len == 5 && strncmp(action, "config", action_len) == 0) {
-        nvs_print_config();
+    } else if (action_len == 6 && strncmp(action, "config", action_len) == 0) {
+        nvs_print_config(LOG_LEVEL_INFO);
 
         // Yield so hopefully the logger unblocks and prints its out before the CLI task prints OK and returns
         vTaskDelay(pdMS_TO_TICKS(100));

@@ -94,7 +94,12 @@ static bool http_server_parse_post_body(httpd_req_t *req, cJSON **payload) {
 }
 
 /*
- * Generic function for parsing out a string value from a json key with built-in error handling and fallback value
+ * Generic function for parsing out a string value from a json key with built-in error handling and fallback value. It
+ * does not COPY the value into the field_to_set arg, but assigns the original arg pointer (by the deref of ptr to a
+ * ptr) to the available/alloced string. This avoids an extra buffer declaration, because the value to set (either
+ * what's in the json object or the fallback string) is already declared and will persist. Caller must ensure that the
+ * json object's string and the fallback must remain alloced until whatever has used their values is done with them
+ * (i.e. config object is saved)!
  */
 static void http_server_parse_json_string(cJSON *payload,
                                           char  *json_key,
@@ -103,16 +108,22 @@ static void http_server_parse_json_string(cJSON *payload,
                                           char  *fallback) {
     cJSON *json_obj = cJSON_GetObjectItem(payload, json_key);
     if (cJSON_IsString(json_obj)) {
-        *field_to_set = cJSON_GetStringValue(json_obj);
-        if (strlen(*field_to_set) > max_field_length) {
+        char *rx_strvalue = cJSON_GetStringValue(json_obj);
+
+        if (strlen(rx_strvalue) > max_field_length) {
             log_printf(LOG_LEVEL_INFO,
-                       "Received value > %d chars, invalid. Defaulting to %s",
+                       "Received value '%s' > %d chars, invalid. Defaulting to '%s'",
+                       rx_strvalue,
                        max_field_length,
                        fallback);
             *field_to_set = fallback;
+        } else {
+            // rx_strvalue is the char pointer held within the cjson object, so it will be a valid pointer until json
+            // object is freed and is not tied to the local scope here
+            *field_to_set = rx_strvalue;
         }
     } else {
-        log_printf(LOG_LEVEL_INFO, "Unable to parse param, defaulting to %s", fallback);
+        log_printf(LOG_LEVEL_WARN, "Unable to parse param, defaulting to '%s'", fallback);
         *field_to_set = fallback;
     }
 }
@@ -141,10 +152,10 @@ static esp_err_t configure_post_handler(httpd_req_t *req) {
                                   &config.tz_display_name,
                                   MAX_LENGTH_TZ_DISPLAY_NAME_PARAM,
                                   default_tz_display_name);
-    char temp_mode_str[MAX_LENGTH_OPERATING_MODE_PARAM];
+    char *temp_mode_str;
     http_server_parse_json_string(payload,
                                   "operating_mode",
-                                  (char **)&temp_mode_str,
+                                  &temp_mode_str,
                                   MAX_LENGTH_OPERATING_MODE_PARAM,
                                   default_mode);
     config.operating_mode = spot_check_string_to_mode(temp_mode_str);
@@ -179,18 +190,19 @@ static esp_err_t configure_post_handler(httpd_req_t *req) {
         }
         case SPOT_CHECK_MODE_CUSTOM: {
             // Example default image already on server, default update interval 1 hour
-            char *default_custom_screen_url           = URL_BASE "";
+            char *default_custom_screen_url           = URL_BASE "custom_screen_test_image";
             char *default_custom_update_interval_secs = "3600";
             http_server_parse_json_string(payload,
                                           "custom_screen_url",
                                           &config.custom_screen_url,
                                           MAX_LENGTH_CUSTOM_SCREEN_URL_PARAM,
                                           default_custom_screen_url);
+            log_printf(LOG_LEVEL_WARN, "config custm val: %s", config.custom_screen_url);
 
-            char temp_interval_str[MAX_LENGTH_CUSTOM_UPDATE_INTERVAL_SECS_PARAM];
+            char *temp_interval_str;
             http_server_parse_json_string(payload,
-                                          "custom_update_interval_seconds",
-                                          (char **)&temp_interval_str,
+                                          "custom_update_interval_secs",
+                                          &temp_interval_str,
                                           MAX_LENGTH_CUSTOM_UPDATE_INTERVAL_SECS_PARAM,
                                           default_custom_update_interval_secs);
             uint32_t temp_interval = strtoul(temp_interval_str, NULL, 10);
@@ -221,6 +233,9 @@ static esp_err_t configure_post_handler(httpd_req_t *req) {
     // TODO : previously we were setting the tz str and forcing a time redraw through scheduler, but that wouldn't
     // properly re render everything else if the spot changed right? For now, reboot in all cases to make things super
     // simple, but in the future this could be smarter to only reboot on mode change or gracefully handle all cases
+    //
+    // TODO :: schedule restart so we finish logging and properly close res conn, don't do it here
+    vTaskDelay(pdMS_TO_TICKS(2000));
     esp_restart();
     while (1) {
     }

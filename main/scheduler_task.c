@@ -54,7 +54,8 @@ typedef struct {
     char              name[21];
     time_t            update_interval_secs;
     time_t            last_executed_epoch_secs;
-    bool              force_next_update;
+    bool              force_next_update;  // mutable flag at runtime to indicate whether this should be run next trigger
+    bool              force_on_transition_to_online;  // set at compile time, should not be changed ever
     bool              active;
     spot_check_mode_t active_operating_mode;
     void (*execute)(void);
@@ -68,8 +69,8 @@ typedef struct {
     bool              active;
     spot_check_mode_t active_operating_mode;
     void (*execute)(void);
-    bool force_next_update;
-    bool force_on_transition_to_online;
+    bool force_next_update;              // mutable flag at runtime to indicate whether this should be run next trigger
+    bool force_on_transition_to_online;  // set at compile time, should not be changed ever
 } discrete_update_t;
 
 static TaskHandle_t          scheduler_task_handle;
@@ -83,44 +84,53 @@ static differential_update_t *spot_name_differential_update;
 // Execute function cannot be blocking! Will execute from 1 sec timer interrupt callback
 static differential_update_t differential_updates[NUM_DIFFERENTIAL_UPDATES] = {
     {
-        .name                  = "ota",
-        .force_next_update     = false,
-        .update_interval_secs  = OTA_CHECK_INTERVAL_SECONDS,
-        .active                = false,
-        .active_operating_mode = 0xFF,
-        .execute               = scheduler_trigger_ota_check,
+        .name                          = "ota",
+        .force_next_update             = false,
+        .force_on_transition_to_online = false,
+        .update_interval_secs          = OTA_CHECK_INTERVAL_SECONDS,
+        .active                        = false,
+        .active_operating_mode         = 0xFF,
+        .execute                       = scheduler_trigger_ota_check,
     },
     {
-        .name                  = "network_check",
-        .force_next_update     = false,
-        .update_interval_secs  = NETWORK_CHECK_INTERVAL_SECONDS,
-        .active                = false,
-        .active_operating_mode = 0xFF,
-        .execute               = scheduler_trigger_network_check,
+        .name                          = "network_check",
+        .force_next_update             = false,
+        .force_on_transition_to_online = false,
+        .update_interval_secs          = NETWORK_CHECK_INTERVAL_SECONDS,
+        .active                        = false,
+        .active_operating_mode         = 0xFF,
+        .execute                       = scheduler_trigger_network_check,
     },
     {
-        .name                  = "mflt_upload",
-        .force_next_update     = false,
+        .name              = "mflt_upload",
+        .force_next_update = false,
+        .force_on_transition_to_online =
+            false,  // do not set this true - it will run immediately on transition from init->online mode at boot, and
+                    // if it has a large payload to upload, it will break any subsequent network requests (like custom
+                    // screen download) because we can't block on the upload, it just triggers the internal http client
+                    // in memfault code
         .update_interval_secs  = MFLT_UPLOAD_INTERVAL_SECONDS,
         .active                = false,
         .active_operating_mode = 0xFF,
         .execute               = scheduler_trigger_mflt_upload,
     },
     {
-        .name                  = "dirty_screen",
-        .force_next_update     = false,
-        .update_interval_secs  = SCREEN_DIRTY_INTERVAL_SECONDS,
-        .active                = false,
-        .active_operating_mode = SPOT_CHECK_MODE_WEATHER,
-        .execute               = scheduler_trigger_screen_dirty,
+        .name                          = "dirty_screen",
+        .force_next_update             = false,
+        .force_on_transition_to_online = false,
+        .update_interval_secs          = SCREEN_DIRTY_INTERVAL_SECONDS,
+        .active                        = false,
+        .active_operating_mode         = SPOT_CHECK_MODE_WEATHER,
+        .execute                       = scheduler_trigger_screen_dirty,
     },
     {
-        .name                  = "custom_screen_update",
-        .force_next_update     = false,
-        .update_interval_secs  = 0,  // set from config value in scheduler init fun
-        .active                = false,
-        .active_operating_mode = SPOT_CHECK_MODE_CUSTOM,
-        .execute               = scheduler_trigger_custom_screen_update,
+        .name                          = "custom_screen_update",
+        .force_next_update             = false,
+        .force_on_transition_to_online = true,  // mostly need it to force run immediately on init->online transition
+        .update_interval_secs          = 0,     // set from config value in scheduler start fun
+        .active                        = false,
+        .active_operating_mode         = SPOT_CHECK_MODE_CUSTOM,
+        .execute                       = scheduler_trigger_custom_screen_update,
     }};
 
 // Execute function cannot be blocking! Will execute from 1 sec timer interrupt callback
@@ -347,8 +357,8 @@ static void scheduler_task(void *args) {
                              (update_bits & UPDATE_SWELL_CHART_BIT);
                 break;
             case SPOT_CHECK_MODE_CUSTOM:
-                // For now we always full clear in custom screen mode
-                full_clear = true;
+                // For now we always full clear in custom screen mode if this is a screen image update
+                full_clear = update_bits & CUSTOM_SCREEN_UPDATE_BIT;
                 break;
             default:
                 MEMFAULT_ASSERT(0);
@@ -418,7 +428,7 @@ static void scheduler_task(void *args) {
 
         if (update_bits & CUSTOM_SCREEN_UPDATE_BIT && scheduler_get_mode() != SCHEDULER_MODE_OFFLINE) {
             sleep_handler_set_busy(SYSTEM_IDLE_CUSTOM_SCREEN_BIT);
-            screen_img_handler_download_and_save(SCREEN_IMG_SWELL_CHART);
+            screen_img_handler_download_and_save(SCREEN_IMG_CUSTOM_SCREEN);
             sleep_handler_set_idle(SYSTEM_IDLE_CUSTOM_SCREEN_BIT);
         }
 
@@ -706,7 +716,7 @@ void scheduler_set_online_mode() {
             // Only activate the struct if it matches with the currently active operating mode
             differential_updates[i].active =
                 active_operating_mode_matches(config->operating_mode, differential_updates[i].active_operating_mode);
-            differential_updates[i].force_next_update = false;
+            differential_updates[i].force_next_update = differential_updates[i].force_on_transition_to_online;
 
             // Only reset the base diff time if we're coming from offline or init - from OTA we want to seamlessly
             // transition back to same state. Edge case bug here if device keeps losing and regaining connection before
@@ -753,9 +763,12 @@ UBaseType_t scheduler_task_get_stack_high_water() {
 
 void scheduler_task_init() {
     scheduler_mode = SCHEDULER_MODE_INIT;
+}
 
+void scheduler_task_start() {
     // If we're running in custom mode, set the update_interval_secs field of the custom screen update diff struct since
-    // it's dynamic from the config and not a preprocessor macro like all others
+    // it's dynamic from the config and not a preprocessor macro like all others. Has to be done in _start not _init
+    // becuase NVS doesn't load config into memory until its own _start function
     spot_check_config_t *config = nvs_get_config();
     if (config->operating_mode == SPOT_CHECK_MODE_CUSTOM) {
         differential_update_t *diff_check = NULL;
@@ -764,14 +777,13 @@ void scheduler_task_init() {
             if (strcmp("custom_screen_update", diff_check->name) == 0) {
                 diff_check->update_interval_secs = config->custom_update_interval_secs;
                 log_printf(LOG_LEVEL_DEBUG,
-                           "Updated custom screen update diff stuct update_interval_secs to %u",
-                           diff_check->update_interval_secs);
+                           "Updated custom screen update diff stuct update_interval_secs to %.0f (%lu)",
+                           diff_check->update_interval_secs,
+                           config->custom_update_interval_secs);
             }
         }
     }
-}
 
-void scheduler_task_start() {
     // Print out all update structs and set them all to inactive. main.c init function responsible for setting scheduler
     // into offline or online mode no matter what, otherwise scheduler will never run.
     log_printf(LOG_LEVEL_DEBUG, "List of all time differential updates:");

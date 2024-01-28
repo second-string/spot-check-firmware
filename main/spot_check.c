@@ -569,7 +569,7 @@ spot_check_mode_t spot_check_string_to_mode(char *in_str) {
         }
     }
 
-    log_printf(LOG_LEVEL_ERROR, "Could not find a matching operating mode for string '%s' - fatal error!");
+    log_printf(LOG_LEVEL_ERROR, "Could not find a matching operating mode for string '%s' - fatal error!", in_str);
     MEMFAULT_ASSERT(0);
 }
 

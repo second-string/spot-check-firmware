@@ -57,11 +57,14 @@ static spot_check_config_t *nvs_load_config() {
     max_bytes_to_write = MAX_LENGTH_OPERATING_MODE_PARAM;
     nvs_get_string("operating_mode", _operating_mode, &max_bytes_to_write, "weather");
 
-    max_bytes_to_write = MAX_LENGTH_OPERATING_MODE_PARAM;
-    nvs_get_string("custom_screen_url", _custom_screen_url, &max_bytes_to_write, "custom_screen_url");
+    max_bytes_to_write = MAX_LENGTH_CUSTOM_SCREEN_URL_PARAM;
+    nvs_get_string("custom_scrn_url",
+                   _custom_screen_url,
+                   &max_bytes_to_write,
+                   "https://spotcheck.brianteam.com/custom_screen_test_image");
 
     uint32_t temp_custom_update_interval_secs = 0;
-    nvs_get_uint32("custom_update_interval_secs", &temp_custom_update_interval_secs);
+    nvs_get_uint32("custom_ui_secs", &temp_custom_update_interval_secs);
 
     current_config.spot_name                   = _spot_name;
     current_config.spot_uid                    = _spot_uid;
@@ -72,6 +75,8 @@ static spot_check_config_t *nvs_load_config() {
     current_config.operating_mode              = spot_check_string_to_mode(_operating_mode);
     current_config.custom_screen_url           = _custom_screen_url;
     current_config.custom_update_interval_secs = temp_custom_update_interval_secs;
+
+    nvs_print_config(LOG_LEVEL_DEBUG);
 
     return &current_config;
 }
@@ -203,6 +208,12 @@ bool nvs_set_string(char *key, char *val) {
     bool retval = false;
     MEMFAULT_ASSERT(handle);
 
+    // If config is only partially populated (depending on the mode) just skip over the unset keys
+    if (!val) {
+        log_printf(LOG_LEVEL_INFO, "Value string provided for key '%s' is null, not setting any value in NVS", key);
+        return true;
+    }
+
     esp_err_t err = nvs_set_str(handle, key, val);
     if (err == ESP_OK) {
         retval = true;
@@ -226,17 +237,36 @@ spot_check_config_t *nvs_get_config() {
 /*
  * Helper func to print out all the key/vals in current config
  */
-void nvs_print_config() {
-    log_printf(LOG_LEVEL_INFO, "CURRENT IN-MEM SPOT CHECK CONFIG");
-    log_printf(LOG_LEVEL_INFO, "spot_name: %s", current_config.spot_name);
-    log_printf(LOG_LEVEL_INFO, "spot_uid: %s", current_config.spot_uid);
-    log_printf(LOG_LEVEL_INFO, "spot_lat: %s", current_config.spot_lat);
-    log_printf(LOG_LEVEL_INFO, "spot_lon: %s", current_config.spot_lon);
-    log_printf(LOG_LEVEL_INFO, "tz_str: %s", current_config.tz_str);
-    log_printf(LOG_LEVEL_INFO, "tz_display_name: %s", current_config.tz_display_name);
-    log_printf(LOG_LEVEL_INFO, "operating_mode: %s", current_config.operating_mode);
-    log_printf(LOG_LEVEL_INFO, "custom_screen_url: %s", current_config.custom_screen_url);
-    log_printf(LOG_LEVEL_INFO, "custom_update_interval_secs: %lu", current_config.custom_update_interval_secs);
+void nvs_print_config(log_level_t level) {
+    // call to log_printf needs compile-time eval of params so we have to do it this ugly way
+    switch (level) {
+        case LOG_LEVEL_INFO:
+            log_printf(LOG_LEVEL_INFO, "CURRENT IN-MEM SPOT CHECK CONFIG");
+            log_printf(LOG_LEVEL_INFO, "spot_name: %s", current_config.spot_name);
+            log_printf(LOG_LEVEL_INFO, "spot_uid: %s", current_config.spot_uid);
+            log_printf(LOG_LEVEL_INFO, "spot_lat: %s", current_config.spot_lat);
+            log_printf(LOG_LEVEL_INFO, "spot_lon: %s", current_config.spot_lon);
+            log_printf(LOG_LEVEL_INFO, "tz_str: %s", current_config.tz_str);
+            log_printf(LOG_LEVEL_INFO, "tz_display_name: %s", current_config.tz_display_name);
+            log_printf(LOG_LEVEL_INFO, "operating_mode: %s", spot_check_mode_to_string(current_config.operating_mode));
+            log_printf(LOG_LEVEL_INFO, "custom_scrn_url: %s", current_config.custom_screen_url);
+            log_printf(LOG_LEVEL_INFO, "custom_ui_secs: %lu", current_config.custom_update_interval_secs);
+            break;
+        case LOG_LEVEL_DEBUG:
+            log_printf(LOG_LEVEL_DEBUG, "CURRENT IN-MEM SPOT CHECK CONFIG");
+            log_printf(LOG_LEVEL_DEBUG, "spot_name: %s", current_config.spot_name);
+            log_printf(LOG_LEVEL_DEBUG, "spot_uid: %s", current_config.spot_uid);
+            log_printf(LOG_LEVEL_DEBUG, "spot_lat: %s", current_config.spot_lat);
+            log_printf(LOG_LEVEL_DEBUG, "spot_lon: %s", current_config.spot_lon);
+            log_printf(LOG_LEVEL_DEBUG, "tz_str: %s", current_config.tz_str);
+            log_printf(LOG_LEVEL_DEBUG, "tz_display_name: %s", current_config.tz_display_name);
+            log_printf(LOG_LEVEL_DEBUG, "operating_mode: %s", spot_check_mode_to_string(current_config.operating_mode));
+            log_printf(LOG_LEVEL_DEBUG, "custom_scrn_url: %s", current_config.custom_screen_url);
+            log_printf(LOG_LEVEL_DEBUG, "custom_ui_secs: %lu", current_config.custom_update_interval_secs);
+            break;
+        default:
+            MEMFAULT_ASSERT(0);
+    }
 }
 
 void nvs_save_config(spot_check_config_t *config) {
@@ -261,10 +291,14 @@ void nvs_save_config(spot_check_config_t *config) {
     MEMFAULT_ASSERT(nvs_set_string("tz_str", config->tz_str));
     MEMFAULT_ASSERT(nvs_set_string("tz_display_name", config->tz_display_name));
     MEMFAULT_ASSERT(nvs_set_string("operating_mode", (char *)spot_check_mode_to_string(config->operating_mode)));
-    MEMFAULT_ASSERT(nvs_set_string("custom_screen_url", config->custom_screen_url));
-    MEMFAULT_ASSERT(nvs_set_uint32("custom_update_interval_secs", config->custom_update_interval_secs));
+    MEMFAULT_ASSERT(nvs_set_string("custom_scrn_url", config->custom_screen_url));
+    MEMFAULT_ASSERT(nvs_set_uint32("custom_ui_secs", config->custom_update_interval_secs));
 
     ESP_ERROR_CHECK(nvs_commit(handle));
+
+    // Need to reload back into mem. Could theoretically manually set these to avoid the second flash time hit, but
+    // safer to use the existing logic
+    nvs_load_config();
 }
 
 esp_err_t nvs_full_erase() {
