@@ -227,32 +227,35 @@ void app_main(void) {
         memfault_packetizer_set_active_sources(kMfltDataSourceMask_Event);
         memfault_interface_post_data();
 
-        // SNTP check doesn't change our boot process, we just block here a bit to make the experience better to
-        // make it less likely we render the epoch before it syncs correctly. Sometimes SNTP gets a new value within
-        // a second, sometimes it takes 45 seconds. If sntp doesn't report fully synced,  we also check the date and
-        // as long as it's not 1970 we call it synced to help speed up the process.
-        // This could theoretically be skipped in custom mode since that doesn't display the time, but also opens us up
-        // to stepping on https requests if sntp sync succeeds and launches time forward a huge amount while were
-        // already doing the initial custom endpoint request after entering online mode.
-        bool     sntp_time_set = false;
-        uint32_t start_ticks   = xTaskGetTickCount();
-        uint32_t now_ticks     = start_ticks;
-        log_printf(LOG_LEVEL_INFO, "Waiting for sntp time");
-        while (!sntp_time_set && (now_ticks - start_ticks < pdMS_TO_TICKS(30 * 1000))) {
-            sntp_time_set = sntp_time_is_synced();
+        // Don't care about SNTP time sync for custom, skip to downloading user image
+        if (config->operating_mode != SPOT_CHECK_MODE_CUSTOM) {
+            // SNTP check doesn't change our boot process, we just block here a bit to make the experience better to
+            // make it less likely we render the epoch before it syncs correctly. Sometimes SNTP gets a new value within
+            // a second, sometimes it takes 45 seconds. If sntp doesn't report fully synced,  we also check the date and
+            // as long as it's not 1970 we call it synced to help speed up the process.
+            // This could theoretically be skipped in custom mode since that doesn't display the time, but also opens us
+            // up to stepping on https requests if sntp sync succeeds and launches time forward a huge amount while were
+            // already doing the initial custom endpoint request after entering online mode.
+            bool     sntp_time_set = false;
+            uint32_t start_ticks   = xTaskGetTickCount();
+            uint32_t now_ticks     = start_ticks;
+            log_printf(LOG_LEVEL_INFO, "Waiting for sntp time");
+            while (!sntp_time_set && (now_ticks - start_ticks < pdMS_TO_TICKS(30 * 1000))) {
+                sntp_time_set = sntp_time_is_synced();
 
-            vTaskDelay(pdMS_TO_TICKS(1000));
-            now_ticks = xTaskGetTickCount();
-        }
+                vTaskDelay(pdMS_TO_TICKS(1000));
+                now_ticks = xTaskGetTickCount();
+            }
 
-        if (!sntp_time_set) {
-            log_printf(LOG_LEVEL_WARN,
-                       "Did not receive SNTP update before timing out! Non-blocking to rest of startup since we've "
-                       "validated internet connection with healthcheck");
-        } else {
-            log_printf(LOG_LEVEL_INFO,
-                       "Successfully synced SNTP time after %lu seconds",
-                       (now_ticks - start_ticks) / configTICK_RATE_HZ);
+            if (!sntp_time_set) {
+                log_printf(LOG_LEVEL_WARN,
+                           "Did not receive SNTP update before timing out! Non-blocking to rest of startup since we've "
+                           "validated internet connection with healthcheck");
+            } else {
+                log_printf(LOG_LEVEL_INFO,
+                           "Successfully synced SNTP time after %lu seconds",
+                           (now_ticks - start_ticks) / configTICK_RATE_HZ);
+            }
         }
 
         // TODO ::show time date and spot name here while other network stuff is fetched
