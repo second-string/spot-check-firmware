@@ -10,8 +10,15 @@
 #include "http_server.h"
 #include "nvs.h"
 #include "scheduler_task.h"
+#include "screen_img_handler.h"
 
 #define TAG SC_TAG_NVS
+
+static const char *const chart_strings_by_enum[] = {
+    [SCREEN_IMG_TIDE_CHART]  = "tide",
+    [SCREEN_IMG_SWELL_CHART] = "swell",
+    [SCREEN_IMG_WIND_CHART]  = "wind",
+};
 
 static nvs_handle_t handle = 0;
 
@@ -66,6 +73,29 @@ static spot_check_config_t *nvs_load_config() {
     uint32_t temp_custom_update_interval_secs = 0;
     nvs_get_uint32("custom_ui_secs", &temp_custom_update_interval_secs);
 
+    max_bytes_to_write = MAX_LENGTH_ACTIVE_CHART_PARAM;
+    char temp_chart_str[10];
+    nvs_get_string("chart_1", temp_chart_str, &max_bytes_to_write, "tide");
+
+    screen_img_t active_chart_1;
+    if (!nvs_chart_string_to_enum(temp_chart_str, &active_chart_1)) {
+        log_printf(LOG_LEVEL_ERROR,
+                   "Error parsing chart str '%s' to enum, falling back to tide chart enum",
+                   temp_chart_str);
+        active_chart_1 = SCREEN_IMG_TIDE_CHART;
+    }
+
+    max_bytes_to_write = MAX_LENGTH_ACTIVE_CHART_PARAM;
+    nvs_get_string("chart_2", temp_chart_str, &max_bytes_to_write, "swell");
+
+    screen_img_t active_chart_2;
+    if (!nvs_chart_string_to_enum(temp_chart_str, &active_chart_2)) {
+        log_printf(LOG_LEVEL_ERROR,
+                   "Error parsing chart str '%s' to enum, falling back to swell chart enum",
+                   temp_chart_str);
+        active_chart_2 = SCREEN_IMG_SWELL_CHART;
+    }
+
     current_config.spot_name                   = _spot_name;
     current_config.spot_uid                    = _spot_uid;
     current_config.spot_lat                    = _spot_lat;
@@ -75,6 +105,8 @@ static spot_check_config_t *nvs_load_config() {
     current_config.operating_mode              = spot_check_string_to_mode(_operating_mode);
     current_config.custom_screen_url           = _custom_screen_url;
     current_config.custom_update_interval_secs = temp_custom_update_interval_secs;
+    current_config.active_chart_1              = active_chart_1;
+    current_config.active_chart_2              = active_chart_2;
 
     nvs_print_config(LOG_LEVEL_DEBUG);
 
@@ -251,6 +283,8 @@ void nvs_print_config(log_level_t level) {
             log_printf(LOG_LEVEL_INFO, "operating_mode: %s", spot_check_mode_to_string(current_config.operating_mode));
             log_printf(LOG_LEVEL_INFO, "custom_scrn_url: %s", current_config.custom_screen_url);
             log_printf(LOG_LEVEL_INFO, "custom_ui_secs: %lu", current_config.custom_update_interval_secs);
+            log_printf(LOG_LEVEL_INFO, "active_chart_1: %u", current_config.active_chart_1);
+            log_printf(LOG_LEVEL_INFO, "active_chart_2: %u", current_config.active_chart_2);
             break;
         case LOG_LEVEL_DEBUG:
             log_printf(LOG_LEVEL_DEBUG, "CURRENT IN-MEM SPOT CHECK CONFIG");
@@ -263,6 +297,8 @@ void nvs_print_config(log_level_t level) {
             log_printf(LOG_LEVEL_DEBUG, "operating_mode: %s", spot_check_mode_to_string(current_config.operating_mode));
             log_printf(LOG_LEVEL_DEBUG, "custom_scrn_url: %s", current_config.custom_screen_url);
             log_printf(LOG_LEVEL_DEBUG, "custom_ui_secs: %lu", current_config.custom_update_interval_secs);
+            log_printf(LOG_LEVEL_DEBUG, "active_chart_1: %u", current_config.active_chart_1);
+            log_printf(LOG_LEVEL_DEBUG, "active_chart_2: %u", current_config.active_chart_2);
             break;
         default:
             MEMFAULT_ASSERT(0);
@@ -293,6 +329,8 @@ void nvs_save_config(spot_check_config_t *config) {
     MEMFAULT_ASSERT(nvs_set_string("operating_mode", (char *)spot_check_mode_to_string(config->operating_mode)));
     MEMFAULT_ASSERT(nvs_set_string("custom_scrn_url", config->custom_screen_url));
     MEMFAULT_ASSERT(nvs_set_uint32("custom_ui_secs", config->custom_update_interval_secs));
+    MEMFAULT_ASSERT(nvs_set_string("chart_1", (char *)chart_strings_by_enum[config->active_chart_1]));
+    MEMFAULT_ASSERT(nvs_set_string("chart_2", (char *)chart_strings_by_enum[config->active_chart_2]));
 
     ESP_ERROR_CHECK(nvs_commit(handle));
 
@@ -308,4 +346,29 @@ esp_err_t nvs_full_erase() {
     }
 
     return err;
+}
+
+/*
+ * Convert string val received by fw from config POST to the enum value used in the actual in-mem config
+ */
+bool nvs_chart_string_to_enum(char *chart_str_in, screen_img_t *enum_out) {
+    bool success = false;
+    for (uint8_t i = 0; i < sizeof(chart_strings_by_enum) / sizeof(char *); i++) {
+        if (strcmp(chart_strings_by_enum[i], chart_str_in) == 0) {
+            *enum_out = i;
+            success   = true;
+            break;
+        }
+    }
+
+    return success;
+}
+
+/*
+ * Expose access to the enum/string array to http_server
+ */
+void nvs_chart_enum_to_string(screen_img_t enum_in, char *chart_str_out) {
+    MEMFAULT_ASSERT(enum_in != SCREEN_IMG_COUNT);
+
+    strcpy(chart_str_out, chart_strings_by_enum[enum_in]);
 }

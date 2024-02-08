@@ -10,16 +10,27 @@
 #define SCREEN_IMG_SWELL_CHART_SIZE_NVS_KEY "swell_img_sz"
 #define SCREEN_IMG_SWELL_CHART_WIDTH_PX_NVS_KEY "swell_img_w"
 #define SCREEN_IMG_SWELL_CHART_HEIGHT_PX_NVS_KEY "swell_img_h"
+#define SCREEN_IMG_WIND_CHART_SIZE_NVS_KEY "wind_img_sz"
+#define SCREEN_IMG_WIND_CHART_WIDTH_PX_NVS_KEY "wind_img_w"
+#define SCREEN_IMG_WIND_CHART_HEIGHT_PX_NVS_KEY "wind_img_h"
 #define SCREEN_IMG_CUSTOM_SCREEN_SIZE_NVS_KEY "cstm_img_sz"
 #define SCREEN_IMG_CUSTOM_SCREEN_WIDTH_PX_NVS_KEY "cstm_img_w"
 #define SCREEN_IMG_CUSTOM_SCREEN_HEIGHT_PX_NVS_KEY "cstm_img_h"
 
-// Start byte of each image saved inthe screen_img partition. Assumes the partition is 512K, which puts the second image
-// at the halfway point. If each image is 700x200 px, each takes up 140kb, so we've got a fair amount of
-// overcompensation. Could be dynamically calced but this is simpler for now.
-// NOTE: These MUST by 4k aligned for proper erasing
+/*
+ * Start byte of each image saved inthe screen_img partition. Screen partition as of now is 512kb large. If each chart
+ * is 700x200 px with 2-pixels-ber-byte, each takes up 70kb (0x11170). But when erasing with page boundaries, fw will
+ * erase up to 0x12000. Could be dynamically calced but this is simpler for now.
+ *
+ * NOTE: These MUST by 4k aligned for proper erasing
+ *
+ * TODO :: this could save a lot of space just by having a 'chart 1 offset'/'chart 2 offset' and just placing each chart
+ * there instead of in its own individual place in the partition. This isn't scalable, but passes for now until more
+ * charts might be added.
+ */
 #define SCREEN_IMG_TIDE_CHART_OFFSET 0x0
-#define SCREEN_IMG_SWELL_CHART_OFFSET 0x40000
+#define SCREEN_IMG_SWELL_CHART_OFFSET 0x12000
+#define SCREEN_IMG_WIND_CHART_OFFSET 0x24000
 
 // Allow the fullscreen custom screen image to occupy the same space as they'll never be used together
 #define SCREEN_IMG_CUSTOM_SCREEN_OFFSET 0x0
@@ -30,6 +41,7 @@
 typedef enum {
     SCREEN_IMG_TIDE_CHART,
     SCREEN_IMG_SWELL_CHART,
+    SCREEN_IMG_WIND_CHART,
     SCREEN_IMG_CUSTOM_SCREEN,
 
     SCREEN_IMG_COUNT,
@@ -39,4 +51,6 @@ void screen_img_handler_init();
 bool screen_img_handler_download_and_save(screen_img_t screen_img);
 
 bool screen_img_handler_clear_screen_img(screen_img_t screen_img);
+bool screen_img_handler_clear_chart(screen_img_t screen_img);
 bool screen_img_handler_draw_screen_img(screen_img_t screen_img);
+bool screen_img_handler_draw_chart(screen_img_t screen_img);

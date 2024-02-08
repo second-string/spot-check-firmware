@@ -13,6 +13,7 @@
 #include "json.h"
 #include "nvs.h"
 #include "scheduler_task.h"
+#include "screen_img_handler.h"
 #include "sntp_time.h"
 #include "spot_check.h"
 
@@ -136,6 +137,7 @@ static esp_err_t health_get_handler(httpd_req_t *req) {
 static esp_err_t configure_post_handler(httpd_req_t *req) {
     cJSON *payload;
     MEMFAULT_ASSERT(http_server_parse_post_body(req, &payload));
+    vTaskDelay(pdMS_TO_TICKS(400));
 
     // Load all our values into here to save to nvs. No need to alloc
     // any more memory than the json takes because nvs will use those
@@ -162,10 +164,13 @@ static esp_err_t configure_post_handler(httpd_req_t *req) {
 
     switch (config.operating_mode) {
         case SPOT_CHECK_MODE_WEATHER: {
-            char *default_spot_name = "The Wedge";
-            char *default_spot_lat  = "33.5930302087";
-            char *default_spot_lon  = "-117.8819918632";
-            char *default_spot_uid  = "5842041f4e65fad6a770882b";
+            char *default_spot_name    = "The Wedge";
+            char *default_spot_lat     = "33.5930302087";
+            char *default_spot_lon     = "-117.8819918632";
+            char *default_spot_uid     = "5842041f4e65fad6a770882b";
+            char *default_active_chart = "tide";
+            char *temp_active_chart;
+
             http_server_parse_json_string(payload,
                                           "spot_name",
                                           &config.spot_name,
@@ -186,6 +191,19 @@ static esp_err_t configure_post_handler(httpd_req_t *req) {
                                           &config.spot_uid,
                                           MAX_LENGTH_SPOT_UID_PARAM,
                                           default_spot_uid);
+            http_server_parse_json_string(payload,
+                                          "active_chart_1",
+                                          &temp_active_chart,
+                                          MAX_LENGTH_ACTIVE_CHART_PARAM,
+                                          default_active_chart);
+            MEMFAULT_ASSERT(nvs_chart_string_to_enum(temp_active_chart, &config.active_chart_1));
+
+            http_server_parse_json_string(payload,
+                                          "active_chart_2",
+                                          &temp_active_chart,
+                                          MAX_LENGTH_ACTIVE_CHART_PARAM,
+                                          default_active_chart);
+            MEMFAULT_ASSERT(nvs_chart_string_to_enum(temp_active_chart, &config.active_chart_2));
             break;
         }
         case SPOT_CHECK_MODE_CUSTOM: {
@@ -224,11 +242,11 @@ static esp_err_t configure_post_handler(httpd_req_t *req) {
                        __func__);
     }
 
-    nvs_save_config(&config);
-
-    // End response
+    // Release client before we do time-intensive stuff with flash
     cJSON_Delete(payload);
     httpd_resp_send(req, NULL, 0);
+
+    nvs_save_config(&config);
 
     // TODO : previously we were setting the tz str and forcing a time redraw through scheduler, but that wouldn't
     // properly re render everything else if the spot changed right? For now, reboot in all cases to make things super
@@ -256,6 +274,13 @@ static esp_err_t current_config_get_handler(httpd_req_t *req) {
     cJSON *operating_mode              = cJSON_CreateString(spot_check_mode_to_string(current_config->operating_mode));
     cJSON *custom_screen_url           = cJSON_CreateString(current_config->custom_screen_url);
     cJSON *custom_update_interval_secs = cJSON_CreateNumber(current_config->custom_update_interval_secs);
+
+    char temp_chart_str[10];
+    nvs_chart_enum_to_string(current_config->active_chart_1, temp_chart_str);
+    cJSON *active_chart_1 = cJSON_CreateString(temp_chart_str);
+    nvs_chart_enum_to_string(current_config->active_chart_2, temp_chart_str);
+    cJSON *active_chart_2 = cJSON_CreateString(temp_chart_str);
+
     cJSON_AddItemToObject(root, "spot_name", spot_name_json);
     cJSON_AddItemToObject(root, "spot_lat", spot_lat_json);
     cJSON_AddItemToObject(root, "spot_lon", spot_lon_json);
@@ -265,6 +290,8 @@ static esp_err_t current_config_get_handler(httpd_req_t *req) {
     cJSON_AddItemToObject(root, "operating_mode", operating_mode);
     cJSON_AddItemToObject(root, "custom_screen_url", custom_screen_url);
     cJSON_AddItemToObject(root, "custom_update_interval_secs", custom_update_interval_secs);
+    cJSON_AddItemToObject(root, "active_chart_1", active_chart_1);
+    cJSON_AddItemToObject(root, "active_chart_2", active_chart_2);
 
     char *response_json = cJSON_Print(root);
     httpd_resp_send(req, response_json, HTTPD_RESP_USE_STRLEN);

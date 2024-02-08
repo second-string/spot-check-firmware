@@ -25,7 +25,7 @@
 #define TAG SC_TAG_SCHEDULER
 
 #define NUM_DIFFERENTIAL_UPDATES 5
-#define NUM_DISCRETE_UPDATES 8
+#define NUM_DISCRETE_UPDATES 9
 
 #define OTA_CHECK_INTERVAL_SECONDS (CONFIG_OTA_CHECK_INTERVAL_HOURS * MINS_PER_HOUR * SECS_PER_MIN)
 #define NETWORK_CHECK_INTERVAL_SECONDS (30)
@@ -43,15 +43,44 @@
 #define UPDATE_DATE_BIT (1 << 8)
 #define MARK_SCREEN_DIRTY_BIT (1 << 9)
 #define CUSTOM_SCREEN_UPDATE_BIT (1 << 10)
+#define UPDATE_WIND_CHART_BIT (1 << 11)
 
 // Anything that causes a draw to the  screen needs to be added here. This exists so scheduler doesn't re-render screen
 // for logical update structs like memfault or ota check
-#define BITS_NEEDING_RENDER                                                                                            \
-    (UPDATE_CONDITIONS_BIT | UPDATE_TIDE_CHART_BIT | UPDATE_SWELL_CHART_BIT | UPDATE_TIME_BIT | UPDATE_SPOT_NAME_BIT | \
-     UPDATE_DATE_BIT | CUSTOM_SCREEN_UPDATE_BIT)
+#define BITS_NEEDING_RENDER                                                                           \
+    (UPDATE_CONDITIONS_BIT | UPDATE_TIDE_CHART_BIT | UPDATE_SWELL_CHART_BIT | UPDATE_WIND_CHART_BIT | \
+     UPDATE_TIME_BIT | UPDATE_SPOT_NAME_BIT | UPDATE_DATE_BIT | CUSTOM_SCREEN_UPDATE_BIT)
+
+/*
+ * Exists only to easily index into the discrete/diff update struct arrays in order to perform special handling for
+ * specific entries (rather than always string comparing the name)
+ */
+typedef enum {
+    DISCRETE_UPDATE_INDEX_TIME = 0,
+    DISCRETE_UPDATE_INDEX_DATE,
+    DISCRETE_UPDATE_INDEX_CONDITIONS,
+    DISCRETE_UPDATE_INDEX_TIDE_CHART,
+    DISCRETE_UPDATE_INDEX_SWELL_CHART_MORNING,
+    DISCRETE_UPDATE_INDEX_SWELL_CHART_MIDDAY,
+    DISCRETE_UPDATE_INDEX_SWELL_CHART_EVENING,
+    DISCRETE_UPDATE_INDEX_SPOT_NAME,
+    DISCRETE_UPDATE_INDEX_WIND_CHART,
+
+    DISCRETE_UPDATE_INDEX_COUNT,
+} discrete_update_index_t;
+
+typedef enum {
+    DIFFERENTIAL_UPDATE_INDEX_OTA = 0,
+    DIFFERENTIAL_UPDATE_INDEX_NETWORK_CHECK,
+    DIFFERENTIAL_UPDATE_INDEX_MFLT_UPLOAD,
+    DIFFERENTIAL_UPDATE_INDEX_DIRTY_SCREEN,
+    DIFFERENTIAL_UPDATE_INDEX_CUSTOM_SCREEN_UPDATE,
+
+    DIFFERENTIAL_UPDATE_INDEX_COUNT,
+} differential_update_index_t;
 
 typedef struct {
-    char              name[21];
+    char              debug_name[21];  // only used for logging/debugging, not necessary
     time_t            update_interval_secs;
     time_t            last_executed_epoch_secs;
     bool              force_next_update;  // mutable flag at runtime to indicate whether this should be run next trigger
@@ -62,7 +91,7 @@ typedef struct {
 } differential_update_t;
 
 typedef struct {
-    char              name[14];
+    char              debug_name[14];  // only used for logging/debugging, not necessary
     uint8_t           hour;
     uint8_t           minute;
     struct tm         last_executed;
@@ -78,160 +107,187 @@ static scheduler_mode_t      scheduler_mode;
 static volatile unsigned int seconds_elapsed;
 static conditions_t          last_retrieved_conditions;
 
-// Separate static pointer outside of regular list so we can manually deactivate it once it runs once
-static differential_update_t *spot_name_differential_update;
-
 // Execute function cannot be blocking! Will execute from 1 sec timer interrupt callback
 static differential_update_t differential_updates[NUM_DIFFERENTIAL_UPDATES] = {
-    {
-        .name                          = "ota",
-        .force_next_update             = false,
-        .force_on_transition_to_online = false,
-        .update_interval_secs          = OTA_CHECK_INTERVAL_SECONDS,
-        .active                        = false,
-        .active_operating_mode         = 0xFF,
-        .execute                       = scheduler_trigger_ota_check,
-    },
-    {
-        .name                          = "network_check",
-        .force_next_update             = false,
-        .force_on_transition_to_online = false,
-        .update_interval_secs          = NETWORK_CHECK_INTERVAL_SECONDS,
-        .active                        = false,
-        .active_operating_mode         = 0xFF,
-        .execute                       = scheduler_trigger_network_check,
-    },
-    {
-        .name              = "mflt_upload",
-        .force_next_update = false,
-        .force_on_transition_to_online =
-            false,  // do not set this true - it will run immediately on transition from init->online mode at boot, and
-                    // if it has a large payload to upload, it will break any subsequent network requests (like custom
-                    // screen download) because we can't block on the upload, it just triggers the internal http client
-                    // in memfault code
-        .update_interval_secs  = MFLT_UPLOAD_INTERVAL_SECONDS,
-        .active                = false,
-        .active_operating_mode = 0xFF,
-        .execute               = scheduler_trigger_mflt_upload,
-    },
-    {
-        .name                          = "dirty_screen",
-        .force_next_update             = false,
-        .force_on_transition_to_online = false,
-        .update_interval_secs          = SCREEN_DIRTY_INTERVAL_SECONDS,
-        .active                        = false,
-        .active_operating_mode         = SPOT_CHECK_MODE_WEATHER,
-        .execute                       = scheduler_trigger_screen_dirty,
-    },
-    {
-        .name                          = "custom_screen_update",
-        .force_next_update             = false,
-        .force_on_transition_to_online = true,  // mostly need it to force run immediately on init->online transition
-        .update_interval_secs          = 0,     // set from config value in scheduler start fun
-        .active                        = false,
-        .active_operating_mode         = SPOT_CHECK_MODE_CUSTOM,
-        .execute                       = scheduler_trigger_custom_screen_update,
-    }};
+    [DIFFERENTIAL_UPDATE_INDEX_OTA] =
+        {
+            .debug_name                    = "ota",
+            .force_next_update             = false,
+            .force_on_transition_to_online = false,
+            .update_interval_secs          = OTA_CHECK_INTERVAL_SECONDS,
+            .active                        = false,
+            .active_operating_mode         = 0xFF,
+            .execute                       = scheduler_trigger_ota_check,
+        },
+    [DIFFERENTIAL_UPDATE_INDEX_NETWORK_CHECK] =
+        {
+            .debug_name                    = "network_check",
+            .force_next_update             = false,
+            .force_on_transition_to_online = false,
+            .update_interval_secs          = NETWORK_CHECK_INTERVAL_SECONDS,
+            .active                        = false,
+            .active_operating_mode         = 0xFF,
+            .execute                       = scheduler_trigger_network_check,
+        },
+    [DIFFERENTIAL_UPDATE_INDEX_MFLT_UPLOAD] =
+        {
+            .debug_name        = "mflt_upload",
+            .force_next_update = false,
+            .force_on_transition_to_online =
+                false,  // do not set this true - it will run immediately on transition from init->online mode at boot,
+                        // and if it has a large payload to upload, it will break any subsequent network requests (like
+                        // custom screen download) because we can't block on the upload, it just triggers the internal
+                        // http client in memfault code
+            .update_interval_secs  = MFLT_UPLOAD_INTERVAL_SECONDS,
+            .active                = false,
+            .active_operating_mode = 0xFF,
+            .execute               = scheduler_trigger_mflt_upload,
+        },
+    [DIFFERENTIAL_UPDATE_INDEX_DIRTY_SCREEN] =
+        {
+            .debug_name                    = "dirty_screen",
+            .force_next_update             = false,
+            .force_on_transition_to_online = false,
+            .update_interval_secs          = SCREEN_DIRTY_INTERVAL_SECONDS,
+            .active                        = false,
+            .active_operating_mode         = SPOT_CHECK_MODE_WEATHER,
+            .execute                       = scheduler_trigger_screen_dirty,
+        },
+    [DIFFERENTIAL_UPDATE_INDEX_CUSTOM_SCREEN_UPDATE] =
+        {
+            .debug_name        = "custom_screen_update",
+            .force_next_update = false,
+            .force_on_transition_to_online =
+                true,                    // mostly need it to force run immediately on init->online transition
+            .update_interval_secs  = 0,  // set from config value in scheduler start fun
+            .active                = false,
+            .active_operating_mode = SPOT_CHECK_MODE_CUSTOM,
+            .execute               = scheduler_trigger_custom_screen_update,
+        },
+};
 
 // Execute function cannot be blocking! Will execute from 1 sec timer interrupt callback
 static discrete_update_t discrete_updates[NUM_DISCRETE_UPDATES] = {
-    {
-        .name                          = "time",
-        .force_next_update             = false,
-        .force_on_transition_to_online = true,
-        .hour                          = 0xFF,  // wildcards, should update every minute every hour
-        .minute                        = 0xFF,
-        .last_executed                 = {0},
-        .active                        = false,
-        .active_operating_mode         = SPOT_CHECK_MODE_WEATHER,
-        .execute                       = scheduler_trigger_time_update,
-    },
-    {
-        .name                          = "date",
-        .force_next_update             = false,
-        .force_on_transition_to_online = true,
-        .hour                          = 0,
-        .minute                        = 1,
-        .last_executed                 = {0},
-        .active                        = false,
-        .active_operating_mode         = SPOT_CHECK_MODE_WEATHER,
-        .execute                       = scheduler_trigger_date_update,
-    },
-    {
-        .name                          = "conditions",
-        .force_next_update             = false,
-        .force_on_transition_to_online = true,
-        .hour                          = 0xFF,  // wildcard, runs on 5th minute of every hours
-        .minute                        = 5,
-        .last_executed                 = {0},
-        .active                        = false,
-        .active_operating_mode         = SPOT_CHECK_MODE_WEATHER,
-        .execute                       = scheduler_trigger_conditions_update,
-    },
-    {
-        .name                          = "tide",
-        .force_next_update             = false,
-        .force_on_transition_to_online = true,
-        .hour                          = 3,
-        .minute                        = 0,
-        .last_executed                 = {0},
-        .active                        = false,
-        .active_operating_mode         = SPOT_CHECK_MODE_WEATHER,
-        .execute                       = scheduler_trigger_tide_chart_update,
-    },
-    {
-        .name                          = "swell_morning",
-        .force_next_update             = false,
-        .force_on_transition_to_online = true,
-        .hour                          = 3,
-        .minute                        = 0,
-        .last_executed                 = {0},
-        .active                        = false,
-        .active_operating_mode         = SPOT_CHECK_MODE_WEATHER,
-        .execute                       = scheduler_trigger_swell_chart_update,
-    },
-    {
-        .name                          = "swell_midday",
-        .force_next_update             = false,
-        .force_on_transition_to_online = false,
-        .hour                          = 12,
-        .minute                        = 0,
-        .last_executed                 = {0},
-        .active                        = false,
-        .active_operating_mode         = SPOT_CHECK_MODE_WEATHER,
-        .execute                       = scheduler_trigger_swell_chart_update,
-    },
-    {
-        .name                          = "swell_evening",
-        .force_next_update             = true,
-        .force_on_transition_to_online = false,
-        .hour                          = 17,
-        .minute                        = 0,
-        .last_executed                 = {0},
-        .active                        = false,
-        .active_operating_mode         = SPOT_CHECK_MODE_WEATHER,
-        .execute                       = scheduler_trigger_swell_chart_update,
-    },
-    {
-        .name = "spot_name",  // use an extra discrete update to hack in spot name renders. Needed for drawing spot name
-                              // on first transition from boot offline mode into online mode
-        .force_next_update             = false,
-        .force_on_transition_to_online = true,
-        .hour                          = 0xEE,  // this hour will obviously never be hit
-        .minute                        = 0xEE,  // this minute will obviously never be hit
-        .last_executed                 = {0},
-        .active                        = false,
-        .active_operating_mode         = SPOT_CHECK_MODE_WEATHER,
-        .execute                       = scheduler_trigger_spot_name_update,
-    },
+    [DISCRETE_UPDATE_INDEX_TIME] =
+        {
+            .debug_name                    = "time",
+            .force_next_update             = false,
+            .force_on_transition_to_online = true,
+            .hour                          = 0xFF,  // wildcards, should update every minute every hour
+            .minute                        = 0xFF,
+            .last_executed                 = {0},
+            .active                        = false,
+            .active_operating_mode         = SPOT_CHECK_MODE_WEATHER,
+            .execute                       = scheduler_trigger_time_update,
+        },
+    [DISCRETE_UPDATE_INDEX_DATE] =
+        {
+            .debug_name                    = "date",
+            .force_next_update             = false,
+            .force_on_transition_to_online = true,
+            .hour                          = 0,
+            .minute                        = 1,
+            .last_executed                 = {0},
+            .active                        = false,
+            .active_operating_mode         = SPOT_CHECK_MODE_WEATHER,
+            .execute                       = scheduler_trigger_date_update,
+        },
+    [DISCRETE_UPDATE_INDEX_CONDITIONS] =
+        {
+            .debug_name                    = "conditions",
+            .force_next_update             = false,
+            .force_on_transition_to_online = true,
+            .hour                          = 0xFF,  // wildcard, runs on 5th minute of every hours
+            .minute                        = 5,
+            .last_executed                 = {0},
+            .active                        = false,
+            .active_operating_mode         = SPOT_CHECK_MODE_WEATHER,
+            .execute                       = scheduler_trigger_conditions_update,
+        },
+    [DISCRETE_UPDATE_INDEX_TIDE_CHART] =
+        {
+            .debug_name                    = "tide",
+            .force_next_update             = false,
+            .force_on_transition_to_online = true,
+            .hour                          = 3,
+            .minute                        = 0,
+            .last_executed                 = {0},
+            .active                        = false,
+            .active_operating_mode         = SPOT_CHECK_MODE_WEATHER,
+            .execute                       = scheduler_trigger_tide_chart_update,
+        },
+    [DISCRETE_UPDATE_INDEX_SWELL_CHART_MORNING] =
+        {
+            .debug_name                    = "swell_morning",
+            .force_next_update             = false,
+            .force_on_transition_to_online = true,
+            .hour                          = 3,
+            .minute                        = 0,
+            .last_executed                 = {0},
+            .active                        = false,
+            .active_operating_mode         = SPOT_CHECK_MODE_WEATHER,
+            .execute                       = scheduler_trigger_swell_chart_update,
+        },
+    [DISCRETE_UPDATE_INDEX_SWELL_CHART_MIDDAY] =
+        {
+            .debug_name                    = "swell_midday",
+            .force_next_update             = false,
+            .force_on_transition_to_online = false,
+            .hour                          = 12,
+            .minute                        = 0,
+            .last_executed                 = {0},
+            .active                        = false,
+            .active_operating_mode         = SPOT_CHECK_MODE_WEATHER,
+            .execute                       = scheduler_trigger_swell_chart_update,
+        },
+    [DISCRETE_UPDATE_INDEX_SWELL_CHART_EVENING] =
+        {
+            .debug_name                    = "swell_evening",
+            .force_next_update             = false,
+            .force_on_transition_to_online = false,
+            .hour                          = 17,
+            .minute                        = 0,
+            .last_executed                 = {0},
+            .active                        = false,
+            .active_operating_mode         = SPOT_CHECK_MODE_WEATHER,
+            .execute                       = scheduler_trigger_swell_chart_update,
+        },
+    [DISCRETE_UPDATE_INDEX_SPOT_NAME] =
+        {
+            .debug_name = "spot_name",  // use an extra discrete update to hack in spot name renders. Needed for drawing
+                                        // spot name on first transition from boot offline mode into online mode
+            .force_next_update             = false,
+            .force_on_transition_to_online = true,
+            .hour                          = 0xEE,  // this hour will obviously never be hit
+            .minute                        = 0xEE,  // this minute will obviously never be hit
+            .last_executed                 = {0},
+            .active                        = false,
+            .active_operating_mode         = SPOT_CHECK_MODE_WEATHER,
+            .execute                       = scheduler_trigger_spot_name_update,
+        },
+    [DISCRETE_UPDATE_INDEX_WIND_CHART] =
+        {
+            .debug_name                    = "wind",
+            .force_next_update             = false,
+            .force_on_transition_to_online = true,
+            .hour                          = 0xFF,  // wildcard, runs on 5th minute of every hours
+            .minute                        = 5,
+            .last_executed                 = {0},
+            .active                        = false,
+            .active_operating_mode         = SPOT_CHECK_MODE_WEATHER,
+            .execute                       = scheduler_trigger_wind_chart_update,
+        },
+
+    // NOTE :: MAKE SURE update_struct_is_chart IS UPDATED IF ANY NEW UPDATE STRUCTS FOR CHARTS ARE ADDED
 };
 
-// The update structs that should run in offline mode.
+// The update structs that should run in offline mode. Right now it's only one, so this can be typed specifically for
+// that enum type.
 // TODO :: need a way for online -> offline to keep updating time after we've been online and rendered full homescreen
 // once. Can't just add time here though, because if healthcheck or any of the network requests during boot kick into
 // offline mode, then time starts rendering even if it isn't correct
-const char *const offline_mode_update_names[] = {
-    "network_check",
+const differential_update_index_t offline_mode_update_indexes[] = {
+    DIFFERENTIAL_UPDATE_INDEX_NETWORK_CHECK,
 };
 
 /*
@@ -261,6 +317,38 @@ static inline bool discrete_time_not_yet_executed_today(struct tm now, struct tm
            now.tm_min != last_executed.tm_min;
 }
 
+static inline bool active_chart_matches(spot_check_config_t *config, discrete_update_index_t index) {
+    screen_img_t screen_img_to_compare;
+    switch (index) {
+        case DISCRETE_UPDATE_INDEX_TIDE_CHART:
+            screen_img_to_compare = SCREEN_IMG_TIDE_CHART;
+            break;
+        case DISCRETE_UPDATE_INDEX_SWELL_CHART_MORNING:
+        case DISCRETE_UPDATE_INDEX_SWELL_CHART_MIDDAY:
+        case DISCRETE_UPDATE_INDEX_SWELL_CHART_EVENING:
+            screen_img_to_compare = SCREEN_IMG_SWELL_CHART;
+            break;
+        case DISCRETE_UPDATE_INDEX_WIND_CHART:
+            screen_img_to_compare = SCREEN_IMG_WIND_CHART;
+            break;
+        default:
+            MEMFAULT_ASSERT(0);
+    }
+
+    return config->active_chart_1 == screen_img_to_compare || config->active_chart_2 == screen_img_to_compare;
+}
+
+/*
+ * Returns true if the arg index is one of the chart update structs.
+ * THIS FUNCTION NEEDS TO BE UPDATED IF A NEW CHART UPDATE STRUCT IS EVER ADDED.
+ * I really don't like this implementation, too easy to forget, but the best I can think of for now.
+ */
+static inline bool update_struct_is_chart(discrete_update_index_t index) {
+    return index == DISCRETE_UPDATE_INDEX_TIDE_CHART || index == DISCRETE_UPDATE_INDEX_SWELL_CHART_MORNING ||
+           index == DISCRETE_UPDATE_INDEX_SWELL_CHART_MIDDAY || index == DISCRETE_UPDATE_INDEX_SWELL_CHART_EVENING ||
+           index == DISCRETE_UPDATE_INDEX_WIND_CHART;
+}
+
 /*
  * Polling function that runs every 1 second. Responsible for checking all differential/discrete time update structs
  * and if any have reached their elapsed time, execute and update them. No execute functions for the update structs
@@ -285,7 +373,7 @@ static void scheduler_polling_timer_callback(void *timer_args) {
             // Printing time_t is fucked, have to convert to double with difftime
             log_printf(LOG_LEVEL_DEBUG,
                        "Executing polling diff update '%s' (last: %.0f, now: %.0f, intvl: %.0f, force: %u)",
-                       diff_check->name,
+                       diff_check->debug_name,
                        difftime(diff_check->last_executed_epoch_secs, 0),
                        difftime(now_epoch_secs, 0),
                        difftime(diff_check->update_interval_secs, 0),
@@ -313,7 +401,7 @@ static void scheduler_polling_timer_callback(void *timer_args) {
             log_printf(LOG_LEVEL_DEBUG,
                        "Executing discrete update '%s' (curr hr: %u, curr min: %u, check hr: %u, check min: %u, "
                        "force: %u)",
-                       discrete_check->name,
+                       discrete_check->debug_name,
                        now_local.tm_hour,
                        now_local.tm_min,
                        discrete_check->hour,
@@ -389,6 +477,12 @@ static void scheduler_task(void *args) {
             sleep_handler_set_busy(SYSTEM_IDLE_SWELL_CHART_BIT);
             screen_img_handler_download_and_save(SCREEN_IMG_SWELL_CHART);
             sleep_handler_set_idle(SYSTEM_IDLE_SWELL_CHART_BIT);
+        }
+
+        if (update_bits & UPDATE_WIND_CHART_BIT && scheduler_get_mode() != SCHEDULER_MODE_OFFLINE) {
+            sleep_handler_set_busy(SYSTEM_IDLE_WIND_CHART_BIT);
+            screen_img_handler_download_and_save(SCREEN_IMG_WIND_CHART);
+            sleep_handler_set_idle(SYSTEM_IDLE_WIND_CHART_BIT);
         }
 
         // Note: MUST come before OTA bit right now. Special case timer on boot where we delay first memfault and ota
@@ -473,11 +567,9 @@ static void scheduler_task(void *args) {
             spot_check_draw_spot_name(config->spot_name);
             sleep_handler_set_idle(SYSTEM_IDLE_CONDITIONS_BIT);
 
-            // We could be in this block from a manual direct trigger call or the async diff update struct. Either way,
-            // make sure the diff struct is now deactivated so we don't run it anymore.
-            if (spot_name_differential_update != NULL) {
-                spot_name_differential_update->active = false;
-            }
+            // This should only ever run once, so whether it was triggered from initial boot or a new config spot, clear
+            // the active flag here until it's manually triggered again.
+            discrete_updates[DISCRETE_UPDATE_INDEX_SPOT_NAME].active = false;
         }
 
         if (update_bits & UPDATE_CONDITIONS_BIT) {
@@ -500,9 +592,9 @@ static void scheduler_task(void *args) {
         if (update_bits & UPDATE_TIDE_CHART_BIT) {
             sleep_handler_set_busy(SYSTEM_IDLE_TIDE_CHART_BIT);
             if (!full_clear) {
-                screen_img_handler_clear_screen_img(SCREEN_IMG_TIDE_CHART);
+                screen_img_handler_clear_chart(SCREEN_IMG_TIDE_CHART);
             }
-            screen_img_handler_draw_screen_img(SCREEN_IMG_TIDE_CHART);
+            screen_img_handler_draw_chart(SCREEN_IMG_TIDE_CHART);
             log_printf(LOG_LEVEL_INFO, "scheduler task updated tide chart");
             sleep_handler_set_idle(SYSTEM_IDLE_TIDE_CHART_BIT);
         }
@@ -510,11 +602,21 @@ static void scheduler_task(void *args) {
         if (update_bits & UPDATE_SWELL_CHART_BIT) {
             sleep_handler_set_busy(SYSTEM_IDLE_SWELL_CHART_BIT);
             if (!full_clear) {
-                screen_img_handler_clear_screen_img(SCREEN_IMG_SWELL_CHART);
+                screen_img_handler_clear_chart(SCREEN_IMG_SWELL_CHART);
             }
-            screen_img_handler_draw_screen_img(SCREEN_IMG_SWELL_CHART);
+            screen_img_handler_draw_chart(SCREEN_IMG_SWELL_CHART);
             log_printf(LOG_LEVEL_INFO, "scheduler task updated swell chart");
             sleep_handler_set_idle(SYSTEM_IDLE_SWELL_CHART_BIT);
+        }
+
+        if (update_bits & UPDATE_WIND_CHART_BIT) {
+            sleep_handler_set_busy(SYSTEM_IDLE_WIND_CHART_BIT);
+            if (!full_clear) {
+                screen_img_handler_clear_chart(SCREEN_IMG_WIND_CHART);
+            }
+            screen_img_handler_draw_chart(SCREEN_IMG_WIND_CHART);
+            log_printf(LOG_LEVEL_INFO, "scheduler task updated wind chart");
+            sleep_handler_set_idle(SYSTEM_IDLE_WIND_CHART_BIT);
         }
 
         if (update_bits & MARK_SCREEN_DIRTY_BIT) {
@@ -580,8 +682,27 @@ void scheduler_trigger_swell_chart_update() {
     xTaskNotify(scheduler_task_handle, UPDATE_SWELL_CHART_BIT, eSetBits);
 }
 
+void scheduler_trigger_wind_chart_update() {
+    xTaskNotify(scheduler_task_handle, UPDATE_WIND_CHART_BIT, eSetBits);
+}
+
 void scheduler_trigger_both_charts_update() {
-    xTaskNotify(scheduler_task_handle, UPDATE_SWELL_CHART_BIT | UPDATE_TIDE_CHART_BIT, eSetBits);
+    uint32_t             chart_bits = 0x0;
+    spot_check_config_t *config     = nvs_get_config();
+
+    if (config->active_chart_1 == SCREEN_IMG_TIDE_CHART || config->active_chart_2 == SCREEN_IMG_TIDE_CHART) {
+        chart_bits |= UPDATE_TIDE_CHART_BIT;
+    }
+
+    if (config->active_chart_1 == SCREEN_IMG_SWELL_CHART || config->active_chart_2 == SCREEN_IMG_SWELL_CHART) {
+        chart_bits |= UPDATE_SWELL_CHART_BIT;
+    }
+
+    if (config->active_chart_1 == SCREEN_IMG_WIND_CHART || config->active_chart_2 == SCREEN_IMG_WIND_CHART) {
+        chart_bits |= UPDATE_WIND_CHART_BIT;
+    }
+
+    xTaskNotify(scheduler_task_handle, chart_bits, eSetBits);
 }
 
 void scheduler_trigger_ota_check() {
@@ -613,8 +734,8 @@ void scheduler_set_offline_mode() {
 
     bool activate = false;
     for (int i = 0; i < NUM_DIFFERENTIAL_UPDATES; i++) {
-        for (int j = 0; j < sizeof(offline_mode_update_names) / sizeof(char *); j++) {
-            if (strcmp(offline_mode_update_names[j], differential_updates[i].name) == 0) {
+        for (int j = 0; j < sizeof(offline_mode_update_indexes) / sizeof(differential_update_index_t); j++) {
+            if (offline_mode_update_indexes[j] == i) {
                 activate = true;
                 break;
             }
@@ -622,28 +743,29 @@ void scheduler_set_offline_mode() {
 
         if (activate) {
             differential_updates[i].active = true;
-            log_printf(LOG_LEVEL_DEBUG, "Activated update struct '%s'", differential_updates[i].name);
+            log_printf(LOG_LEVEL_DEBUG, "Activated update struct '%s'", differential_updates[i].debug_name);
         } else {
             differential_updates[i].active = false;
-            log_printf(LOG_LEVEL_DEBUG, "Deactivated update struct '%s'", differential_updates[i].name);
+            log_printf(LOG_LEVEL_DEBUG, "Deactivated update struct '%s'", differential_updates[i].debug_name);
         }
         activate = false;
     }
 
     for (int i = 0; i < NUM_DISCRETE_UPDATES; i++) {
-        for (int j = 0; j < sizeof(offline_mode_update_names) / sizeof(char *); j++) {
-            if (strcmp(offline_mode_update_names[j], discrete_updates[i].name) == 0) {
-                activate = true;
-                break;
-            }
-        }
+        // NOTE :: currently there's only one offline activated struct and it's differential. If that changes this needs
+        // to be updated for (int j = 0; j < sizeof(offline_mode_update_names) / sizeof(char *); j++) {
+        //     if (strcmp(offline_mode_update_names[j], discrete_updates[i].name) == 0) {
+        activate = true;
+        break;
+        // }
+        // }
 
         if (activate) {
             discrete_updates[i].active = true;
-            log_printf(LOG_LEVEL_DEBUG, "Activated update struct '%s'", discrete_updates[i].name);
+            log_printf(LOG_LEVEL_DEBUG, "Activated update struct '%s'", discrete_updates[i].debug_name);
         } else {
             discrete_updates[i].active = false;
-            log_printf(LOG_LEVEL_DEBUG, "Deactivated update struct '%s'", discrete_updates[i].name);
+            log_printf(LOG_LEVEL_DEBUG, "Deactivated update struct '%s'", discrete_updates[i].debug_name);
         }
         activate = false;
     }
@@ -664,14 +786,14 @@ void scheduler_set_ota_mode() {
 
     for (int i = 0; i < NUM_DIFFERENTIAL_UPDATES; i++) {
         differential_updates[i].active = false;
-        log_printf(LOG_LEVEL_DEBUG, "Deactivated update struct '%s'", differential_updates[i].name);
+        log_printf(LOG_LEVEL_DEBUG, "Deactivated update struct '%s'", differential_updates[i].debug_name);
     }
 
     for (int i = 0; i < NUM_DISCRETE_UPDATES; i++) {
         // Don't disable time or date
-        if (strncmp(discrete_updates[i].name, "time", 4) != 0 || strncmp(discrete_updates[i].name, "date", 4) != 0) {
+        if (i == DISCRETE_UPDATE_INDEX_TIME || i == DISCRETE_UPDATE_INDEX_DATE) {
             discrete_updates[i].active = false;
-            log_printf(LOG_LEVEL_DEBUG, "Deactivated update struct '%s'", discrete_updates[i].name);
+            log_printf(LOG_LEVEL_DEBUG, "Deactivated update struct '%s'", discrete_updates[i].debug_name);
         }
     }
 
@@ -700,18 +822,16 @@ void scheduler_set_online_mode() {
         respect_force_flags = true;
     }
 
-    // Only have one update struct that shouldn't run in online mode so just hardcode it
-    char *offline_only_update_name = "network_check";
-
     struct tm now_local;
     sntp_time_get_local_time(&now_local);
     time_t now_epoch_secs = mktime(&now_local);
 
     spot_check_config_t *config = nvs_get_config();
     for (int i = 0; i < NUM_DIFFERENTIAL_UPDATES; i++) {
-        if (strcmp(offline_only_update_name, differential_updates[i].name) == 0) {
+        // Only have one update struct that shouldn't run in online mode so just hardcode it
+        if (i == DIFFERENTIAL_UPDATE_INDEX_NETWORK_CHECK) {
             differential_updates[i].active = false;
-            log_printf(LOG_LEVEL_DEBUG, "Deactivated diff update struct '%s'", differential_updates[i].name);
+            log_printf(LOG_LEVEL_DEBUG, "Deactivated diff update struct '%s'", differential_updates[i].debug_name);
         } else {
             // Only activate the struct if it matches with the currently active operating mode
             differential_updates[i].active =
@@ -728,29 +848,37 @@ void scheduler_set_online_mode() {
             log_printf(LOG_LEVEL_DEBUG,
                        "%s diff update struct '%s'",
                        differential_updates[i].active ? "Activated" : "Did not active",
-                       differential_updates[i].name);
+                       differential_updates[i].debug_name);
         }
     }
 
+    bool activate_struct        = false;
+    bool operating_mode_matches = false;
     for (int i = 0; i < NUM_DISCRETE_UPDATES; i++) {
-        if (strcmp(offline_only_update_name, discrete_updates[i].name) == 0) {
-            discrete_updates[i].active = false;
-            log_printf(LOG_LEVEL_DEBUG, "Deactivated discrete update struct '%s'", discrete_updates[i].name);
-        } else {
-            // Only activate the struct if it matches with the currently active operating mode
-            discrete_updates[i].active =
-                active_operating_mode_matches(config->operating_mode, discrete_updates[i].active_operating_mode);
+        // No matter the struct type (chart or otherwise), never activate if operating mode doesn't match
+        operating_mode_matches =
+            active_operating_mode_matches(config->operating_mode, discrete_updates[i].active_operating_mode);
 
-            // Don't force specific discrete updates on activation. Otherwise we'd trigger things like all three swell
-            // updates back to back (and an unnecessary time update but that's a bit less intrusive)
-            discrete_updates[i].force_next_update =
-                respect_force_flags && discrete_updates[i].force_on_transition_to_online;
-            log_printf(LOG_LEVEL_DEBUG,
-                       "%s %s discrete update struct '%s'",
-                       discrete_updates[i].active ? "Activated" : "Did not activate",
-                       discrete_updates[i].force_on_transition_to_online ? "and forced" : "but did not force",
-                       discrete_updates[i].name);
+        // If op mode matches and this struct is for a chart, also check against the active chart values in the config
+        if (operating_mode_matches && update_struct_is_chart(i)) {
+            activate_struct = active_chart_matches(config, i);
+        } else {
+            activate_struct = operating_mode_matches;
         }
+
+        discrete_updates[i].active = activate_struct;
+
+        // Don't force specific discrete updates on activation. Otherwise we'd trigger things like all three swell
+        // updates back to back (and an unnecessary time update but that's a bit less intrusive). Also only worry about
+        // this if the struct was activated in the previous lines, otherwise pointless (1sec callback bails immediately
+        // if not active) and log messages looks funny
+        discrete_updates[i].force_next_update =
+            respect_force_flags && activate_struct && discrete_updates[i].force_on_transition_to_online;
+        log_printf(LOG_LEVEL_DEBUG,
+                   "%s %s discrete update struct '%s'",
+                   discrete_updates[i].active ? "Activated" : "Did not activate",
+                   discrete_updates[i].force_next_update ? "and forced" : "but did not force",
+                   discrete_updates[i].debug_name);
     }
 
     scheduler_mode = SCHEDULER_MODE_ONLINE;
@@ -766,24 +894,6 @@ void scheduler_task_init() {
 }
 
 void scheduler_task_start() {
-    // If we're running in custom mode, set the update_interval_secs field of the custom screen update diff struct since
-    // it's dynamic from the config and not a preprocessor macro like all others. Has to be done in _start not _init
-    // becuase NVS doesn't load config into memory until its own _start function
-    spot_check_config_t *config = nvs_get_config();
-    if (config->operating_mode == SPOT_CHECK_MODE_CUSTOM) {
-        differential_update_t *diff_check = NULL;
-        for (int i = 0; i < NUM_DIFFERENTIAL_UPDATES; i++) {
-            diff_check = &differential_updates[i];
-            if (strcmp("custom_screen_update", diff_check->name) == 0) {
-                diff_check->update_interval_secs = config->custom_update_interval_secs;
-                log_printf(LOG_LEVEL_DEBUG,
-                           "Updated custom screen update diff stuct update_interval_secs to %.0f (%lu)",
-                           diff_check->update_interval_secs,
-                           config->custom_update_interval_secs);
-            }
-        }
-    }
-
     // Print out all update structs and set them all to inactive. main.c init function responsible for setting scheduler
     // into offline or online mode no matter what, otherwise scheduler will never run.
     log_printf(LOG_LEVEL_DEBUG, "List of all time differential updates:");
@@ -793,13 +903,8 @@ void scheduler_task_start() {
         diff_check->active = false;
         log_printf(LOG_LEVEL_DEBUG,
                    "'%s' executing every %.0f seconds",
-                   diff_check->name,
+                   diff_check->debug_name,
                    diff_check->update_interval_secs);
-
-        // Set the unique spot name update pointer on init to deactive the update struct after running once after boot
-        if (strcmp("spot_name", diff_check->name) == 0) {
-            spot_name_differential_update = diff_check;
-        }
     }
 
     log_printf(LOG_LEVEL_DEBUG, "List of all discrete updates:");
@@ -809,9 +914,24 @@ void scheduler_task_start() {
         discrete_check->active = false;
         log_printf(LOG_LEVEL_DEBUG,
                    "'%s' executing at %u:%02u",
-                   discrete_check->name,
+                   discrete_check->debug_name,
                    discrete_check->hour,
                    discrete_check->minute);
+    }
+
+    // If we're running in custom mode, set the update_interval_secs field of the custom screen update diff
+    // struct since it's dynamic from the config and not a preprocessor macro like all others. Has to be done in
+    // _start not _init becuase NVS doesn't load config into memory until its own _start function
+    spot_check_config_t *config = nvs_get_config();
+    if (config->operating_mode == SPOT_CHECK_MODE_CUSTOM) {
+        differential_update_t *custom_diff_update =
+            &differential_updates[DIFFERENTIAL_UPDATE_INDEX_CUSTOM_SCREEN_UPDATE];
+
+        custom_diff_update->update_interval_secs = config->custom_update_interval_secs;
+        log_printf(LOG_LEVEL_DEBUG,
+                   "Updated custom screen update diff stuct update_interval_secs to %.0f (%lu)",
+                   custom_diff_update->update_interval_secs,
+                   config->custom_update_interval_secs);
     }
 
     xTaskCreate(&scheduler_task,

@@ -51,7 +51,7 @@ http_request_t http_client_build_get_request(char                *endpoint,
                                              char                *url_buf,
                                              query_param         *params,
                                              uint8_t              num_params);
-http_request_t http_client_build_external_get_request(char *custom_url, char *url_buf);
+http_request_t http_client_build_external_get_request(char *custom_url, char *url_buf, size_t url_buf_size_bytes);
 http_request_t http_client_build_post_request(char *endpoint, char *url_buf, char *post_data, size_t post_data_size);
 bool           http_client_perform_with_retries(http_request_t           *request_obj,
                                                 uint8_t                   additional_retries,

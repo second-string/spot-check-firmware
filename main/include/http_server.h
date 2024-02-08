@@ -14,6 +14,7 @@
 #define MAX_LENGTH_OPERATING_MODE_PARAM (64)
 #define MAX_LENGTH_CUSTOM_SCREEN_URL_PARAM (256)
 #define MAX_LENGTH_CUSTOM_UPDATE_INTERVAL_SECS_PARAM (7)  // Allows at least up to 3 days plus a null term
+#define MAX_LENGTH_ACTIVE_CHART_PARAM (10)
 
 void http_server_start();
 void http_server_stop();

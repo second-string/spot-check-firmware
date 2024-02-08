@@ -7,6 +7,7 @@
 
 #include "http_server.h"
 #include "log.h"
+#include "screen_img_handler.h"
 #include "spot_check.h"
 
 typedef struct {
@@ -19,6 +20,8 @@ typedef struct {
     spot_check_mode_t operating_mode;
     char             *custom_screen_url;
     uint32_t          custom_update_interval_secs;
+    screen_img_t      active_chart_1;
+    screen_img_t      active_chart_2;
 } spot_check_config_t;
 
 void                 nvs_init();
@@ -33,5 +36,7 @@ void                 nvs_save_config(spot_check_config_t *config);
 void                 nvs_print_config(log_level_t level);
 esp_err_t            nvs_full_erase();
 spot_check_config_t *nvs_get_config();
+bool                 nvs_chart_string_to_enum(char *chart_str_in, screen_img_t *enum_out);
+void                 nvs_chart_enum_to_string(screen_img_t enum_in, char *chart_str_out);
 
 #endif

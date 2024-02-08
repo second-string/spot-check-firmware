@@ -8,9 +8,10 @@
 #define SYSTEM_IDLE_OTA_BIT (1 << 4)
 #define SYSTEM_IDLE_CLI_BIT (1 << 5)
 #define SYSTEM_IDLE_CUSTOM_SCREEN_BIT (1 << 6)
+#define SYSTEM_IDLE_WIND_CHART_BIT (1 << 7)
 #define SYSTEM_IDLE_BITS                                                                                            \
     (SYSTEM_IDLE_TIME_BIT | SYSTEM_IDLE_CONDITIONS_BIT | SYSTEM_IDLE_TIDE_CHART_BIT | SYSTEM_IDLE_SWELL_CHART_BIT | \
-     SYSTEM_IDLE_OTA_BIT | SYSTEM_IDLE_CLI_BIT | SYSTEM_IDLE_CUSTOM_SCREEN_BIT)
+     SYSTEM_IDLE_OTA_BIT | SYSTEM_IDLE_CLI_BIT | SYSTEM_IDLE_CUSTOM_SCREEN_BIT | SYSTEM_IDLE_WIND_CHART_BIT)
 
 void sleep_handler_init();
 void sleep_handler_start();

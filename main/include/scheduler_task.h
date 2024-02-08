@@ -17,6 +17,7 @@ void             scheduler_trigger_spot_name_update();
 void             scheduler_trigger_conditions_update();
 void             scheduler_trigger_tide_chart_update();
 void             scheduler_trigger_swell_chart_update();
+void             scheduler_trigger_wind_chart_update();
 void             scheduler_trigger_both_charts_update();
 void             scheduler_trigger_ota_check();
 void             scheduler_trigger_mflt_upload();

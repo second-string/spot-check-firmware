@@ -330,8 +330,10 @@ http_request_t http_client_build_get_request(char                *endpoint,
     if (params && num_params > 0) {
         query_param temp_params[num_params];
         if (strcmp(endpoint, "conditions") == 0 || strcmp(endpoint, "screen_update") == 0 ||
-            strcmp(endpoint, "swell_chart") == 0 || strcmp(endpoint, "tides_chart") == 0) {
+            strcmp(endpoint, "swell_chart") == 0 || strcmp(endpoint, "tides_chart") == 0 ||
+            strcmp(endpoint, "wind_chart") == 0) {
             MEMFAULT_ASSERT(num_params == 4);
+
             temp_params[0] = (query_param){.key = "device_id", .value = spot_check_get_serial()};
             temp_params[1] = (query_param){.key = "lat", .value = config->spot_lat};
             temp_params[2] = (query_param){.key = "lon", .value = config->spot_lon};
@@ -364,7 +366,9 @@ http_request_t http_client_build_get_request(char                *endpoint,
     return req;
 }
 
-http_request_t http_client_build_external_get_request(char *custom_url, char *url_buf) {
+http_request_t http_client_build_external_get_request(char *custom_url, char *url_buf, size_t url_buf_size_bytes) {
+    MEMFAULT_ASSERT(strlen(custom_url) < url_buf_size_bytes);
+
     http_request_t req = {
         .req_type = HTTP_REQ_TYPE_GET,
     };
