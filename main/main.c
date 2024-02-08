@@ -261,7 +261,6 @@ void app_main(void) {
         // TODO ::show time date and spot name here while other network stuff is fetched
         // All checks passed for full boot. Show fetching conditions screen then switching scheduler to online mode.
         // This will force update everything and thendo one big render.
-        // TODO :: erase checking connection text
         spot_check_clear_checking_connection_screen();
         scheduler_set_online_mode();
 

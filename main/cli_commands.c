@@ -479,7 +479,7 @@ static BaseType_t cli_command_nvs(char *write_buffer, size_t write_buffer_size, 
     BaseType_t  action_len;
     const char *action = FreeRTOS_CLIGetParameter(cmd_str, 1, &action_len);
     if (action == NULL) {
-        strcpy(write_buffer, "Error: usage is '<action> [<key>] [<number>]'");
+        strcpy(write_buffer, "Error: usage is '<action> [<key>] [<val>]'");
         return pdFALSE;
     }
 
@@ -494,7 +494,7 @@ static BaseType_t cli_command_nvs(char *write_buffer, size_t write_buffer_size, 
 
     if (action_len == 3 && strncmp(action, "get", action_len) == 0) {
         if (key_str == NULL) {
-            strcpy(write_buffer, "Error: usage is '<action> [<key>] [<number>]'");
+            strcpy(write_buffer, "Error: usage is '<action> [<key>]'");
             return pdFALSE;
         }
 
@@ -512,7 +512,7 @@ static BaseType_t cli_command_nvs(char *write_buffer, size_t write_buffer_size, 
         BaseType_t  val_len;
         const char *val_str = FreeRTOS_CLIGetParameter(cmd_str, 3, &val_len);
         if (val_str == NULL) {
-            strcpy(write_buffer, "Error: usage is 'set <key> <value>'");
+            strcpy(write_buffer, "Error: usage is 'set <key> <value>' (only string values currently supported)");
             return pdFALSE;
         }
 
