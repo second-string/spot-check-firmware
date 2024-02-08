@@ -791,7 +791,7 @@ void scheduler_set_ota_mode() {
 
     for (int i = 0; i < NUM_DISCRETE_UPDATES; i++) {
         // Don't disable time or date
-        if (i == DISCRETE_UPDATE_INDEX_TIME || i == DISCRETE_UPDATE_INDEX_DATE) {
+        if (i != DISCRETE_UPDATE_INDEX_TIME && i != DISCRETE_UPDATE_INDEX_DATE) {
             discrete_updates[i].active = false;
             log_printf(LOG_LEVEL_DEBUG, "Deactivated update struct '%s'", discrete_updates[i].debug_name);
         }
