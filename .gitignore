@@ -24,3 +24,6 @@ dependencies.lock
 
 .venv
 configuration_app/dist
+
+# Python cache files from running espressif tools/scripts from our config app
+*.pyc
