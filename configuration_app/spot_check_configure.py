@@ -5,6 +5,7 @@ import requests
 import sqlite3
 import urllib.parse
 import json
+import socket
 
 from time import sleep
 
@@ -25,6 +26,54 @@ banner = """
         | |
         |_|
 """
+
+def find_spot_check_device(max_attempts):
+    print("Searching for Spot Check device on the network...")
+
+    success = False
+    ip = ""
+    attempts = 1
+    while not success:
+        try:
+            # Resolve mDNS to IP first, it's massively faster for further requests
+            ip = socket.gethostbyname("spot-check.local.")
+            success = True
+        except Exception as e:
+            success = False
+            if attempts < max_attempts:
+                print("Could not find Spot Check device on the network. Have you set up the device's connection to the local network using option 1) of the main menu?")
+                print("Retrying in 5 seconds...")
+                attempts += 1
+                sleep(5)
+            else:
+                print("Could not find Spot Check device.")
+                return (False, "")
+
+    attempts = 1
+    success = False
+    while not success:
+        try:
+            res = requests.get(f"http://{ip}/health", headers={"Content-type": "application/json"}, timeout=4.0, stream=True)
+            res.raise_for_status()
+            success = True
+        except Exception as e:
+            success = False
+            print("Could not communicate with Spot Check device.")
+
+            if attempts < max_attempts:
+                print("Retrying in 5 seconds...")
+                attempts += 1
+                sleep(5)
+            else:
+                return (False, ip)
+
+    if success:
+        print(f"Found device!")
+
+
+    return (success, ip)
+
+
 
 def configure_weather_mode(current_config):
     spot_name = ""
@@ -149,26 +198,15 @@ def configure():
     db_conn = sqlite3.connect("timezones.db")
     cursor = db_conn.cursor()
 
-    print("Searching for Spot Check device on the network...")
-    success = False
-    while not success:
-        try:
-            res = requests.get("http://spot-check.local./health", headers={"Content-type": "application/json"}, timeout=0.2)
-            res.raise_for_status()
-            success = True
-        except Exception as e:
-            success = False
-            print("Could not find Spot Check device on the network. Make sure you you have connected the device to the network using step 1 in the main menu, and that this computer is connected to the same network.")
-            print("Retrying in 5 seconds...")
-            sleep(5)
+    success, ip = find_spot_check_device(3)
+    if not success:
+        return
 
-    print("Found device!")
-    print()
     print("Fetching device current configuration...")
     success = False
     while not success:
         try:
-            res = requests.get("http://spot-check.local./current_configuration", headers={"Content-type": "application/json"}, timeout=0.2)
+            res = requests.get(f"http://{ip}/current_configuration", headers={"Content-type": "application/json"}, timeout=0.2)
             res.raise_for_status()
             success = True
         except Exception as e:
@@ -246,19 +284,6 @@ def configure():
         **extra_vals,
     }
 
-    print(body)
-
-    while not success:
-        try:
-            res = requests.get("http://spot-check.local./health", headers={"Content-type": "application/json"}, timeout=0.2)
-            res.raise_for_status()
-            success = True
-        except Exception as e:
-            success = False
-            print("Could not find Spot Check device on the network. Make sure you you have connected the device to the network using step 1 in the main menu, and that this computer is connected to the same network.")
-            print("Retrying in 5 seconds...")
-            sleep(5)
-
     print()
     print("Saving new configuration to device...")
     success = False
@@ -298,20 +323,10 @@ def provision():
     asyncio.run(prov_main())
 
 def clear_nvs():
-    print("Searching for Spot Check device on the network...")
-    success = False
-    while not success:
-        try:
-            res = requests.get("http://spot-check.local./health", headers={"Content-type": "application/json"}, timeout=0.2)
-            res.raise_for_status()
-            success = True
-        except Exception as e:
-            success = False
-            print("Could not find Spot Check device on the network. Make sure you you have connected the device to the network using step 1 in the main menu, and that this computer is connected to the same network.")
-            print("Retrying in 5 seconds...")
-            sleep(5)
+    success, ip = find_spot_check_device(3)
+    if not success:
+        return
 
-    print("Found device!")
     print()
     print("Resetting device to factory defaults...")
     try:
