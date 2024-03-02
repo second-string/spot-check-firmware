@@ -50,10 +50,13 @@ static const char *spot_check_mode_strs[SPOT_CHECK_MODE_COUNT] = {
 };
 
 static struct tm last_time_displayed = {0};
-static char      device_serial[20];
-static char      firmware_version[NUM_BYTES_VERSION_STR + 1];  // 5-8 bytes for version, 1 for dash, 16 msb of elf hash.
-static char      hw_version[10];                               // always less, hardcoded below in ifdefs
-                                                               //
+static struct tm last_date_displayed = {
+    0};  // Need separate storage for date because date is updated on different sequence than time
+
+static char device_serial[20];
+static char firmware_version[NUM_BYTES_VERSION_STR + 1];  // 5-8 bytes for version, 1 for dash, 16 msb of elf hash.
+static char hw_version[10];                               // always less, hardcoded below in ifdefs
+                                                          //
 
 char *spot_check_get_serial() {
     return device_serial;
@@ -251,7 +254,7 @@ void spot_check_clear_date() {
     char     date_string[64];
     uint32_t previous_date_width_px;
     uint32_t previous_date_height_px;
-    sntp_time_get_time_str(&last_time_displayed, NULL, date_string);
+    sntp_time_get_time_str(&last_date_displayed, NULL, date_string);
     display_get_text_bounds(date_string,
                             DATE_DRAW_X_PX,
                             DATE_DRAW_Y_PX,
@@ -261,11 +264,11 @@ void spot_check_clear_date() {
                             &previous_date_height_px);
 
     if (previous_date_width_px > 0 && previous_date_height_px > 0) {
-        // Add 5px buffer for lowercase letters
-        display_clear_area(DATE_DRAW_X_PX - 5,
-                           DATE_DRAW_Y_PX - previous_date_height_px - 5,
-                           previous_date_width_px + 10,
-                           previous_date_height_px + 10);
+        // Add 10px buffer for lowercase letters
+        display_clear_area(DATE_DRAW_X_PX - 10,
+                           DATE_DRAW_Y_PX - previous_date_height_px - 10,
+                           previous_date_width_px + 20,
+                           previous_date_height_px + 20);
     }
 }
 
@@ -279,6 +282,8 @@ bool spot_check_draw_date() {
     sntp_time_get_time_str(&now_local, NULL, date_string);
 
     display_draw_text(date_string, DATE_DRAW_X_PX, DATE_DRAW_Y_PX, DISPLAY_FONT_SIZE_SHMEDIUM, DISPLAY_FONT_ALIGN_LEFT);
+
+    memcpy(&last_date_displayed, &now_local, sizeof(struct tm));
     return true;
 }
 
@@ -605,6 +610,7 @@ void spot_check_init() {
     // Init last_time_display with epoch so date update logic always executes to start with
     time_t epoch = 0;
     memcpy(&last_time_displayed, localtime(&epoch), sizeof(struct tm));
+    memcpy(&last_date_displayed, localtime(&epoch), sizeof(struct tm));
 
     uint8_t mac[6];
     // Note: must use this mac-reading func, it's the base one that actually pulls values from EFUSE while others just

@@ -342,6 +342,8 @@ static esp_err_t set_time_post_handler(httpd_req_t *req) {
     cJSON *payload;
     MEMFAULT_ASSERT(http_server_parse_post_body(req, &payload));
 
+    // TODO :: this appears to only work with GMT time, then SNTP internally converts it to local time based on internal
+    // tz_str already set
     cJSON *json_epoch_secs = cJSON_GetObjectItem(payload, "epoch_secs");
     if (cJSON_IsNumber(json_epoch_secs)) {
         // Set time and de-init sntp to keep user's manual time set

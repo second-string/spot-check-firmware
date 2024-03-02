@@ -1,6 +1,3 @@
-#include <sys/time.h>
-#include <time.h>
-
 #include "freertos/FreeRTOS.h"
 
 #include "esp_partition.h"
@@ -16,7 +13,6 @@
 #include "log.h"
 #include "nvs.h"
 #include "screen_img_handler.h"
-#include "sntp_time.h"
 #include "spot_check.h"
 
 #define TAG SC_TAG_SCREEN_IMG_HANDLER
