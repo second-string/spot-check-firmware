@@ -103,12 +103,13 @@ bool spot_check_download_and_save_conditions(conditions_t *new_conditions) {
         http_client_read_response_to_buffer(&client, content_length, &server_response, &response_data_size);
 
     if (http_err == ESP_OK && response_data_size != 0) {
-        cJSON *json               = parse_json(server_response);
-        cJSON *data_value         = cJSON_GetObjectItem(json, "data");
-        cJSON *temperature_object = cJSON_GetObjectItem(data_value, "temp");
-        cJSON *wind_speed_object  = cJSON_GetObjectItem(data_value, "wind_speed");
-        cJSON *wind_dir_object    = cJSON_GetObjectItem(data_value, "wind_dir");
-        cJSON *tide_height_object = cJSON_GetObjectItem(data_value, "tide_height");
+        cJSON *json                  = parse_json(server_response);
+        cJSON *data_value            = cJSON_GetObjectItem(json, "data");
+        cJSON *temperature_object    = cJSON_GetObjectItem(data_value, "temp");
+        cJSON *wind_speed_object     = cJSON_GetObjectItem(data_value, "wind_speed");
+        cJSON *wind_dir_object       = cJSON_GetObjectItem(data_value, "wind_dir");
+        cJSON *tide_height_object    = cJSON_GetObjectItem(data_value, "tide_height");
+        cJSON *is_tide_rising_object = cJSON_GetObjectItem(data_value, "is_rising");
 
         log_printf(LOG_LEVEL_DEBUG, "Server response: %s", server_response);
         if (server_response != NULL) {
@@ -124,19 +125,6 @@ bool spot_check_download_and_save_conditions(conditions_t *new_conditions) {
                        "code (could be a wifi login portal default login page)");
             return false;
         }
-
-        // char *temperature_debug_str = cJSON_Print(temperature_object);
-        // char *wind_speed_debug_str  = cJSON_Print(wind_speed_object);
-        // char *wind_dir_debug_str    = cJSON_Print(wind_dir_object);
-        // char *tide_height_debug_str = cJSON_Print(tide_height_object);
-        // log_printf(LOG_LEVEL_DEBUG, "cJSON_Print value for temperature: %s", temperature_debug_str);
-        // log_printf(LOG_LEVEL_DEBUG, "cJSON_Print value for wind_speed: %s", wind_speed_debug_str);
-        // log_printf(LOG_LEVEL_DEBUG, "cJSON_Print value for wind_dir: %s", wind_dir_debug_str);
-        // log_printf(LOG_LEVEL_DEBUG, "cJSON_Print value for tide_height: %s", tide_height_debug_str);
-        // free(temperature_debug_str);
-        // free(wind_speed_debug_str);
-        // free(wind_dir_debug_str);
-        // free(tide_height_debug_str);
 
         // Parse out end-result values with fallbacks in case value for key is not expected type
         int8_t temperature = 0;
@@ -173,9 +161,19 @@ bool spot_check_download_and_save_conditions(conditions_t *new_conditions) {
             tide_height_str = "?";
         }
 
+        bool is_tide_rising;
+        if (cJSON_IsBool(is_tide_rising_object)) {
+            is_tide_rising = cJSON_IsTrue(is_tide_rising_object);
+        } else {
+            log_printf(LOG_LEVEL_WARN,
+                       "Expecting bool from api for is_rising key, did not get one. Defaulting to true");
+            is_tide_rising = true;
+        }
+
         // Copy into global conditions after every field set
-        new_conditions->temperature = temperature;
-        new_conditions->wind_speed  = wind_speed;
+        new_conditions->temperature    = temperature;
+        new_conditions->wind_speed     = wind_speed;
+        new_conditions->is_tide_rising = is_tide_rising;
         strcpy(new_conditions->wind_dir, wind_dir_str);
         strcpy(new_conditions->tide_height, tide_height_str);
 
@@ -382,12 +380,12 @@ bool spot_check_draw_conditions(conditions_t *conditions) {
         char temperature_str[9];
         // Expect max 2 digit speed & 3 char direction for wind
         char wind_str[12];
-        // Expect max negative double-digit w/ decimal tide height
-        char tide_str[18];
+        // Expect max negative double-digit w/ decimal tide height and 'falling'
+        char tide_str[19];
         sprintf(temperature_str, "%dº F", conditions->temperature);
         sprintf(wind_str, "%d kt. %s", conditions->wind_speed, conditions->wind_dir);
         // TODO :: still not retrieviing rising / falling from api
-        sprintf(tide_str, "%s ft. %s", conditions->tide_height, "rising");
+        sprintf(tide_str, "%s ft. %s", conditions->tide_height, conditions->is_tide_rising ? "rising" : "falling");
         display_draw_text(temperature_str,
                           CONDITIONS_DRAW_X_PX,
                           CONDITIONS_TEMPERATURE_DRAW_Y_PX,
