@@ -2,7 +2,7 @@
 # CMakeLists in this exact order for cmake to work correctly
 cmake_minimum_required(VERSION 3.5)
 
-set(PROJECT_VER "0.0.20")
+set(PROJECT_VER "0.0.21")
 
 
 set(MEMFAULT_FIRMWARE_SDK ~/Developer/memfault-firmware-sdk)
