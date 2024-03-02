@@ -491,34 +491,63 @@ static BaseType_t cli_command_nvs(char *write_buffer, size_t write_buffer_size, 
     if (key_str) {
         strncpy(key, key_str, key_len);
     }
+    key[key_len] = '\0';
 
-    if (action_len == 3 && strncmp(action, "get", action_len) == 0) {
+    if (action_len == 4 && strncmp(action, "gets", action_len) == 0) {
         if (key_str == NULL) {
-            strcpy(write_buffer, "Error: usage is '<action> [<key>]'");
+            strcpy(write_buffer, "Error: usage is 'gets <key>'");
             return pdFALSE;
         }
 
         // Most of the max val lengths are 64 bytes
-        char   val[64];
-        size_t size    = 0;
+        char   val[256];
+        size_t size    = 256;
         bool   success = nvs_get_string(key, val, &size, "");
-        MEMFAULT_ASSERT(size > 0 && size < 64);
         if (success) {
             sprintf(write_buffer, "%s: %s", key, val);
         } else {
             strcpy(write_buffer, "Failed to get value from NVS");
         }
-    } else if (action_len == 3 && strncmp(action, "set", action_len) == 0) {
+    } else if (action_len == 4 && strncmp(action, "sets", action_len) == 0) {
         BaseType_t  val_len;
         const char *val_str = FreeRTOS_CLIGetParameter(cmd_str, 3, &val_len);
         if (val_str == NULL) {
-            strcpy(write_buffer, "Error: usage is 'set <key> <value>' (only string values currently supported)");
+            strcpy(write_buffer, "Error: usage is 'sets <key> <str value>'");
             return pdFALSE;
         }
 
         bool success = nvs_set_string(key, (char *)val_str);
         if (success) {
             sprintf(write_buffer, "SET %s: %s", key, val_str);
+        } else {
+            strcpy(write_buffer, "Failed to write value to NVS");
+        }
+    } else if (action_len == 6 && strncmp(action, "getu32", action_len) == 0) {
+        if (key_str == NULL) {
+            strcpy(write_buffer, "Error: usage is 'getu32 <key>'");
+            return pdFALSE;
+        }
+
+        // Most of the max val lengths are 64 bytes
+        uint32_t val;
+        bool     success = nvs_get_uint32(key, &val);
+        if (success) {
+            sprintf(write_buffer, "%s: %lu", key, val);
+        } else {
+            strcpy(write_buffer, "Failed to get value from NVS");
+        }
+    } else if (action_len == 6 && strncmp(action, "setu32", action_len) == 0) {
+        BaseType_t  val_len;
+        const char *val_str = FreeRTOS_CLIGetParameter(cmd_str, 3, &val_len);
+        if (val_str == NULL) {
+            strcpy(write_buffer, "Error: usage is 'setu32 <key> <u32 value>'");
+            return pdFALSE;
+        }
+
+        uint32_t val     = atoi(val_str);
+        bool     success = nvs_set_uint32(key, val);
+        if (success) {
+            sprintf(write_buffer, "SET %s: %lu", key, val);
         } else {
             strcpy(write_buffer, "Failed to write value to NVS");
         }
@@ -877,7 +906,8 @@ void cli_command_register_all() {
         .pcCommand = "api",
         .pcHelpString =
             "api:\n\timg <tide|swell>: download and save image to flash\n\t<endpoint>: send request "
-            "to API endpoint with base URL set in menuconfig\n\tdebug: perform debugging actions\n\tfailures: print "
+            "to API endpoint with base URL set in menuconfig\n\tdebug: perform debugging actions\n\tfailures: "
+            "print "
             "failure count for get/post reqs",
         .pxCommandInterpreter        = cli_command_api,
         .cExpectedNumberOfParameters = -1,
@@ -904,7 +934,8 @@ void cli_command_register_all() {
     static const CLI_Command_Definition_t nvs_cmd = {
         .pcCommand = "nvs",
         .pcHelpString =
-            "nvs:\n\tget <key>: get the string value stored for the key\n\tset <key> <str>: set a string value in NVS "
+            "nvs:\n\tget <key>: get the string value stored for the key\n\tset <key> <str>: set a string value in "
+            "NVS "
             "for a given key\n\tconfig: print the current config",
         .pxCommandInterpreter        = cli_command_nvs,
         .cExpectedNumberOfParameters = -1,
@@ -939,7 +970,8 @@ void cli_command_register_all() {
     static const CLI_Command_Definition_t sleep_cmd = {
         .pcCommand = "sleep",
         .pcHelpString =
-            "sleep:\n\tbusy: Set test CLI bit to busy in sleep handler idle event group\n\tidle: Set test CLI bit to "
+            "sleep:\n\tbusy: Set test CLI bit to busy in sleep handler idle event group\n\tidle: Set test CLI bit "
+            "to "
             "idle in sleep handler idle event group",
         .pxCommandInterpreter        = cli_command_sleep,
         .cExpectedNumberOfParameters = 1,
@@ -955,7 +987,8 @@ void cli_command_register_all() {
     static const CLI_Command_Definition_t memfault_cmd = {
         .pcCommand = "mflt",
         .pcHelpString =
-            "mflt:\n\tassert: force a memfault crash and dump collection\n\theartbeat: mark heartbeat as dirty to send "
+            "mflt:\n\tassert: force a memfault crash and dump collection\n\theartbeat: mark heartbeat as dirty to "
+            "send "
             "before elapsed duration\n\tupload: upload all available memfault data currently stored",
         .pxCommandInterpreter        = cli_command_memfault,
         .cExpectedNumberOfParameters = -1,
