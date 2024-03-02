@@ -18,8 +18,8 @@
 #define TAG SC_TAG_SCREEN_IMG_HANDLER
 
 #define WEATHER_CHART_X_COORD (50)
-#define WEATHER_CHART_1_Y_COORD_PX (200)
-#define WEATHER_CHART_2_Y_COORD_PX (400)
+#define WEATHER_CHART_1_Y_COORD_PX (190)  // make sure this doesn't run into the lowest conditions render line
+#define WEATHER_CHART_2_Y_COORD_PX (400)  // keep this at 400 to separate top axis title and bottom main title by 10px
 
 typedef struct {
     screen_img_t screen_img;

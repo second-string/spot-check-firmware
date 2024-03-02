@@ -121,15 +121,13 @@ void sntp_set_time(uint32_t epoch_secs) {
 }
 
 void sntp_set_tz_str(char *new_tz_str) {
-    // EST +5 from GMT - DST starts 3rd month, second (2) sunday (0) at 2am (/2) - DST ends 11th month first (1) sunday
+    // EST +5 from GMT - "EST5EDT,M3.2.0,M11.1.0"
+    // DST starts 3rd month, second (2) sunday (0) at 2am (/2) - DST ends 11th month first (1) sunday
     // (0) at 2am (/2)
-    //  "CET-1CEST,M3.5.0/2,M10.5.0/2" : CEST +2 from GMT - DST starts 3rd month, last (5) sunday (0) at 2am (/2) - DST
-    //  ends 10th month last (5) sunday (0) at 2am (/2)
-    // https://www.gnu.org/software/libc/manual/html_node/TZ-Variable.html
     //
-    // TODO :: 1. I don't know if 4 works for 'last' day of the month if there can ever be 5 of a day in a month (don't
-    // think so) and 2. I don't know if sunday is still 0 for places like DE where the week starts on Monday (so it
-    // would maybe be 7 instead of 0)
+    // CEST +2 from GMT - "CET-1CEST,M3.5.0,M10.5.0/3"
+    //  DST starts 3rd month, last (5) sunday (0) at 2am (/2) - DST ends 10th month last (5) sunday (0) at 2am (/2)
+    // https://www.gnu.org/software/libc/manual/html_node/TZ-Variable.html
     setenv("TZ", new_tz_str, 1);
     tzset();
 }
