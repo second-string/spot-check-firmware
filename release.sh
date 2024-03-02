@@ -20,6 +20,11 @@ echo
 echo Building new binary of "$TAG" to ensure correct version released to server
 echo
 
+if ! command -v idf.py &> /dev/null; then
+    echo "idf.py not found on path, make sure esp-idf environment set up. Aborting"
+    exit 1
+fi
+
 idf.py clean
 idf.py build
 
