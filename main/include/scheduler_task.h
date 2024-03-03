@@ -10,19 +10,20 @@ typedef enum {
     SCHEDULER_MODE_OTA,
 } scheduler_mode_t;
 
-void             scheduler_trigger_network_check();
-void             scheduler_trigger_time_update();
-void             scheduler_trigger_date_update();
-void             scheduler_trigger_spot_name_update();
-void             scheduler_trigger_conditions_update();
-void             scheduler_trigger_tide_chart_update();
-void             scheduler_trigger_swell_chart_update();
-void             scheduler_trigger_wind_chart_update();
-void             scheduler_trigger_both_charts_update();
-void             scheduler_trigger_ota_check();
-void             scheduler_trigger_mflt_upload();
-void             scheduler_trigger_screen_dirty();
-void             scheduler_trigger_custom_screen_update();
+void             scheduler_trigger();
+void             scheduler_schedule_network_check();
+void             scheduler_schedule_time_update();
+void             scheduler_schedule_date_update();
+void             scheduler_schedule_spot_name_update();
+void             scheduler_schedule_conditions_update();
+void             scheduler_schedule_tide_chart_update();
+void             scheduler_schedule_swell_chart_update();
+void             scheduler_schedule_wind_chart_update();
+void             scheduler_schedule_both_charts_update();
+void             scheduler_schedule_ota_check();
+void             scheduler_schedule_mflt_upload();
+void             scheduler_schedule_screen_dirty();
+void             scheduler_schedule_custom_screen_update();
 void             scheduler_block_until_system_idle();
 void             scheduler_set_busy(uint32_t system_idle_bitmask);
 void             scheduler_set_idle(uint32_t system_idle_bitmask);

@@ -68,9 +68,11 @@ static void special_case_boot_delayed_callback() {
     // Reset memfault back to full uploads for the rest of runtime
     memfault_packetizer_set_active_sources(kMfltDataSourceMask_All);
 
-    scheduler_trigger_mflt_upload();
+    scheduler_schedule_mflt_upload();
+    scheduler_trigger();
     vTaskDelay(pdMS_TO_TICKS(2000));
-    scheduler_trigger_ota_check();
+    scheduler_schedule_ota_check();
+    scheduler_trigger();
     log_printf(LOG_LEVEL_DEBUG, "Exiting special case boot delay callback");
 }
 

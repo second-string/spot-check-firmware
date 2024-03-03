@@ -104,8 +104,6 @@ static void screen_img_handler_get_metadata(screen_img_t screen_img, screen_img_
 }
 static void screen_img_handler_log_metadata(screen_img_metadata_t *metadata) {
     log_printf(LOG_LEVEL_DEBUG, "SCREEN IMG HANDLER METADATA:");
-    // log_printf(LOG_LEVEL_DEBUG, "  x_coord: %u", metadata->x_coord);
-    // log_printf(LOG_LEVEL_DEBUG, "  y_coord: %u", metadata->y_coord);
     log_printf(LOG_LEVEL_DEBUG, "  %s: %lu", metadata->screen_img_size_key, metadata->screen_img_size);
     log_printf(LOG_LEVEL_DEBUG, "  %s: %lu", metadata->screen_img_width_key, metadata->screen_img_width);
     log_printf(LOG_LEVEL_DEBUG, "  %s: %lu", metadata->screen_img_height_key, metadata->screen_img_height);

@@ -106,6 +106,7 @@ static TaskHandle_t          scheduler_task_handle;
 static scheduler_mode_t      scheduler_mode;
 static volatile unsigned int seconds_elapsed;
 static conditions_t          last_retrieved_conditions;
+static uint32_t              scheduled_bits;
 
 // Execute function cannot be blocking! Will execute from 1 sec timer interrupt callback
 static differential_update_t differential_updates[NUM_DIFFERENTIAL_UPDATES] = {
@@ -117,7 +118,7 @@ static differential_update_t differential_updates[NUM_DIFFERENTIAL_UPDATES] = {
             .update_interval_secs          = OTA_CHECK_INTERVAL_SECONDS,
             .active                        = false,
             .active_operating_mode         = 0xFF,
-            .execute                       = scheduler_trigger_ota_check,
+            .execute                       = scheduler_schedule_ota_check,
         },
     [DIFFERENTIAL_UPDATE_INDEX_NETWORK_CHECK] =
         {
@@ -127,7 +128,7 @@ static differential_update_t differential_updates[NUM_DIFFERENTIAL_UPDATES] = {
             .update_interval_secs          = NETWORK_CHECK_INTERVAL_SECONDS,
             .active                        = false,
             .active_operating_mode         = 0xFF,
-            .execute                       = scheduler_trigger_network_check,
+            .execute                       = scheduler_schedule_network_check,
         },
     [DIFFERENTIAL_UPDATE_INDEX_MFLT_UPLOAD] =
         {
@@ -141,7 +142,7 @@ static differential_update_t differential_updates[NUM_DIFFERENTIAL_UPDATES] = {
             .update_interval_secs  = MFLT_UPLOAD_INTERVAL_SECONDS,
             .active                = false,
             .active_operating_mode = 0xFF,
-            .execute               = scheduler_trigger_mflt_upload,
+            .execute               = scheduler_schedule_mflt_upload,
         },
     [DIFFERENTIAL_UPDATE_INDEX_DIRTY_SCREEN] =
         {
@@ -151,7 +152,7 @@ static differential_update_t differential_updates[NUM_DIFFERENTIAL_UPDATES] = {
             .update_interval_secs          = SCREEN_DIRTY_INTERVAL_SECONDS,
             .active                        = false,
             .active_operating_mode         = SPOT_CHECK_MODE_WEATHER,
-            .execute                       = scheduler_trigger_screen_dirty,
+            .execute                       = scheduler_schedule_screen_dirty,
         },
     [DIFFERENTIAL_UPDATE_INDEX_CUSTOM_SCREEN_UPDATE] =
         {
@@ -162,7 +163,7 @@ static differential_update_t differential_updates[NUM_DIFFERENTIAL_UPDATES] = {
             .update_interval_secs  = 0,  // set from config value in scheduler start fun
             .active                = false,
             .active_operating_mode = SPOT_CHECK_MODE_CUSTOM,
-            .execute               = scheduler_trigger_custom_screen_update,
+            .execute               = scheduler_schedule_custom_screen_update,
         },
 };
 
@@ -178,7 +179,7 @@ static discrete_update_t discrete_updates[NUM_DISCRETE_UPDATES] = {
             .last_executed                 = {0},
             .active                        = false,
             .active_operating_mode         = SPOT_CHECK_MODE_WEATHER,
-            .execute                       = scheduler_trigger_time_update,
+            .execute                       = scheduler_schedule_time_update,
         },
     [DISCRETE_UPDATE_INDEX_DATE] =
         {
@@ -190,7 +191,7 @@ static discrete_update_t discrete_updates[NUM_DISCRETE_UPDATES] = {
             .last_executed                 = {0},
             .active                        = false,
             .active_operating_mode         = SPOT_CHECK_MODE_WEATHER,
-            .execute                       = scheduler_trigger_date_update,
+            .execute                       = scheduler_schedule_date_update,
         },
     [DISCRETE_UPDATE_INDEX_CONDITIONS] =
         {
@@ -202,7 +203,7 @@ static discrete_update_t discrete_updates[NUM_DISCRETE_UPDATES] = {
             .last_executed                 = {0},
             .active                        = false,
             .active_operating_mode         = SPOT_CHECK_MODE_WEATHER,
-            .execute                       = scheduler_trigger_conditions_update,
+            .execute                       = scheduler_schedule_conditions_update,
         },
     [DISCRETE_UPDATE_INDEX_TIDE_CHART] =
         {
@@ -214,7 +215,7 @@ static discrete_update_t discrete_updates[NUM_DISCRETE_UPDATES] = {
             .last_executed                 = {0},
             .active                        = false,
             .active_operating_mode         = SPOT_CHECK_MODE_WEATHER,
-            .execute                       = scheduler_trigger_tide_chart_update,
+            .execute                       = scheduler_schedule_tide_chart_update,
         },
     [DISCRETE_UPDATE_INDEX_SWELL_CHART_MORNING] =
         {
@@ -226,7 +227,7 @@ static discrete_update_t discrete_updates[NUM_DISCRETE_UPDATES] = {
             .last_executed                 = {0},
             .active                        = false,
             .active_operating_mode         = SPOT_CHECK_MODE_WEATHER,
-            .execute                       = scheduler_trigger_swell_chart_update,
+            .execute                       = scheduler_schedule_swell_chart_update,
         },
     [DISCRETE_UPDATE_INDEX_SWELL_CHART_MIDDAY] =
         {
@@ -238,7 +239,7 @@ static discrete_update_t discrete_updates[NUM_DISCRETE_UPDATES] = {
             .last_executed                 = {0},
             .active                        = false,
             .active_operating_mode         = SPOT_CHECK_MODE_WEATHER,
-            .execute                       = scheduler_trigger_swell_chart_update,
+            .execute                       = scheduler_schedule_swell_chart_update,
         },
     [DISCRETE_UPDATE_INDEX_SWELL_CHART_EVENING] =
         {
@@ -250,7 +251,7 @@ static discrete_update_t discrete_updates[NUM_DISCRETE_UPDATES] = {
             .last_executed                 = {0},
             .active                        = false,
             .active_operating_mode         = SPOT_CHECK_MODE_WEATHER,
-            .execute                       = scheduler_trigger_swell_chart_update,
+            .execute                       = scheduler_schedule_swell_chart_update,
         },
     [DISCRETE_UPDATE_INDEX_SPOT_NAME] =
         {
@@ -263,7 +264,7 @@ static discrete_update_t discrete_updates[NUM_DISCRETE_UPDATES] = {
             .last_executed                 = {0},
             .active                        = false,
             .active_operating_mode         = SPOT_CHECK_MODE_WEATHER,
-            .execute                       = scheduler_trigger_spot_name_update,
+            .execute                       = scheduler_schedule_spot_name_update,
         },
     [DISCRETE_UPDATE_INDEX_WIND_CHART] =
         {
@@ -275,7 +276,7 @@ static discrete_update_t discrete_updates[NUM_DISCRETE_UPDATES] = {
             .last_executed                 = {0},
             .active                        = false,
             .active_operating_mode         = SPOT_CHECK_MODE_WEATHER,
-            .execute                       = scheduler_trigger_wind_chart_update,
+            .execute                       = scheduler_schedule_wind_chart_update,
         },
 
     // NOTE :: MAKE SURE update_struct_is_chart IS UPDATED IF ANY NEW UPDATE STRUCTS FOR CHARTS ARE ADDED
@@ -413,6 +414,10 @@ static void scheduler_polling_timer_callback(void *timer_args) {
             discrete_check->force_next_update = false;
         }
     }
+
+    // After all structs have scheduled their update bits, kick scheduler. This prevents the race condition of freertos
+    // context switching to the scheduler task before the timer task is done scheduling everything
+    scheduler_trigger();
 }
 
 static void scheduler_task(void *args) {
@@ -654,39 +659,72 @@ static void scheduler_task(void *args) {
     }
 }
 
-void scheduler_trigger_network_check() {
-    xTaskNotify(scheduler_task_handle, CHECK_NETWORK_BIT, eSetBits);
+/*
+ * Trigger the task notification for all bits that have accumulated from calls to scheduler_schedule_* functions.
+ * Grouping them and triggering one time prevents non-deterministic race conditions with the FreeRTOS scheduler as more
+ * and more bits are set. This was causing inconsistent screen renders on boot where there's a bunch of stuff scheduled
+ * at once
+ */
+void scheduler_trigger() {
+    // Don't trigger if nothing's set, this would result in triggering full task every second at end of update struct
+    // timer func
+    if (scheduled_bits == 0x0) {
+        return;
+    }
+
+    uint32_t saved_scheduled_bits = scheduled_bits;
+
+    // TODO :: this should be wrapped in a lock to avoid the race condition of calling notify, another task setting a
+    // bit, and then the scheduler task taking over and not having that set bit in it's bits. Then we'd erase
+    // scheduled_bits below and it would be lost
+    xTaskNotify(scheduler_task_handle, scheduled_bits, eSetBits);
+    scheduled_bits = 0x0;
+
+    // After important work is done, trying to minimize time between notify call and setting bits = 0
+    log_printf(LOG_LEVEL_DEBUG, "Triggered scheduler task with bits 0x%08X", saved_scheduled_bits);
 }
 
-void scheduler_trigger_time_update() {
-    xTaskNotify(scheduler_task_handle, UPDATE_TIME_BIT, eSetBits);
+void scheduler_schedule_network_check() {
+    log_printf(LOG_LEVEL_DEBUG, "Scheduling bit 0x%08X (network check)", CHECK_NETWORK_BIT);
+    scheduled_bits |= CHECK_NETWORK_BIT;
 }
 
-void scheduler_trigger_date_update() {
-    xTaskNotify(scheduler_task_handle, UPDATE_DATE_BIT, eSetBits);
+void scheduler_schedule_time_update() {
+    log_printf(LOG_LEVEL_DEBUG, "Scheduling bit 0x%08X (time)", UPDATE_TIME_BIT);
+    scheduled_bits |= UPDATE_TIME_BIT;
 }
 
-void scheduler_trigger_spot_name_update() {
-    xTaskNotify(scheduler_task_handle, UPDATE_SPOT_NAME_BIT, eSetBits);
+void scheduler_schedule_date_update() {
+    log_printf(LOG_LEVEL_DEBUG, "Scheduling bit 0x%08X (date)", UPDATE_DATE_BIT);
+    scheduled_bits |= UPDATE_DATE_BIT;
 }
 
-void scheduler_trigger_conditions_update() {
-    xTaskNotify(scheduler_task_handle, UPDATE_CONDITIONS_BIT, eSetBits);
+void scheduler_schedule_spot_name_update() {
+    log_printf(LOG_LEVEL_DEBUG, "Scheduling bit 0x%08X (spot name)", UPDATE_SPOT_NAME_BIT);
+    scheduled_bits |= UPDATE_SPOT_NAME_BIT;
 }
 
-void scheduler_trigger_tide_chart_update() {
-    xTaskNotify(scheduler_task_handle, UPDATE_TIDE_CHART_BIT, eSetBits);
+void scheduler_schedule_conditions_update() {
+    log_printf(LOG_LEVEL_DEBUG, "Scheduling bit 0x%08X (conditions)", UPDATE_CONDITIONS_BIT);
+    scheduled_bits |= UPDATE_CONDITIONS_BIT;
 }
 
-void scheduler_trigger_swell_chart_update() {
-    xTaskNotify(scheduler_task_handle, UPDATE_SWELL_CHART_BIT, eSetBits);
+void scheduler_schedule_tide_chart_update() {
+    log_printf(LOG_LEVEL_DEBUG, "Scheduling bit 0x%08X (tide chart)", UPDATE_TIDE_CHART_BIT);
+    scheduled_bits |= UPDATE_TIDE_CHART_BIT;
 }
 
-void scheduler_trigger_wind_chart_update() {
-    xTaskNotify(scheduler_task_handle, UPDATE_WIND_CHART_BIT, eSetBits);
+void scheduler_schedule_swell_chart_update() {
+    log_printf(LOG_LEVEL_DEBUG, "Scheduling bit 0x%08X (swell chart)", UPDATE_SWELL_CHART_BIT);
+    scheduled_bits |= UPDATE_SWELL_CHART_BIT;
 }
 
-void scheduler_trigger_both_charts_update() {
+void scheduler_schedule_wind_chart_update() {
+    log_printf(LOG_LEVEL_DEBUG, "Scheduling bit 0x%08X (wind chart)", UPDATE_WIND_CHART_BIT);
+    scheduled_bits |= UPDATE_WIND_CHART_BIT;
+}
+
+void scheduler_schedule_both_charts_update() {
     uint32_t             chart_bits = 0x0;
     spot_check_config_t *config     = nvs_get_config();
 
@@ -702,23 +740,28 @@ void scheduler_trigger_both_charts_update() {
         chart_bits |= UPDATE_WIND_CHART_BIT;
     }
 
-    xTaskNotify(scheduler_task_handle, chart_bits, eSetBits);
+    log_printf(LOG_LEVEL_DEBUG, "Scheduling bits 0x%08X (chart 1 and 2)", chart_bits);
+    scheduled_bits |= chart_bits;
 }
 
-void scheduler_trigger_ota_check() {
-    xTaskNotify(scheduler_task_handle, CHECK_OTA_BIT, eSetBits);
+void scheduler_schedule_ota_check() {
+    log_printf(LOG_LEVEL_DEBUG, "Scheduling bit 0x%08X (ota)", CHECK_OTA_BIT);
+    scheduled_bits |= CHECK_OTA_BIT;
 }
 
-void scheduler_trigger_mflt_upload() {
-    xTaskNotify(scheduler_task_handle, SEND_MFLT_DATA_BIT, eSetBits);
+void scheduler_schedule_mflt_upload() {
+    log_printf(LOG_LEVEL_DEBUG, "Scheduling bit 0x%08X (memfault)", SEND_MFLT_DATA_BIT);
+    scheduled_bits |= SEND_MFLT_DATA_BIT;
 }
 
-void scheduler_trigger_screen_dirty() {
-    xTaskNotify(scheduler_task_handle, MARK_SCREEN_DIRTY_BIT, eSetBits);
+void scheduler_schedule_screen_dirty() {
+    log_printf(LOG_LEVEL_DEBUG, "Scheduling bit 0x%08X (mark screen dirty)", MARK_SCREEN_DIRTY_BIT);
+    scheduled_bits |= MARK_SCREEN_DIRTY_BIT;
 }
 
-void scheduler_trigger_custom_screen_update() {
-    xTaskNotify(scheduler_task_handle, CUSTOM_SCREEN_UPDATE_BIT, eSetBits);
+void scheduler_schedule_custom_screen_update() {
+    log_printf(LOG_LEVEL_DEBUG, "Scheduling bit 0x%08X (custom screen update)", CUSTOM_SCREEN_UPDATE_BIT);
+    scheduled_bits |= CUSTOM_SCREEN_UPDATE_BIT;
 }
 
 scheduler_mode_t scheduler_get_mode() {
@@ -891,6 +934,7 @@ UBaseType_t scheduler_task_get_stack_high_water() {
 
 void scheduler_task_init() {
     scheduler_mode = SCHEDULER_MODE_INIT;
+    scheduled_bits = 0x0;
 }
 
 void scheduler_task_start() {

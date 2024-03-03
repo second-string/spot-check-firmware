@@ -280,9 +280,11 @@ static BaseType_t cli_command_api(char *write_buffer, size_t write_buffer_size, 
         }
 
         if (screen_img_str_len == 4 && strcmp(screen_img_str, "tide") == 0) {
-            scheduler_trigger_tide_chart_update();
+            scheduler_schedule_tide_chart_update();
         } else if (screen_img_str_len == 5 && strcmp(screen_img_str, "swell") == 0) {
-            scheduler_trigger_swell_chart_update();
+            scheduler_schedule_swell_chart_update();
+        } else if (screen_img_str_len == 6 && strcmp(screen_img_str, "custom") == 0) {
+            scheduler_schedule_custom_screen_update();
         } else {
             char msg[80];
             sprintf(msg, "Found no matching screen_img_t enum value for img '%s'", screen_img_str);
@@ -292,7 +294,7 @@ static BaseType_t cli_command_api(char *write_buffer, size_t write_buffer_size, 
     } else if (endpoint_len == 3 && strncmp(endpoint, "ota", endpoint_len) == 0) {
         ota_task_start();
     } else if (endpoint_len == 6 && strncmp(endpoint, "health", endpoint_len) == 0) {
-        scheduler_trigger_network_check();
+        scheduler_schedule_network_check();
     } else if (endpoint_len == 8 && strncmp(endpoint, "failures", endpoint_len) == 0) {
         uint16_t get_failures  = 0;
         uint16_t post_failures = 0;
@@ -301,6 +303,8 @@ static BaseType_t cli_command_api(char *write_buffer, size_t write_buffer_size, 
     } else {
         strcpy(write_buffer, "Unsupported api endpoint");
     }
+
+    scheduler_trigger();
 
     return pdFALSE;
 }
@@ -574,25 +578,29 @@ static BaseType_t cli_command_scheduler(char *write_buffer, size_t write_buffer_
 
     memset(write_buffer, 0x0, write_buffer_size);
     if (type_len == 4 && strncmp(type, "time", type_len) == 0) {
-        scheduler_trigger_time_update();
+        scheduler_schedule_time_update();
         strcpy(write_buffer, "Triggered time update");
     } else if (type_len == 4 && strncmp(type, "date", type_len) == 0) {
-        scheduler_trigger_date_update();
+        scheduler_schedule_date_update();
     } else if (type_len == 10 && strncmp(type, "conditions", type_len) == 0) {
-        scheduler_trigger_conditions_update();
+        scheduler_schedule_conditions_update();
         strcpy(write_buffer, "Triggered conditions update");
     } else if (type_len == 4 && strncmp(type, "tide", type_len) == 0) {
-        scheduler_trigger_tide_chart_update();
+        scheduler_schedule_tide_chart_update();
         strcpy(write_buffer, "Triggered tide chart update");
     } else if (type_len == 5 && strncmp(type, "swell", type_len) == 0) {
-        scheduler_trigger_swell_chart_update();
+        scheduler_schedule_swell_chart_update();
         strcpy(write_buffer, "Triggered swell chart update");
     } else if (type_len == 4 && strncmp(type, "both", type_len) == 0) {
-        scheduler_trigger_both_charts_update();
+        scheduler_schedule_both_charts_update();
         strcpy(write_buffer, "Triggered both charts update");
+    } else if (type_len == 6 && strncmp(type, "custom", type_len) == 0) {
+        scheduler_schedule_custom_screen_update();
     } else {
         strcpy(write_buffer, "Invalid scheduler update type, must be 'time|conditions|tide|swell|both'");
     }
+
+    scheduler_trigger();
 
     return pdFALSE;
 }
@@ -758,7 +766,8 @@ BaseType_t cli_command_memfault(char *write_buffer, size_t write_buffer_size, co
         strcpy(write_buffer,
                "Marked heartbeat timer as elapsed so next trigger (timer or manual) will upload a heartbeat");
     } else if (action_len == 6 && strncmp(action, "upload", action_len) == 0) {
-        scheduler_trigger_mflt_upload();
+        scheduler_schedule_mflt_upload();
+        scheduler_trigger();
         strcpy(write_buffer, "Triggered memfault upload in scheduler");
     } else {
         strcpy(write_buffer, "Unknown mflt command");

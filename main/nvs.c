@@ -314,10 +314,11 @@ void nvs_save_config(spot_check_config_t *config) {
     // Kick conditions & both charts update if we have a new spot. The logic in scheduler interprets these three update
     // bits as a full clear, so also include the time trigger so there isn't a minute-long gap of no time
     if (current_config.spot_lat != config->spot_lat || current_config.spot_lon != config->spot_lon) {
-        scheduler_trigger_time_update();
-        scheduler_trigger_spot_name_update();
-        scheduler_trigger_conditions_update();
-        scheduler_trigger_both_charts_update();
+        scheduler_schedule_time_update();
+        scheduler_schedule_spot_name_update();
+        scheduler_schedule_conditions_update();
+        scheduler_schedule_both_charts_update();
+        scheduler_trigger();
     }
 
     MEMFAULT_ASSERT(nvs_set_string("spot_name", config->spot_name));
