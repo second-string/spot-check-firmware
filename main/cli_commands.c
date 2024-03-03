@@ -534,7 +534,7 @@ static BaseType_t cli_command_nvs(char *write_buffer, size_t write_buffer_size, 
 
         // Most of the max val lengths are 64 bytes
         uint32_t val;
-        bool     success = nvs_get_uint32(key, &val);
+        bool     success = nvs_get_uint32(key, &val, 0);
         if (success) {
             sprintf(write_buffer, "%s: %lu", key, val);
         } else {

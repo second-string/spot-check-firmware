@@ -78,13 +78,13 @@ static void screen_img_handler_get_metadata(screen_img_t screen_img, screen_img_
             MEMFAULT_ASSERT(0);
     }
 
-    bool success = nvs_get_uint32(metadata->screen_img_size_key, &metadata->screen_img_size);
+    bool success = nvs_get_uint32(metadata->screen_img_size_key, &metadata->screen_img_size, 0);
     if (!success) {
         log_printf(LOG_LEVEL_WARN, "No screen img size value stored in NVS, setting to zero");
     }
 
     uint32_t temp_dim = 0;
-    success           = nvs_get_uint32(metadata->screen_img_width_key, &temp_dim);
+    success           = nvs_get_uint32(metadata->screen_img_width_key, &temp_dim, metadata->screen_img_width);
     if (!success) {
         log_printf(LOG_LEVEL_WARN,
                    "No screen img width value stored in NVS, keeping default of %u",
@@ -93,7 +93,7 @@ static void screen_img_handler_get_metadata(screen_img_t screen_img, screen_img_
         metadata->screen_img_width = temp_dim;
     }
 
-    success = nvs_get_uint32(metadata->screen_img_height_key, &temp_dim);
+    success = nvs_get_uint32(metadata->screen_img_height_key, &temp_dim, metadata->screen_img_height);
     if (!success) {
         log_printf(LOG_LEVEL_WARN,
                    "No screen img height value stored in NVS, keeping default of %u",

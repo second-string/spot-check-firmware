@@ -26,9 +26,9 @@ typedef struct {
 
 void                 nvs_init();
 void                 nvs_start();
-bool                 nvs_get_uint32(char *key, uint32_t *val);
+bool                 nvs_get_uint32(char *key, uint32_t *val, uint32_t fallback);
 bool                 nvs_set_uint32(char *key, uint32_t val);
-bool                 nvs_get_int8(char *key, int8_t *val);
+bool                 nvs_get_int8(char *key, int8_t *val, int8_t fallback);
 bool                 nvs_set_int8(char *key, int8_t val);
 bool                 nvs_get_string(char *key, char *val, size_t *val_size, char *fallback);
 bool                 nvs_set_string(char *key, char *val);

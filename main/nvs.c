@@ -71,7 +71,7 @@ static spot_check_config_t *nvs_load_config() {
                    "https://spotcheck.brianteam.com/custom_screen_test_image");
 
     uint32_t temp_custom_update_interval_secs = 0;
-    nvs_get_uint32("custom_ui_secs", &temp_custom_update_interval_secs);
+    nvs_get_uint32("custom_ui_secs", &temp_custom_update_interval_secs, 900);
 
     max_bytes_to_write = MAX_LENGTH_ACTIVE_CHART_PARAM;
     char temp_chart_str[10];
@@ -132,7 +132,7 @@ void nvs_start() {
     nvs_load_config();
 }
 
-bool nvs_get_uint32(char *key, uint32_t *val) {
+bool nvs_get_uint32(char *key, uint32_t *val, uint32_t fallback) {
     bool retval = false;
     MEMFAULT_ASSERT(handle);
 
@@ -142,11 +142,19 @@ bool nvs_get_uint32(char *key, uint32_t *val) {
             retval = true;
             break;
         case ESP_ERR_NVS_NOT_FOUND:
-            log_printf(LOG_LEVEL_INFO, "The NVS value for key '%s' is not initialized yet", key);
-            *val = 0;
+            log_printf(LOG_LEVEL_INFO,
+                       "The NVS value for key '%s' is not initialized yet, returning fallback value %lu",
+                       key,
+                       fallback);
+            *val = fallback;
             break;
         default:
-            log_printf(LOG_LEVEL_ERROR, "Error (%s) reading value for key '%s' from NVS", esp_err_to_name(err), key);
+            log_printf(LOG_LEVEL_ERROR,
+                       "Error (%s) reading value for key '%s' from NVS, returning fallback value %lu",
+                       esp_err_to_name(err),
+                       key,
+                       fallback);
+            *val = fallback;
     }
 
     return retval;
@@ -170,7 +178,7 @@ bool nvs_set_uint8(char *key, int8_t val) {
     return retval;
 }
 
-bool nvs_get_int8(char *key, int8_t *val) {
+bool nvs_get_int8(char *key, int8_t *val, int8_t fallback) {
     bool retval = false;
     MEMFAULT_ASSERT(handle);
 
@@ -180,11 +188,19 @@ bool nvs_get_int8(char *key, int8_t *val) {
             retval = true;
             break;
         case ESP_ERR_NVS_NOT_FOUND:
-            log_printf(LOG_LEVEL_INFO, "The NVS value for key '%s' is not initialized yet", key);
-            *val = 0;
+            log_printf(LOG_LEVEL_INFO,
+                       "The NVS value for key '%s' is not initialized yet, returning fallback value %d",
+                       key,
+                       fallback);
+            *val = fallback;
             break;
         default:
-            log_printf(LOG_LEVEL_ERROR, "Error (%s) reading value for key '%s' from NVS", esp_err_to_name(err), key);
+            log_printf(LOG_LEVEL_ERROR,
+                       "Error (%s) reading value for key '%s' from NVS, returning fallback value %d",
+                       esp_err_to_name(err),
+                       key,
+                       fallback);
+            *val = fallback;
     }
 
     return retval;
