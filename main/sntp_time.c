@@ -25,9 +25,13 @@ static void sntp_time_sync_notification_cb(struct timeval *tv) {
 
 void sntp_time_init() {
     sntp_setoperatingmode(SNTP_SYNC_MODE_IMMED);
-    // TODO :: look into dhcp as primary server if we can update time from router w/o internet connection
-    // https://github.com/espressif/esp-idf/blob/c2ccc383dae2a47c2c2dc8c7ad78175a3fd11361/examples/protocols/sntp/main/sntp_example_main.c#L139
-    sntp_setservername(0, "pool.ntp.org");
+
+    // If this is set as index 0, SNTP will fail to validate a server on its first try, then wait a full 15sec before
+    // trying again and properly resolving with this server. Somehow setting it as server 1 makes it the first server
+    // that SNTP uses, and so it immediately succeeds on its first try. No idea why, lwIP SNTP source code just uses arg
+    // as an index into an array so 0 should be fine, but don't change this.
+    sntp_setservername(1, "pool.ntp.org");
+    sntp_setservername(2, "time.nist.gov");
     sntp_set_time_sync_notification_cb(sntp_time_sync_notification_cb);
     sntp_setoperatingmode(SNTP_OPMODE_POLL);
 }
